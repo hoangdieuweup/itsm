@@ -1,7 +1,7 @@
 """Events published by the auth module."""
 
-from app.auth.constants import AuthEvents
-from app.events import DomainEvent
+from app.core.events import DomainEvent
+from app.modules.auth.constants import AuthEvents
 
 
 class UserCreated(DomainEvent):

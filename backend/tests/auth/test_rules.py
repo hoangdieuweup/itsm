@@ -2,8 +2,8 @@
 
 import pytest
 
-from app.auth.constants import UserRole, UserStatus
-from app.auth.rules import AuthRules
+from app.modules.auth.constants import UserRole, UserStatus
+from app.modules.auth.rules import AuthRules
 
 
 @pytest.mark.parametrize(

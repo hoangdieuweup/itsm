@@ -1,6 +1,6 @@
 """Errors owned by the dx_core integration."""
 
-from app.exceptions import IntegrationError, ValidationFailedError
+from app.core.exceptions import IntegrationError, ValidationFailedError
 from app.integrations.dx_core.constants import DxErrorCode
 
 

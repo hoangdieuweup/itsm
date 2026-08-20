@@ -5,10 +5,10 @@ from abc import abstractmethod
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import Department, User
-from app.auth.schemas import DepartmentRead, UserRead
-from app.markers import database
-from app.repository import AbstractRepository
+from app.core.base.markers import database
+from app.core.base.repository import AbstractRepository
+from app.modules.auth.models import Department, User
+from app.modules.auth.schemas import DepartmentRead, UserRead
 
 
 class AbstractUserRepository(AbstractRepository[UserRead]):

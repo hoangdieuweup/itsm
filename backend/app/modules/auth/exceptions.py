@@ -5,8 +5,8 @@ fact about auth: what counts as missing, what counts as blocked. The
 mechanism they build on lives in app.exceptions.
 """
 
-from app.auth.constants import ErrorCode
-from app.exceptions import ForbiddenError, NotFoundError, ValidationFailedError
+from app.core.exceptions import ForbiddenError, NotFoundError, ValidationFailedError
+from app.modules.auth.constants import ErrorCode
 
 
 class UserNotFound(NotFoundError):

@@ -1,6 +1,6 @@
 """Errors owned by the storage integration."""
 
-from app.exceptions import IntegrationError, NotFoundError
+from app.core.exceptions import IntegrationError, NotFoundError
 from app.integrations.storage.constants import StorageErrorCode
 
 

@@ -9,7 +9,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
-from app.database import Base, get_session
+from app.core.database import Base, get_session
 from app.integrations.cache.client import CacheClient
 from app.integrations.cache.config import cache_settings
 from app.integrations.cache.dependencies import get_cache

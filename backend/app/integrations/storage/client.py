@@ -4,11 +4,11 @@ import logging
 
 import aioboto3
 
+from app.core.base.markers import helper, integration
+from app.core.retry import retry
 from app.integrations.storage.config import storage_settings
 from app.integrations.storage.constants import StorageDefaults
 from app.integrations.storage.exceptions import UploadFailed
-from app.markers import helper, integration
-from app.retry import retry
 
 logger = logging.getLogger(__name__)
 

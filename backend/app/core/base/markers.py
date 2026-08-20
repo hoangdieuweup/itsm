@@ -15,7 +15,9 @@ than one job — split it instead of stacking markers.
 
 import functools
 from collections.abc import Callable
-from typing import Any
+from typing import Any, TypeVar, overload
+
+_F = TypeVar("_F", bound=Callable[..., Any])
 
 
 class _MethodMarker:
@@ -23,7 +25,16 @@ class _MethodMarker:
 
     layer: str
 
-    def __init__(self, func: Callable[..., Any]) -> None:
+    @overload
+    def __new__(cls, func: _F) -> _F: ...  # type: ignore[misc]
+    @overload
+    def __new__(cls, func: Callable[..., Any]) -> "_MethodMarker": ...
+    def __new__(cls, func: Callable[..., Any]) -> Any:
+        instance = super().__new__(cls)
+        instance._init(func)
+        return instance
+
+    def _init(self, func: Callable[..., Any]) -> None:
         functools.update_wrapper(self, func)
         self._func = func
         setattr(func, "__layer__", self.layer)  # noqa: B010 -- dynamic attribute, not a fixed attr of Callable

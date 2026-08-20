@@ -11,10 +11,10 @@ import logging
 import signal
 from collections.abc import Awaitable, Callable
 
+from app.core.logging_config import setup_logging
 from app.integrations.cache.client import RedisConnectionFactory
 from app.integrations.queue.client import Broker
 from app.integrations.queue.idempotency import RedisIdempotencyStore, idempotent
-from app.logging_config import setup_logging
 
 setup_logging()
 logger = logging.getLogger(__name__)

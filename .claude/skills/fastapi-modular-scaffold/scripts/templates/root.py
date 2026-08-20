@@ -59,7 +59,7 @@ def mount_protected_docs(app: FastAPI) -> None:
 
 def main(modules: list[str]) -> str:
     """Render app/main.py: wiring only, never business logic."""
-    imports = "\n".join(f"from app.{m}.router import router as {m}_router" for m in modules)
+    imports = "\n".join(f"from app.modules.{m}.router import router as {m}_router" for m in modules)
     includes = "\n".join(f'app.include_router({m}_router, prefix="/api/v1")' for m in modules)
     return f'''
 """Application entry point. Holds wiring only, never business logic."""
@@ -72,12 +72,12 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.constants import Environment
-from app.docs import DOCS_DISABLED, DOCS_ENABLED, mount_protected_docs
-from app.exceptions import AppError
+from app.core.docs import DOCS_DISABLED, DOCS_ENABLED, mount_protected_docs
+from app.core.exceptions import AppError
 from app.lifespan import lifespan
-from app.logging_config import setup_logging
-from app.middleware import RequestIdMiddleware
-from app.models import ApiResponse, ErrorPayload
+from app.core.logging_config import setup_logging
+from app.core.middleware import RequestIdMiddleware
+from app.core.models import ApiResponse, ErrorPayload
 {imports}
 
 setup_logging()
@@ -406,7 +406,7 @@ from typing import Generic, TypeVar
 from fastapi import Query
 from pydantic import BaseModel
 
-from app.models import CustomModel
+from app.core.models import CustomModel
 
 T = TypeVar("T")
 
@@ -684,7 +684,7 @@ import signal
 from collections.abc import Awaitable, Callable
 
 from app.integrations.queue.client import Broker
-from app.logging_config import setup_logging
+from app.core.logging_config import setup_logging
 {idempotency_import}
 
 setup_logging()
@@ -855,6 +855,13 @@ Fully transparent: __get__ delegates to the wrapped function's own descriptor
 protocol, so a decorated method binds self and awaits exactly as if this
 decorator were never applied — verified for sync, async, and @staticmethod.
 
+The overloaded __new__ makes these markers invisible to the type checker: the
+first overload says "marker(func) returns the same callable type it received",
+so a @integration-decorated method still satisfies a Protocol that declares the
+same method as a plain async def. Without this, the type checker sees a
+_MethodMarker descriptor — a different kind of attribute — and rejects
+structural subtyping with "must both be descriptors".
+
 See references/layer-examples.md for which method in each module gets which
 marker. A method carrying more than one marker is a sign it is doing more
 than one job — split it instead of stacking markers.
@@ -862,7 +869,9 @@ than one job — split it instead of stacking markers.
 
 import functools
 from collections.abc import Callable
-from typing import Any
+from typing import Any, TypeVar, overload
+
+_F = TypeVar("_F", bound=Callable[..., Any])
 
 
 class _MethodMarker:
@@ -870,7 +879,16 @@ class _MethodMarker:
 
     layer: str
 
-    def __init__(self, func: Callable[..., Any]) -> None:
+    @overload
+    def __new__(cls, func: _F) -> _F: ...  # type: ignore[misc]
+    @overload
+    def __new__(cls, func: Callable[..., Any]) -> "_MethodMarker": ...
+    def __new__(cls, func: Callable[..., Any]) -> Any:
+        instance = super().__new__(cls)
+        instance._init(func)
+        return instance
+
+    def _init(self, func: Callable[..., Any]) -> None:
         functools.update_wrapper(self, func)
         self._func = func
         setattr(func, "__layer__", self.layer)  # noqa: B010 -- dynamic attribute, not a fixed attr of Callable

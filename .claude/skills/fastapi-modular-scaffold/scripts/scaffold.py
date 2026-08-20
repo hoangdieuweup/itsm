@@ -34,23 +34,29 @@ def write(base: Path, rel: str, content: str, executable: bool = False) -> None:
 def build_root(base: Path, name: str, modules: list[str], integrations: list[str]) -> None:
     """Create the application root, which holds mechanism only."""
     write(base, "app/__init__.py", "")
-    write(base, "app/docs.py", root.docs())
     write(base, "app/main.py", root.main(modules))
     write(base, "app/config.py", root.config(name))
     write(base, "app/constants.py", root.constants())
-    write(base, "app/database.py", root.database())
-    write(base, "app/exceptions.py", root.exceptions())
-    write(base, "app/models.py", root.models())
-    write(base, "app/pagination.py", root.pagination())
-    write(base, "app/repository.py", root.repository())
-    write(base, "app/uow.py", root.unit_of_work())
-    write(base, "app/use_case.py", root.use_case())
-    write(base, "app/markers.py", root.markers())
-    write(base, "app/retry.py", root.retry())
-    write(base, "app/events.py", root.events())
-    write(base, "app/middleware.py", root.middleware())
-    write(base, "app/logging_config.py", root.logging_config("tracing" in integrations))
     write(base, "app/lifespan.py", root.lifespan(integrations))
+
+    # core/ — shared mechanism, no business concept
+    write(base, "app/core/__init__.py", "")
+    write(base, "app/core/database.py", root.database())
+    write(base, "app/core/exceptions.py", root.exceptions())
+    write(base, "app/core/models.py", root.models())
+    write(base, "app/core/pagination.py", root.pagination())
+    write(base, "app/core/events.py", root.events())
+    write(base, "app/core/middleware.py", root.middleware())
+    write(base, "app/core/logging_config.py", root.logging_config("tracing" in integrations))
+    write(base, "app/core/docs.py", root.docs())
+    write(base, "app/core/retry.py", root.retry())
+
+    # core/base/ — abstract contracts
+    write(base, "app/core/base/__init__.py", "")
+    write(base, "app/core/base/repository.py", root.repository())
+    write(base, "app/core/base/uow.py", root.unit_of_work())
+    write(base, "app/core/base/use_case.py", root.use_case())
+    write(base, "app/core/base/markers.py", root.markers())
 
     if "queue" in integrations:
         with_cache = "cache" in integrations
@@ -61,7 +67,8 @@ def build_root(base: Path, name: str, modules: list[str], integrations: list[str
 
 def build_domain(base: Path, name: str, with_cache: bool, minimal: bool) -> None:
     """Create one domain module owning everything it needs."""
-    mod = f"app/{name}"
+    write(base, "app/modules/__init__.py", "")
+    mod = f"app/modules/{name}"
     write(base, f"{mod}/__init__.py", "")
     write(base, f"{mod}/constants.py", domain.constants(name))
     write(base, f"{mod}/config.py", domain.config(name))
@@ -148,7 +155,7 @@ def wire_module_into_main(base: Path, name: str) -> None:
     """
     main_path = base / "app/main.py"
     content = main_path.read_text(encoding="utf-8")
-    import_line = f"from app.{name}.router import router as {name}_router"
+    import_line = f"from app.modules.{name}.router import router as {name}_router"
     include_line = f'app.include_router({name}_router, prefix="/api/v1")'
 
     if import_line in content:
@@ -168,7 +175,7 @@ def wire_module_into_main(base: Path, name: str) -> None:
 
 def discover_modules(base: Path) -> list[str]:
     """Find every domain module an existing project already has, by its public.py facade."""
-    return sorted(p.parent.name for p in (base / "app").glob("*/public.py") if p.is_file())
+    return sorted(p.parent.name for p in (base / "app/modules").glob("*/public.py") if p.is_file())
 
 
 def discover_integrations(base: Path) -> list[str]:

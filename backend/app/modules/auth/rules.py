@@ -6,8 +6,8 @@ this class and the SSO sync/session services (out of scope for this issue),
 which call these rules but also do I/O.
 """
 
-from app.auth.constants import LoginPolicy, RoleMapping, UserRole, UserStatus
-from app.markers import rule
+from app.core.base.markers import rule
+from app.modules.auth.constants import LoginPolicy, RoleMapping, UserRole, UserStatus
 
 
 class AuthRules:

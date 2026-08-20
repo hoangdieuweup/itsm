@@ -49,38 +49,43 @@ app/
 ├── lifespan.py          the ONLY place pools are created
 ├── config.py            global settings ONLY (db, env, cors)
 ├── constants.py         global enums ONLY (Environment)
-├── exceptions.py        AppError base classes — no domain errors
-├── models.py            CustomModel / FrozenModel base
-├── database.py          Base, session, naming conventions
-├── pagination.py        Page, PaginationParams
-├── events.py            DomainEvent base, EventBus
-├── middleware.py        RequestIdMiddleware — binds request_id to every log line
-├── logging_config.py    structlog + stdlib bridge, JSON in stg/prod, console in dev
-├── docs.py              docs_url matrix + the staging HTTP Basic auth guard
 ├── worker.py            queue consumer process — only when `queue` is selected, its own container
-├── repository.py        AbstractRepository[T] — root contract, rule #15
-├── uow.py               AbstractUnitOfWork — root contract, rule #15
-├── use_case.py          AbstractUseCase — root contract, rule #15
-├── markers.py           @database/@helper/@rule/@use_case/@facade/@integration — role decorators, rule #16
-├── retry.py             @retry(attempts=..., exceptions=...) — backoff for a transient external-call failure
+│
+├── core/                shared mechanism — no business concept lives here
+│   ├── database.py      Base, session, naming conventions
+│   ├── models.py        CustomModel / FrozenModel base
+│   ├── exceptions.py    AppError base classes — no domain errors
+│   ├── pagination.py    Page, PaginationParams
+│   ├── events.py        DomainEvent base, EventBus
+│   ├── middleware.py    RequestIdMiddleware — binds request_id to every log line
+│   ├── logging_config.py structlog + stdlib bridge, JSON in stg/prod, console in dev
+│   ├── docs.py          docs_url matrix + the staging HTTP Basic auth guard
+│   ├── retry.py         @retry(attempts=..., exceptions=...) — backoff for transient failures
+│   └── base/            abstract contracts — rule #15
+│       ├── repository.py AbstractRepository[T] — root contract
+│       ├── uow.py        AbstractUnitOfWork — root contract
+│       ├── use_case.py   AbstractUseCase — root contract
+│       └── markers.py    @database/@helper/@rule/@use_case/@facade/@integration — rule #16
 │
 ├── seeds/                idempotent one-off scripts, run via `python -m app.seeds.<name>`
 │
-├── identity/            a domain module owns all of this
-│   ├── constants.py     its enums, its error codes, its limits — grouped into classes, rule #16
-│   ├── config.py        its settings (IDENTITY_ prefix)
-│   ├── exceptions.py    UserNotFound, EmailTaken — concrete errors
-│   ├── schemas.py       Pydantic — field_validator/field_serializer live here, rule #15/#16
-│   ├── models.py        ORM — only this module queries these tables
-│   ├── rules.py         pure decisions, no I/O — one class, @rule
-│   ├── utils/           formatting and normalization, no decisions — one class per concern, @helper
-│   ├── repository.py    Abstract{X}Repository + the concrete class, @database
-│   ├── uow.py           Abstract{X}UnitOfWork + the concrete class, @database
-│   ├── services/        one file = one use case, each extends AbstractUseCase, @use_case
-│   ├── events.py        events it publishes
-│   ├── dependencies.py  Depends wiring — the composition root, the one place a concrete class is named
-│   ├── router.py        HTTP surface
-│   └── public.py        the ONLY import surface for other modules, @facade
+├── modules/             domain modules — each owns everything it needs
+│   ├── identity/
+│   │   ├── constants.py     its enums, its error codes, its limits — grouped into classes, rule #16
+│   │   ├── config.py        its settings (IDENTITY_ prefix)
+│   │   ├── exceptions.py    UserNotFound, EmailTaken — concrete errors
+│   │   ├── schemas.py       Pydantic — field_validator/field_serializer live here, rule #15/#16
+│   │   ├── models.py        ORM — only this module queries these tables
+│   │   ├── rules.py         pure decisions, no I/O — one class, @rule
+│   │   ├── utils/           formatting and normalization, no decisions — one class per concern, @helper
+│   │   ├── repository.py    Abstract{X}Repository + the concrete class, @database
+│   │   ├── uow.py           Abstract{X}UnitOfWork + the concrete class, @database
+│   │   ├── services/        one file = one use case, each extends AbstractUseCase, @use_case
+│   │   ├── events.py        events it publishes
+│   │   ├── dependencies.py  Depends wiring — the composition root, the one place a concrete class is named
+│   │   ├── router.py        HTTP surface
+│   │   └── public.py        the ONLY import surface for other modules, @facade
+│   └── billing/ ...     same shape, one folder per domain module
 │
 └── integrations/
     ├── cache/           client.py config.py constants.py exceptions.py keys.py
@@ -110,16 +115,18 @@ The recurring question is where a given piece of code belongs. The test is **who
 |---|---|
 | `OrderStatus`, `MAX_SEATS`, error codes | `<module>/constants.py` |
 | `OrderNotFound`, `SeatLimitReached` | `<module>/exceptions.py` |
-| `AppError`, `NotFoundError` base classes | `app/exceptions.py` |
+| `AppError`, `NotFoundError` base classes | `app/core/exceptions.py` |
 | `JWT_SECRET`, `CACHE_TTL` for one module | `<module>/config.py` |
 | `DATABASE_URL`, `CORS_ORIGINS` | `app/config.py` |
 | `can_cancel_order()` — a decision | `<module>/rules.py`, as a `@rule`-decorated class method |
 | `slugify()`, `normalize_email()` — a transform | `<module>/utils/`, as a `@helper`-decorated class method |
-| `Page`, `CustomModel`, session factory | root, as mechanism |
+| `Page`, `CustomModel`, session factory | `app/core/`, as mechanism |
+| `AbstractRepository`, `AbstractUnitOfWork` | `app/core/base/`, as abstract contract |
+| `@database`, `@helper`, `@rule` markers | `app/core/base/markers.py` |
 
 The line between `rules.py` and `utils/` is worth holding: rules encode business decisions and change when the business changes; utils are formatting and shaping and don't. Keeping them apart means rules stay small and heavily tested while utils stay boring. Both live inside a class per rule #16 — see `references/layer-examples.md`.
 
-`app/exceptions.py` naming a domain entity is the earliest visible sign the boundary has leaked. So is any `utils.py` at the root.
+`app/core/exceptions.py` naming a domain entity is the earliest visible sign the boundary has leaked. So is any `utils.py` at the root.
 
 ## Non-negotiable rules
 
@@ -158,9 +165,9 @@ Reading the call site tells you where the constant came from. A bare relative im
 
 **14. No `# noqa`/`# type: ignore` without both a specific code and a stated reason.** `ruff`'s `PGH004`/`PGH003` reject the blanket form (`# noqa` with no code silences everything on the line, not just the one violation it was meant for). That's necessary but not sufficient — a bare `# noqa: F401` still doesn't say *why*. Write `# noqa: F401 -- registers the model on Base.metadata for autogenerate`, the same `-- reason` convention as ESLint. A suppression comment is a decision that needs to survive the person who wrote it leaving the team; if there's no real reason, the fix is the actual problem, not the comment.
 
-**15. `repository.py`, `uow.py` and every `services/*.py` class extend an `Abstract*` contract owned by the root.** `app/repository.py` (`AbstractRepository[T]`), `app/uow.py` (`AbstractUnitOfWork`) and `app/use_case.py` (`AbstractUseCase`) — a module's concrete `{X}Repository`/`{X}UnitOfWork`/use-case classes implement these, and every service depends on the abstraction, never the concrete SQLAlchemy class. Enforced by Python itself: an incomplete implementation raises `TypeError` at instantiation, not a lint warning at review time. `dependencies.py` is the one composition root allowed to name the concrete class. This is what makes a `Fake{X}Repository` unit test possible — see `references/layer-examples.md`.
+**15. `repository.py`, `uow.py` and every `services/*.py` class extend an `Abstract*` contract owned by `core/base/`.** `app/core/base/repository.py` (`AbstractRepository[T]`), `app/core/base/uow.py` (`AbstractUnitOfWork`) and `app/core/base/use_case.py` (`AbstractUseCase`) — a module's concrete `{X}Repository`/`{X}UnitOfWork`/use-case classes implement these, and every service depends on the abstraction, never the concrete SQLAlchemy class. Enforced by Python itself: an incomplete implementation raises `TypeError` at instantiation, not a lint warning at review time. `dependencies.py` is the one composition root allowed to name the concrete class. This is what makes a `Fake{X}Repository` unit test possible — see `references/layer-examples.md`.
 
-**16. No bare constant or bare helper function at module level.** A limit, a cache key, a text formatter — every one still lives in the file that owns it (`constants.py`, `utils/`) and still gets imported from there, but nothing sits outside a class *within* that file: `CatalogLimits.MAX_NAME_LENGTH`, not a loose `MAX_NAME_LENGTH = 255`; `CatalogTextUtils.normalize_name(...)`, not a bare `def normalize_name(...)`. `utils.py` is a package (`utils/__init__.py` + one file per concern), the same way `services/` is one file per use case. This does not reach `router.py`/`dependencies.py`/`lifespan.py` — a FastAPI dependency provider has to stay a plain function `Depends()` calls directly. `app/markers.py`'s `@database`/`@helper`/`@rule`/`@use_case`/`@facade`/`@integration` decorator classes tag each **method** with its role — never the whole class, since a class has main operations and auxiliary ones supporting them (a repository's `get_by_id` vs. its private `_load_by_id`) — visible at the method's definition, not only inferable from the file. `app/retry.py`'s `@retry` and `integrations/queue/idempotency.py`'s `@idempotent` are a different kind of decorator — they change behavior, not just tag it — and stack under a role marker (`@integration` outermost) rather than living in `markers.py`. See `references/layer-examples.md`.
+**16. No bare constant or bare helper function at module level.** A limit, a cache key, a text formatter — every one still lives in the file that owns it (`constants.py`, `utils/`) and still gets imported from there, but nothing sits outside a class *within* that file: `CatalogLimits.MAX_NAME_LENGTH`, not a loose `MAX_NAME_LENGTH = 255`; `CatalogTextUtils.normalize_name(...)`, not a bare `def normalize_name(...)`. `utils.py` is a package (`utils/__init__.py` + one file per concern), the same way `services/` is one file per use case. This does not reach `router.py`/`dependencies.py`/`lifespan.py` — a FastAPI dependency provider has to stay a plain function `Depends()` calls directly. `app/core/base/markers.py`'s `@database`/`@helper`/`@rule`/`@use_case`/`@facade`/`@integration` decorator classes tag each **method** with its role — never the whole class, since a class has main operations and auxiliary ones supporting them (a repository's `get_by_id` vs. its private `_load_by_id`) — visible at the method's definition, not only inferable from the file. `app/core/retry.py`'s `@retry` and `integrations/queue/idempotency.py`'s `@idempotent` are a different kind of decorator — they change behavior, not just tag it — and stack under a role marker (`@integration` outermost) rather than living in `markers.py`. See `references/layer-examples.md`.
 
 ## Deciding how far to go
 

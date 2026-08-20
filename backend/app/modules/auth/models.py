@@ -5,8 +5,8 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.auth.constants import AuthLimits, UserRole, UserStatus
-from app.database import Base
+from app.core.database import Base
+from app.modules.auth.constants import AuthLimits, UserRole, UserStatus
 
 
 class Department(Base):

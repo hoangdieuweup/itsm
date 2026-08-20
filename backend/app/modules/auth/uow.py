@@ -4,14 +4,14 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.repository import (
+from app.core.base.markers import database
+from app.core.base.uow import AbstractUnitOfWork
+from app.modules.auth.repository import (
     AbstractDepartmentRepository,
     AbstractUserRepository,
     DepartmentRepository,
     UserRepository,
 )
-from app.markers import database
-from app.uow import AbstractUnitOfWork
 
 logger = logging.getLogger(__name__)
 

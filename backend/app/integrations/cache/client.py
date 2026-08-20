@@ -9,10 +9,10 @@ from pydantic import BaseModel, ValidationError
 from redis.asyncio import ConnectionPool, Redis
 from redis.exceptions import RedisError
 
+from app.core.base.markers import helper, integration
 from app.integrations.cache.config import cache_settings
 from app.integrations.cache.constants import CacheDefaults
 from app.integrations.cache.keys import CacheKeyBuilder
-from app.markers import helper, integration
 
 logger = logging.getLogger(__name__)
 

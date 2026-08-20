@@ -61,7 +61,7 @@ q.work -> (nack) -> x.retry -> q.retry.30s (TTL 30s) -> x.work -> q.work
 
 Cap attempts (3–5), then route to `q.work.failed` and alert. A queue that retries forever hides a bug and burns capacity.
 
-This is a different retry than `app/retry.py`'s `@retry` decorator (`references/layer-examples.md`): the delay-queue dance above handles a message still failing after every *in-process* attempt is exhausted, across redeliveries and potentially minutes apart; `@retry` handles a single call's transient failure (a dropped connection) within one handler invocation, in milliseconds. Use `@retry` inside a handler for the external calls it makes; let this section's DLX topology be the backstop when the handler gives up entirely.
+This is a different retry than `app/core/retry.py`'s `@retry` decorator (`references/layer-examples.md`): the delay-queue dance above handles a message still failing after every *in-process* attempt is exhausted, across redeliveries and potentially minutes apart; `@retry` handles a single call's transient failure (a dropped connection) within one handler invocation, in milliseconds. Use `@retry` inside a handler for the external calls it makes; let this section's DLX topology be the backstop when the handler gives up entirely.
 
 ## Consumer process
 

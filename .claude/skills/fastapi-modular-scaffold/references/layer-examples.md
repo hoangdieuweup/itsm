@@ -50,13 +50,13 @@ shows up. Keep both.
   class.** A repository has methods that are its actual API (`get_by_id`, `create`) and methods that
   only exist to support one of those (`_load_by_id`, called by `get_by_id`'s cache-aside logic). One
   `@database` on the whole class would say nothing that the file name didn't already say; `@database`
-  on the main operations and `@helper` on the auxiliary one says which is which. `app/markers.py`'s
+  on the main operations and `@helper` on the auxiliary one says which is which. `app/core/base/markers.py`'s
   `database`/`helper`/`rule`/`use_case`/`facade` are decorator *classes* (`__get__`/`__call__`), not
   functions returning closures — verified to bind `self` correctly for sync and async methods and to
   stack correctly under `@staticmethod`. They change nothing at runtime otherwise — no `lint-imports`
   contract reads them (yet) — they're for the human skimming the file or a diff.
 
-## `app/repository.py`, `app/uow.py`, `app/use_case.py` — the root contracts
+## `app/core/base/repository.py`, `app/core/base/uow.py`, `app/core/base/use_case.py` — the root contracts
 
 Root mechanism only, per rule #4: no business concept, just the shape every module's repository,
 unit of work and use case must satisfy.
@@ -140,7 +140,7 @@ class AbstractUseCase(ABC):
         raise NotImplementedError
 ```
 
-`app/markers.py` (the decorators) is generated alongside these — see the "Markers" section below.
+`app/core/base/markers.py` (the decorators) is generated alongside these — see the "Markers" section below.
 
 ## `constants.py` — grouped into classes, no bare values
 
@@ -205,7 +205,7 @@ name: `CatalogLimits.MAX_NAME_LENGTH`, not `MAX_NAME_LENGTH`.
 """Business rules for the catalog module."""
 
 from app.catalog.constants import CatalogLimits, CatalogStatus
-from app.markers import rule
+from app.core.base.markers import rule
 
 
 class CatalogRules:
@@ -258,7 +258,7 @@ __all__ = ["CatalogTextUtils"]
 
 import re
 
-from app.markers import helper
+from app.core.base.markers import helper
 
 _WHITESPACE = re.compile(r"\s+")
 
@@ -303,7 +303,7 @@ from pydantic import field_validator
 from app.catalog.constants import CatalogStatus
 from app.catalog.rules import CatalogRules
 from app.catalog.utils import CatalogTextUtils
-from app.models import CustomModel, FrozenModel
+from app.core.models import CustomModel, FrozenModel
 
 
 class CatalogRead(FrozenModel):
@@ -348,7 +348,7 @@ class CatalogUpdate(CustomModel):
         return normalized
 ```
 
-`CustomModel`/`FrozenModel` in `app/models.py` already do this for every schema project-wide: the
+`CustomModel`/`FrozenModel` in `app/core/models.py` already do this for every schema project-wide: the
 `@field_serializer("*", when_used="json")` there is what makes every datetime cross the wire in one
 consistent format, without each schema repeating the logic.
 
@@ -387,7 +387,7 @@ minimum) comes back `422` with `body["error"]["code"] == "validation_failed"`, n
 
 Pushing validation onto the schema doesn't change who commits the transaction, but it's worth stating
 next to it since both are about trusting the wire boundary to do its job once, correctly, instead of
-re-deriving trust deeper in the stack. `app/database.py`'s `get_session` commits once the request
+re-deriving trust deeper in the stack. `app/core/database.py`'s `get_session` commits once the request
 completes without raising, and rolls back if it does:
 
 ```python
@@ -426,8 +426,8 @@ from app.catalog.exceptions import CatalogNotFound
 from app.catalog.models import Catalog
 from app.catalog.schemas import CatalogRead
 from app.integrations.cache.client import CacheClient
-from app.markers import database, helper
-from app.repository import AbstractRepository
+from app.core.base.markers import database, helper
+from app.core.base.repository import AbstractRepository
 
 
 class AbstractCatalogRepository(AbstractRepository[CatalogRead]):
@@ -520,8 +520,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalog.repository import AbstractCatalogRepository, CatalogRepository
 from app.integrations.cache.client import CacheClient
-from app.markers import database, helper
-from app.uow import AbstractUnitOfWork
+from app.core.base.markers import database, helper
+from app.core.base.uow import AbstractUnitOfWork
 
 logger = logging.getLogger(__name__)
 
@@ -579,9 +579,9 @@ from app.catalog.rules import CatalogRules
 from app.catalog.schemas import CatalogRead
 from app.catalog.uow import AbstractCatalogUnitOfWork
 from app.catalog.utils import CatalogTextUtils
-from app.events import EventBus
-from app.markers import use_case
-from app.use_case import AbstractUseCase
+from app.core.events import EventBus
+from app.core.base.markers import use_case
+from app.core.base.use_case import AbstractUseCase
 
 
 class CreateCatalog(AbstractUseCase):
@@ -637,8 +637,8 @@ from app.catalog.schemas import CatalogRead
 from app.catalog.services.create_catalog import CreateCatalog
 from app.catalog.services.read_catalog import GetCatalog, ListCatalogs
 from app.catalog.uow import AbstractCatalogUnitOfWork, CatalogUnitOfWork
-from app.database import get_session
-from app.events import EventBus, get_event_bus
+from app.core.database import get_session
+from app.core.events import EventBus, get_event_bus
 from app.integrations.cache.client import CacheClient
 from app.integrations.cache.dependencies import get_cache
 
@@ -689,7 +689,7 @@ from fastapi import Depends
 from app.catalog.dependencies import get_repo
 from app.catalog.repository import AbstractCatalogRepository
 from app.catalog.schemas import CatalogRead
-from app.markers import facade
+from app.core.base.markers import facade
 
 
 class CatalogApi:
@@ -720,7 +720,9 @@ branch); one blanket `@database` on the class says nothing the file name didn't 
 
 import functools
 from collections.abc import Callable
-from typing import Any
+from typing import Any, TypeVar, overload
+
+_F = TypeVar("_F", bound=Callable[..., Any])
 
 
 class _MethodMarker:
@@ -728,7 +730,16 @@ class _MethodMarker:
 
     layer: str
 
-    def __init__(self, func: Callable[..., Any]) -> None:
+    @overload
+    def __new__(cls, func: _F) -> _F: ...  # type: ignore[misc]
+    @overload
+    def __new__(cls, func: Callable[..., Any]) -> "_MethodMarker": ...
+    def __new__(cls, func: Callable[..., Any]) -> Any:
+        instance = super().__new__(cls)
+        instance._init(func)
+        return instance
+
+    def _init(self, func: Callable[..., Any]) -> None:
         functools.update_wrapper(self, func)
         self._func = func
         setattr(func, "__layer__", self.layer)  # noqa: B010 -- dynamic attribute, not a fixed attr of Callable
@@ -790,6 +801,14 @@ decorator like `@retry` below (marker outermost that time, so the visible callab
 role tag). Purely informational otherwise — no `lint-imports` contract or `ruff` rule reads `__layer__`
 today. A method carrying more than one *role* marker is a sign it's doing more than one job — split it.
 
+The overloaded `__new__` (instead of `__init__`) is deliberate: the first overload tells the type
+checker that `marker(func)` returns the *same callable type* it received (`_F → _F`), so a
+`@integration`-decorated method on a concrete class still satisfies a `Protocol` that declares
+the same method as a plain `async def`. Without this, the type checker sees the decorated method as
+a `_MethodMarker` descriptor — a different *kind* of attribute than the Protocol expects — and
+rejects structural subtyping with *"must both be descriptors"*. At runtime, `__new__` still returns
+the real `_MethodMarker` instance with `__get__`/`__call__`; the overload only affects static analysis.
+
 `Abstract*` classes are never decorated — the name prefix already announces the contract, and
 `dependencies.py`/`router.py`/`lifespan.py` stay undecorated too, since a FastAPI dependency provider
 has to remain a plain function `Depends()` calls directly.
@@ -798,9 +817,9 @@ has to remain a plain function `Depends()` calls directly.
 
 `@database`/`@helper`/`@rule`/`@use_case`/`@facade`/`@integration` change nothing at runtime. Two more
 decorators in this codebase *do* change behavior — real cross-cutting concerns, not role tags, so they
-live in their own files rather than `app/markers.py`:
+live in their own files rather than `app/core/base/markers.py`:
 
-- **`app/retry.py`'s `retry(attempts=..., exceptions=...)`** — exponential backoff around a transient
+- **`app/core/retry.py`'s `retry(attempts=..., exceptions=...)`** — exponential backoff around a transient
   failure in an external call. Stack it *under* a role marker (`@integration` outermost, `@retry(...)`
   innermost) so the visible, callable attribute still carries the role tag:
   ```python
@@ -850,7 +869,7 @@ from app.catalog.repository import AbstractCatalogRepository
 from app.catalog.schemas import CatalogRead
 from app.catalog.services.create_catalog import CreateCatalog
 from app.catalog.uow import AbstractCatalogUnitOfWork
-from app.events import DomainEvent, EventBus
+from app.core.events import DomainEvent, EventBus
 
 
 class InMemoryEventBus(EventBus):
@@ -976,5 +995,5 @@ hand, the order that keeps the plumbing honest (same order as `references/archit
 
 Two pieces of root mechanism have to already be in place for step 3 to be safe, not something each
 module re-derives: `app/main.py`'s `RequestValidationError` handler (envelopes a schema validator's
-failure) and `app/database.py`'s `get_session` (commits once the request completes cleanly). Both are
+failure) and `app/core/database.py`'s `get_session` (commits once the request completes cleanly). Both are
 generated automatically by `scripts/scaffold.py` and don't need touching per module.

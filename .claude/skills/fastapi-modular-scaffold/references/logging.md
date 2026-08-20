@@ -13,7 +13,7 @@ Every generated project ships this by default — nothing here is opt-in the way
 
 | Id | Answers | Field | Header | Bound where |
 |---|---|---|---|---|
-| `request_id` | Which request, in this service, produced this log line | `request_id` | `X-Request-ID` | `RequestIdMiddleware` (`app/middleware.py`) |
+| `request_id` | Which request, in this service, produced this log line | `request_id` | `X-Request-ID` | `RequestIdMiddleware` (`app/core/middleware.py`) |
 | `correlation_id` | Which end-to-end flow this belongs to, across every service and every queue hop it touches | `correlation_id` | `X-Correlation-ID` | `RequestIdMiddleware`; `Broker.publish`/`consume` (`integrations/queue/client.py`) |
 | `trace_id` / `span_id` | Where this sits in an OpenTelemetry trace | `trace_id`, `span_id` | W3C `traceparent` | `logging_config.py`'s `_add_trace_context` processor, only when the `tracing` integration is selected |
 | A business id | `user_id`, `organization_id`, `order_id`... | whatever name fits | none | bound ad hoc, e.g. inside `get_current_user` |
@@ -45,7 +45,7 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 
 `structlog.contextvars.clear_contextvars()` at the top matters as much as the bind — without it, context bound by a previous request handled on the same worker (in a threadpool-backed sync path, or a bug elsewhere) could leak into this one.
 
-`app/logging_config.py` merges that context into every line via `structlog.contextvars.merge_contextvars` in the shared processor chain, whether the call site used `structlog.get_logger(__name__)` or plain stdlib `logging.getLogger(__name__)` — the `ProcessorFormatter` bridge is what makes the stdlib call get the same treatment, so nothing in the codebase has to choose between the two consistently.
+`app/core/logging_config.py` merges that context into every line via `structlog.contextvars.merge_contextvars` in the shared processor chain, whether the call site used `structlog.get_logger(__name__)` or plain stdlib `logging.getLogger(__name__)` — the `ProcessorFormatter` bridge is what makes the stdlib call get the same treatment, so nothing in the codebase has to choose between the two consistently.
 
 ## Redaction
 
