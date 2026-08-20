@@ -157,7 +157,7 @@ Reading the call site tells you where the constant came from. A bare relative im
 
 **10. Routers hold no business logic.** They translate HTTP to a use-case call. Domain errors map to status codes centrally in `main.py`.
 
-**11. Env var prefixes mirror the module's folder name, never a vendor name.** `integrations/cache/` reads `CACHE_*`, not `REDIS_*` — swapping Redis for another backend shouldn't force every deployment's `.env` to change. Same rule as domain modules already follow (`IDENTITY_*`).
+**11. Env var prefixes mirror the module's folder name, never a vendor name.** `integrations/cache/` reads `CACHE_*`, not `REDIS_*` — swapping Redis for another backend shouldn't force every deployment's `.env` to change. Same rule as domain modules already follow (`IDENTITY_*`). When the folder name itself contains an underscore (e.g. `integrations/dx_core/`), end the prefix in a double underscore (`DX_CORE__*`, not `DX_CORE_*`) so the module segment and the field name stay unambiguous — this also matches `pydantic-settings`' own `env_nested_delimiter` convention. Single-word folders (`cache`, `queue`, `storage`, `auth`) keep the plain single-`_` prefix.
 
 **12. No file over ~500-600 lines, no function over cyclomatic complexity 15.** `ruff`'s `C901` enforces the second one; the first is a judgment call made at review time. Neither is a reason to write a flatter module — split the file into a subpackage instead. See `references/architecture.md#keeping-files-and-functions-small`.
 

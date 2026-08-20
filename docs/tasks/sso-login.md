@@ -120,10 +120,10 @@ sequenceDiagram
 # ── backend/.env ──
 
 # DX Core Service OAuth
-WEUPBOOK_API_BASE_URL=https://api-dx.weupbook.com    # Base URL của DX
-WEUPBOOK_CLIENT_ID=agent-mkt                          # Client ID đăng ký trên DX
-WEUPBOOK_CLIENT_SECRET=<secret>                        # Client secret (confidential)
-WEUPBOOK_SCOPES=users:view fb-pages:view ad-accounts:view  # (tuỳ chọn) Scopes yêu cầu
+DX_CORE__API_BASE_URL=https://api-dx.weupbook.com    # Base URL của DX
+DX_CORE__CLIENT_ID=agent-mkt                          # Client ID đăng ký trên DX
+DX_CORE__CLIENT_SECRET=<secret>                        # Client secret (confidential)
+DX_CORE__SCOPES=users:view fb-pages:view ad-accounts:view  # (tuỳ chọn) Scopes yêu cầu
 
 # URL dùng để build redirect_uri cho callback
 INTERNAL_API_BASE_URL=https://api-agent-mkt.agentsplatform.cloud
@@ -806,7 +806,7 @@ if settings.env != "dev" or email != settings.owner_email or password != setting
 ### Backend
 
 - [ ] Cài thêm: `httpx`, `cryptography` (Fernet)
-- [ ] Tạo config settings: `WEUPBOOK_API_BASE_URL`, `CLIENT_ID`, `CLIENT_SECRET`, `FERNET_KEY`
+- [ ] Tạo config settings: `DX_CORE__API_BASE_URL`, `CLIENT_ID`, `CLIENT_SECRET`, `FERNET_KEY`
 - [ ] Tạo `weupbook_redirect_uri` property trên Settings
 - [ ] Tạo model `DxToken` (access/refresh encrypted, expires_at, scopes)
 - [ ] Tạo module `services/dx_core/oauth.py` — PKCE, exchange, refresh, userinfo, revoke

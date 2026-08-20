@@ -14,7 +14,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class DxCoreConfig(BaseSettings):
     """Environment driven settings for the WeUpBook DX OAuth2 client."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="WEUPBOOK_", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="DX_CORE__", extra="ignore")
 
     API_BASE_URL: HttpUrl = HttpUrl("https://api-dx.weupbook.com")
     CLIENT_ID: str = ""
