@@ -125,12 +125,15 @@ If any item fails → **fix immediately**, then re-review.
 
 ---
 
-### PHASE 5 — Commit / PR
+### PHASE 5 — Branch / Commit / PR
 
-1. Check `git status`, verify correct branch.
-2. Commit messages follow **Conventional Commits**:
-   - `feat: ...` / `fix: ...` / `refactor: ...`
-3. Do not commit secrets or build artifacts.
+1. **Never commit or push directly to `main`** — no exceptions, including trivial docs/meta-only changes. `main` only changes via a merged PR.
+2. Create a branch first, using Gitflow-style prefixes: `feature/<slug>`, `fix/<slug>`, `refactor/<slug>`, `chore/<slug>` (tooling/docs/meta), `hotfix/<slug>` (urgent prod fix). Branch from an up-to-date `main`.
+3. Commit messages follow **Conventional Commits**:
+   - `feat: ...` / `fix: ...` / `refactor: ...` / `chore: ...` / `docs: ...`
+4. Do not commit secrets or build artifacts.
+5. Push the branch and open a PR referencing the issue (`Closes #N` if applicable), carrying the same `component:*`/`type:*` labels and milestone as the issue.
+6. Merging into `main` requires explicit user approval — opening the PR is normally where an automated/agent run's responsibility ends.
 
 ---
 
@@ -143,6 +146,7 @@ If any item fails → **fix immediately**, then re-review.
 5. **Do not refactor beyond scope** unless the user agrees.
 6. Each phase must have a **clear output** before moving to the next.
 7. "Quick fix" / "just one change" tasks → still require Phase 0 + 0.5 + 4 minimum.
+8. **Never push directly to `main`.** Every change goes through a branch + PR, with no exception for small/meta changes. Merging requires explicit user approval.
 
 ---
 
