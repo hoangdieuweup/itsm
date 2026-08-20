@@ -55,6 +55,7 @@ involving Next.js and/or FastAPI. Do not skip phases. Do not skip mandatory step
 
 1. **Staleness check (recover abandoned locks).** List other issues currently marked as claimed/in-progress in the same tracker. For each:
    - If its claim comment is older than this automation's execution timeout + a safety margin (e.g. timeout + 10 min) with no follow-up completion/PR/hand-back comment → treat it as **abandoned**, not active. Post a short comment explaining the previous run likely timed out or crashed, remove the stale in-progress marker, and (if that issue is unrelated to yours) leave it available for the next poll to pick up — do not silently leave a dead lock in place forever.
+   - **Also sweep closed issues.** If any issue is already `closed` (merged/completed by a human or a prior run) but still carries the `in-progress` label, that label is leftover state from a claim that never got a proper hand-back — remove it as routine housekeeping (no comment needed, the issue is already resolved). Do this on every run, not just when you're about to claim something, so stale labels never linger on completed work and never get misread as an active claim by a future poll or by a human skimming labels.
 2. **Conflict check (avoid parallel agents colliding on the same files).** Determine which paths/modules *your* candidate task would touch (from the issue body/labels, or your own read of the codebase). Compare against paths declared or reasonably inferable for any **still-active** (non-stale) in-progress issue:
    - **Overlap found** (same files/modules, or one depends on output the other hasn't produced yet) → **do not claim this issue now.** Skip it this cycle silently (no spam comment needed for a routine skip) and let a future poll re-check. This is "wait," not "fail."
    - **No overlap** → safe to proceed to claim.
@@ -246,17 +247,17 @@ Constraints to apply:
 
 ## PHASE 5 — Branch / Commit / PR / Traceability (when user requests or task is complete)
 
-1. **Never commit or push directly to `main`** (or `master`), for any change — including trivial docs/skill-only edits. `main` only receives changes through a merged PR. This applies to every agent run: interactive chat, automation, and any parallel agent under Phase 0.25.
+1. **Never commit or push directly to `main` or `develop`**, for any change — including trivial docs/skill-only edits. Both branches only receive changes through a merged PR. This applies to every agent run: interactive chat, automation, and any parallel agent under Phase 0.25.
 
-2. **Branch naming (Gitflow-style prefixes, trunk-based flow unless the repo already defines full Gitflow with `develop`/`release/*`):**
-   - `feature/<short-slug>` — new feature (e.g. `feature/sso-login`)
-   - `fix/<short-slug>` — bugfix
-   - `refactor/<short-slug>` — refactor, no behavior change
-   - `chore/<short-slug>` — tooling, deps, meta/docs-only (e.g. this skill file)
-   - `hotfix/<short-slug>` — urgent production fix branched from `main`
+2. **Branch naming + merge target (Gitflow):**
+   - `feature/<short-slug>` — new feature (e.g. `feature/sso-login`) → branch from `develop`, PR **into `develop`**.
+   - `fix/<short-slug>` — bugfix → branch from `develop`, PR **into `develop`**.
+   - `refactor/<short-slug>` — refactor, no behavior change → branch from `develop`, PR **into `develop`**.
+   - `chore/<short-slug>` — tooling, deps, meta/docs-only (e.g. this skill file) → branch from `develop`, PR **into `develop`**.
+   - `hotfix/<short-slug>` — urgent production fix → branch from **`main`**, PR **into `main`**. After merging, also propagate the same fix into `develop` (merge or cherry-pick) so it isn't lost when `develop` is next released.
    - If the repo already has its own branch-naming convention (check recent branch/PR history first) — **follow that instead** of inventing a new one.
 
-3. Before branching: `git checkout main && git pull` (or fetch) to branch from the latest `main`, avoiding stale-base conflicts — especially important when Phase 0.25 conflict-checking is in play with multiple agents.
+3. Before branching: `git checkout develop && git pull` (or fetch) to branch from the latest `develop` (or `main` for a `hotfix/*`), avoiding stale-base conflicts — especially important when Phase 0.25 conflict-checking is in play with multiple agents.
 
 4. Commit messages follow repo conventions (prefer Conventional Commits if the repo uses them):
    - `feat: ...`
@@ -266,16 +267,20 @@ Constraints to apply:
 
 5. Do not commit secrets or build artifacts.
 
-6. Push the branch (not `main`) and open a PR: summary = Goal + Steps completed + Test checklist. The PR must also carry traceability metadata, same principle as issues (Phase 0.25):
+6. Push the branch (not `main`/`develop`) and open a PR: summary = Goal + Steps completed + Test checklist. The PR must also carry traceability metadata, same principle as issues (Phase 0.25):
    - **Reference the issue** it closes (`Closes #N`) so status flows back automatically on merge.
    - **Same labels as the issue** (`component:*`, `type:*`) plus the PR's own state label if the repo uses one (e.g. `needs-review`).
    - **Same milestone as the issue**, so `git tag`/release notes for that milestone can enumerate every merged PR.
 
-7. **Versioning:** if this change is part of a tracked release (has a milestone) and the repo has an existing tagging convention (check `git tag -l`, `CHANGELOG.md`, or prior release commits) — follow it. Do not invent a new versioning scheme unprompted; if none exists and this is the first release-worthy change, ask the user once what scheme to adopt (e.g. SemVer `vMAJOR.MINOR.PATCH`) rather than guessing. Do not create the tag/release yourself unless the user explicitly asks for a release — opening the PR with correct milestone/labels is normally enough; tagging happens at release time, not per-PR.
+7. **`develop` → `main` is a release — never merge it without a version bump.** This merge (or an explicit "cut a release" request) is what triggers versioning, not each individual PR into `develop`:
+   - Bump the version in every versioned manifest the repo has (e.g. `backend/pyproject.toml`, `frontend/package.json`) following SemVer (`vMAJOR.MINOR.PATCH`) unless the repo's existing tags/`CHANGELOG.md` show a different scheme already in use — follow that instead of inventing a new one.
+   - Tag the resulting `main` commit `vX.Y.Z` and write/update `CHANGELOG.md` summarizing what merged since the last release (the milestone's PRs are a good source list).
+   - If no versioning convention exists yet and this is the first release-worthy `develop → main` merge, ask the user once what scheme to adopt rather than guessing.
+   - A regular `feature/fix/refactor/chore` PR into `develop` does **not** get its own version bump/tag — only the `develop → main` release merge does.
 
-8. **Merging into `main`** only happens when the user explicitly asks for it. For fully automated issue-driven work, opening the PR is normally the end of the run's responsibility — leave merging to the user/maintainer unless the automation's own instructions explicitly grant merge authority.
+8. **Merging into `develop` or `main`** only happens when the user explicitly asks for it — this includes the `develop → main` release merge itself, which additionally always requires the version bump/tag from step 7 as part of that approval, never as an afterthought. For fully automated issue-driven work, opening the PR (into `develop`) is normally the end of the run's responsibility — leave merging to the user/maintainer unless the automation's own instructions explicitly grant merge authority.
 
-**Output (Phase 5):** Branch name + PR link (never a bare commit hash on `main`), with issue reference, labels, and milestone confirmed set.
+**Output (Phase 5):** Branch name + PR link (never a bare commit hash on `main`/`develop`), with issue reference, labels, and milestone confirmed set. If this PR is a `develop → main` release merge, also confirm the version bump and tag.
 
 ---
 
@@ -291,7 +296,8 @@ Constraints to apply:
 8. **Architectural review findings get at most 2 fix→review rounds** (Phase 4). Never loop indefinitely trying to satisfy a skill's rules — if still failing after 2 rounds, or if genuinely ambiguous at any point, **escalate instead of guessing**: ask the user, or if issue-driven, comment on the issue + label `needs-info` + stop. Never ship a PR that silently violates its own governing skill's rules.
 9. **When issue-driven / running alongside other agents, run Phase 0.25 first.** You are your own supervisor: reclaim stale locks instead of leaving them stuck forever, skip (wait) instead of colliding with another active claim on overlapping paths, and split oversized work into disjoint sub-issues instead of guessing you can finish it in one bounded run. Never let two agents edit the same files concurrently, and never let a claimed issue sit locked with no trace of what happened to it.
 10. **Every issue and PR gets traceability metadata** — status label, `component:*` label, `type:*` label, and milestone (Phase 0.25 / Phase 5). Create missing labels/milestones rather than skipping them. Never invent a version/tagging scheme unprompted — follow the repo's existing convention, or ask once if none exists.
-11. **Never push directly to `main`.** Every change — code, docs, or skill files — goes through a branch (Gitflow-style prefix: `feature/`, `fix/`, `refactor/`, `chore/`, `hotfix/`) and a PR. This has no exceptions for "small" or "meta" changes. Merging `main` requires explicit user approval.
+11. **Never push directly to `main` or `develop`.** Every change — code, docs, or skill files — goes through a branch (Gitflow-style prefix: `feature/`, `fix/`, `refactor/`, `chore/` → PR into `develop`; `hotfix/` → PR into `main`) and a PR. This has no exceptions for "small" or "meta" changes. Merging `develop` or `main` requires explicit user approval.
+12. **`develop` → `main` always means a version bump + tag.** This is a release, not a routine merge — never merge `develop` into `main` without bumping the version in every versioned manifest and tagging the resulting commit. A regular PR into `develop` never gets its own version bump.
 
 ---
 

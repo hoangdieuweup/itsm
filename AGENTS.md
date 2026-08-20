@@ -38,7 +38,7 @@ Do not skip phases. Do not skip mandatory steps.
 
 Applies whenever the task came from a shared queue (e.g. an `agent-task` GitHub issue picked up by automation) where other agent runs — past, concurrent, or future — may touch the same repo. You are your own supervisor here.
 
-1. **Staleness check:** reclaim abandoned `in-progress` locks (claim comment older than the run timeout + safety margin, no follow-up) instead of leaving them stuck forever.
+1. **Staleness check:** reclaim abandoned `in-progress` locks (claim comment older than the run timeout + safety margin, no follow-up) instead of leaving them stuck forever. Also sweep every run: if a `closed` issue still carries `in-progress` (leftover from a claim that never got a proper hand-back, e.g. a human merged/closed it directly), remove the label as routine housekeeping — never let a stale label on completed work get misread as an active claim.
 2. **Conflict check:** if your candidate issue's paths overlap an active `in-progress` issue, skip it this cycle silently — wait, don't collide.
 3. **Claim immediately, then re-verify — this closes a real race condition.** As soon as steps 1–2 clear, immediately post the claim comment + add `in-progress`, *before* any scope analysis or splitting. Then immediately re-fetch the issue's comments: if another claim comment has an earlier timestamp than yours, you lost the race — back off (remove your `in-progress` label, do nothing further, stop). Two concurrent runs must never both proceed past this point; skipping this step has caused duplicate work in practice (two runs each independently split the same parent issue).
 4. **Split decision (you decide):** if the scope doesn't fit one execution budget or spans independent surfaces (e.g. backend vs frontend vs a specific integration), split into sub-issues with disjoint `Owns (paths)` sections, convert the parent into a tracking issue, and stop — do not implement in this run. Otherwise proceed as a single task.
@@ -139,13 +139,19 @@ If any item fails → **fix immediately**, then re-review.
 
 ### PHASE 5 — Branch / Commit / PR
 
-1. **Never commit or push directly to `main`** — no exceptions, including trivial docs/meta-only changes. `main` only changes via a merged PR.
-2. Create a branch first, using Gitflow-style prefixes: `feature/<slug>`, `fix/<slug>`, `refactor/<slug>`, `chore/<slug>` (tooling/docs/meta), `hotfix/<slug>` (urgent prod fix). Branch from an up-to-date `main`.
+1. **Never commit or push directly to `main` or `develop`** — no exceptions, including trivial docs/meta-only changes. Both only change via a merged PR.
+2. **Gitflow branch/merge targets:**
+   - `feature/<slug>`, `fix/<slug>`, `refactor/<slug>`, `chore/<slug>` — branch from an up-to-date **`develop`**, PR **into `develop`**.
+   - `hotfix/<slug>` (urgent prod fix only) — branch from **`main`**, PR into **`main`**, then also merge/cherry-pick the same fix back into `develop` so it isn't lost on the next release.
 3. Commit messages follow **Conventional Commits**:
    - `feat: ...` / `fix: ...` / `refactor: ...` / `chore: ...` / `docs: ...`
 4. Do not commit secrets or build artifacts.
 5. Push the branch and open a PR referencing the issue (`Closes #N` if applicable), carrying the same `component:*`/`type:*` labels and milestone as the issue.
-6. Merging into `main` requires explicit user approval — opening the PR is normally where an automated/agent run's responsibility ends.
+6. Merging into `develop` requires explicit user approval — opening the PR is normally where an automated/agent run's responsibility ends.
+7. **`develop` → `main` = a release. Never do this without a version bump.** When a PR merges `develop` into `main` (or a maintainer asks to cut a release):
+   - Bump the version (SemVer `vMAJOR.MINOR.PATCH`) in every versioned manifest that has one (e.g. `backend/pyproject.toml`, `frontend/package.json`).
+   - Tag the resulting `main` commit `vX.Y.Z` and write/update `CHANGELOG.md` for that version.
+   - Still requires explicit user approval to merge/tag/publish — do not self-trigger a release.
 
 ---
 
@@ -158,8 +164,9 @@ If any item fails → **fix immediately**, then re-review.
 5. **Do not refactor beyond scope** unless the user agrees.
 6. Each phase must have a **clear output** before moving to the next.
 7. "Quick fix" / "just one change" tasks → still require Phase 0 + 0.5 + 4 minimum.
-8. **Never push directly to `main`.** Every change goes through a branch + PR, with no exception for small/meta changes. Merging requires explicit user approval.
-9. **Run Phase 0.25 first for issue/automation-driven work.** Claim immediately and re-verify (tiebreak on claim-comment timestamp) before any scope analysis — never let two concurrent runs both proceed past the claim step on the same issue.
+8. **Never push directly to `main` or `develop`.** Every change goes through a branch + PR, with no exception for small/meta changes. `feature/fix/refactor/chore` branches target `develop`; only `hotfix/*` targets `main` directly. Merging requires explicit user approval.
+9. **`develop` → `main` is a release, not a routine merge.** Always bump the version (SemVer) and tag `main` when this merge happens — never merge `develop` into `main` without a version bump.
+10. **Run Phase 0.25 first for issue/automation-driven work.** Claim immediately and re-verify (tiebreak on claim-comment timestamp) before any scope analysis — never let two concurrent runs both proceed past the claim step on the same issue.
 
 ---
 
