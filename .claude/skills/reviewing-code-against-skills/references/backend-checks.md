@@ -60,10 +60,17 @@ If the governing skill is `fastapi-modular-scaffold`, its `references/layer-exam
 
 If the governing skill is `fastapi-modular-scaffold`, flag any of these inside `constants.py`, `rules.py`, or a file under `utils/`:
 - A bare `NAME = value` sitting above (or beside) a class in the same file — it should be a class attribute (`Limits.MAX_NAME_LENGTH`, not a loose `MAX_NAME_LENGTH`).
+- A type alias (`Literal[...]`, `TypeAlias`, `TypeVar`) defined locally at the top of a utility, service, or schema file instead of in `<module>/constants.py` as a class attribute — type aliases are constants, not local implementation details. E.g. `AuthCookies.SameSite = Literal["lax", "none", "strict"]` in `constants.py`, not `_SameSite = Literal[...]` at the top of `session_response.py`.
 - A bare `def helper(...)` not attached to any class — it should be a `@staticmethod` on a class named for the concern (`TextUtils.normalize_name`, not a bare `normalize_name`).
 - A flat `utils.py` file instead of a `utils/` package (`utils/__init__.py` re-exporting one class per concern file) — flag this once the file holds more than one concern's worth of helpers, the same threshold as the file-size rule.
 
 This does **not** apply to `router.py`, `dependencies.py`, `lifespan.py`, `middleware.py`, or a seed script's `run()` — those stay plain functions FastAPI's `Depends()` (or `if __name__ == "__main__":`) calls directly; don't flag a dependency provider or a route handler for being a bare function.
+
+## Logic embedded directly in router.py
+
+The exemption right above is only about the class-wrapping rule — it is not a pass on `fastapi-modular-scaffold` rule #10: "Routers hold no business logic. They translate HTTP to a use-case call." Check every changed `router.py` for module-level functions that do more than call a dependency/use-case and hand its result to `Response`/`RedirectResponse`/`ApiResponse`: building a URL from parts, setting or clearing cookies, formatting a value, mapping a status code by hand, anything with its own docstring explaining what it computes. That is reusable transform logic, not HTTP translation, and it belongs in that module's `utils/` (a `@helper`-decorated class method — see `references/layer-examples.md`'s `utils/` package pattern) or `rules.py` if it encodes a decision, imported back into the router.
+
+Flag it even without a git diff to compare against — read every router function's body, not just the ones touched this session, since this is easy to miss on a first pass. A router function is allowed to build a `Response` inline in a couple of lines from a use case's return value; it is not allowed to own private helper functions living in the same file (e.g. a `_build_redirect_url`/`_set_session_cookies`-shaped function defined above the route handlers).
 
 ## Schema-level validation
 

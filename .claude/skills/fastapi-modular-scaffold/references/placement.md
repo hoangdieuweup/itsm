@@ -26,6 +26,7 @@ A second question resolves most of the remainder: **if this module were extracte
 | `Page`, `PaginationParams` | `app/core/pagination.py` | Mechanism, no domain knowledge |
 | `CustomModel`, `FrozenModel` | `app/core/models.py` | Mechanism |
 | `Environment` enum | `app/constants.py` | About the process, not the business |
+| Type aliases (`Literal[...]`, `TypeAlias`, `TypeVar`) | `<module>/constants.py`, as a class attribute of the class that owns the concept | A type alias is a constant — `AuthCookies.SameSite`, not `_SameSite = Literal[...]` at the top of a utility file |
 | Redis key construction | `integrations/cache/keys.py`, as a `CacheKeyBuilder`-style class | One place, or invalidation cannot be reasoned about |
 
 ## Grouped into a class
@@ -33,9 +34,11 @@ A second question resolves most of the remainder: **if this module were extracte
 The file a constant or helper lives in doesn't change — that's what the table above answers. What
 changes is that nothing sits bare at module level inside that file. `MAX_SEATS` isn't a loose
 `MAX_SEATS = 50` above the file's classes; it's `OrderLimits.MAX_SEATS`, a class attribute, grouped
-with the other limits that concern. `slugify` isn't a bare `def slugify(...)`; it's a `@staticmethod`
-on a class in `utils/` — a package, one file and one class per concern, the same way `services/` is
-one file per use case once a module has more than one.
+with the other limits that concern. A type alias like `Literal["lax", "none", "strict"]` isn't a
+local `_SameSite = Literal[...]` at the top of the file that uses it; it's `AuthCookies.SameSite`,
+a class attribute in `constants.py` next to the cookie names it belongs with. `slugify` isn't a bare
+`def slugify(...)`; it's a `@staticmethod` on a class in `utils/` — a package, one file and one class
+per concern, the same way `services/` is one file per use case once a module has more than one.
 
 This is still imported and used from that class, from wherever it's needed — that half is unchanged.
 The rule is about shape within the owning file, not about where cross-module access goes through
@@ -83,7 +86,8 @@ Each of these means the boundary has already leaked:
 - Global `Config` has a setting only one module reads
 - Two modules import the same helper from a third module that is neither's owner
 - A module's `constants.py` imports from another module's `constants.py`
-- A bare `NAME = value` or a bare `def helper(...)` sits above a class in `constants.py`, `rules.py` or a file inside `utils/` — the concept still needs an owning class, not just an owning file
+- A bare `NAME = value`, a type alias (`_SameSite = Literal[...]`), or a bare `def helper(...)` sits above a class in `constants.py`, `rules.py` or a file inside `utils/` — the concept still needs an owning class, not just an owning file
+- A `Literal`/`TypeAlias`/`TypeVar` is defined locally in a utility, service, or schema file instead of in `<module>/constants.py` as a class attribute — type aliases are constants, not local implementation details
 
 The last one is the most serious: it means two modules share a concept, and the concept has no owner. Either it belongs to one of them and the other should go through `public.py`, or it is genuinely universal and belongs at the root — but that case is rarer than it first appears, and duplicating a constant is often cheaper than coupling two modules to share it.
 
