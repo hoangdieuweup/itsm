@@ -58,7 +58,12 @@ involving Next.js and/or FastAPI. Do not skip phases. Do not skip mandatory step
 2. **Conflict check (avoid parallel agents colliding on the same files).** Determine which paths/modules *your* candidate task would touch (from the issue body/labels, or your own read of the codebase). Compare against paths declared or reasonably inferable for any **still-active** (non-stale) in-progress issue:
    - **Overlap found** (same files/modules, or one depends on output the other hasn't produced yet) → **do not claim this issue now.** Skip it this cycle silently (no spam comment needed for a routine skip) and let a future poll re-check. This is "wait," not "fail."
    - **No overlap** → safe to proceed to claim.
-3. **Split decision (you decide, not a human, not a fixed rule).** Once you've read the issue/spec enough to understand real scope (this may require a lightweight pass — doesn't need full Phase 0.5 depth yet):
+3. **Claim immediately, then re-verify (close the race window).** Reading "no in-progress label yet" and then spending minutes on scope analysis before actually claiming leaves a window where a second concurrent run can read the same "unclaimed" state and start its own independent work (including its own independent split) — this has happened in practice (two runs each split the same parent issue into a different set of sub-issues). To avoid it:
+   - As soon as steps 1–2 say "safe to proceed," **immediately** post the claim comment and add the `in-progress` label — *before* doing any deeper scope analysis, splitting, or implementation.
+   - **Immediately after claiming, re-fetch the issue's comments/labels.** If you find another claim comment on the same issue with an earlier timestamp than yours (or a lower comment ID), you lost the race: **back off** — remove your own `in-progress` label if you added one, do not proceed further (no split, no implementation), and stop. The earlier claim wins; this is the tiebreaker, applied deterministically so two runs never both proceed.
+   - If you find another claim comment with a *later* timestamp than yours, you won the race — proceed normally (the other run is expected to back off when it re-verifies).
+   - Only after this re-verification passes do you move on to the split-vs-implement decision (step 4) or Phase 0.5.
+4. **Split decision (you decide, not a human, not a fixed rule).** Once you've read the issue/spec enough to understand real scope (this may require a lightweight pass — doesn't need full Phase 0.5 depth yet):
    - Estimate whether the work is a single coherent, independently-reviewable, mergeable unit that plausibly fits one execution budget (see Phase 2/3 budget-awareness).
    - **If it clearly fits** → proceed as a single task (no split needed just because it's "issue-driven" — don't over-split trivial work).
    - **If it doesn't fit, or spans genuinely independent surfaces** (e.g. backend scaffold vs. frontend scaffold vs. a specific integration) → act as supervisor: create separate sub-issues, each with an explicit **"Owns (paths)"** section listing the directories/files it is responsible for so future conflict checks (step 2) can rely on it. Keep the paths **disjoint** across sub-issues so parallel agents can't collide. Convert the original issue into a tracking/epic issue (remove the pickup label, link the sub-issues), comment explaining the split and why, and stop — do not implement anything yourself in this run. The next poll(s) will pick up the sub-issues normally.
@@ -68,7 +73,7 @@ involving Next.js and/or FastAPI. Do not skip phases. Do not skip mandatory step
      - **Milestone:** attach the issue to the milestone representing its release/epic (e.g. `v0.1.0 — <epic name>`). If none exists yet for this body of work, create one (with a short description) before assigning — don't leave issues un-milestoned when they're part of a tracked epic.
      - Sub-issues inherit the parent's milestone unless the split explicitly represents a different release.
 
-**Output (Phase 0.25):** One line per check — "Staleness: none found / reclaimed #N", "Conflict: none / skipped #N due to overlap with #M", "Split: not needed / split into #A, #B, #C (owns: …)". If you skipped or split, stop here for this run.
+**Output (Phase 0.25):** One line per check — "Staleness: none found / reclaimed #N", "Conflict: none / skipped #N due to overlap with #M", "Claim: won / lost race to comment #X (backed off)", "Split: not needed / split into #A, #B, #C (owns: …)". If you skipped, lost the claim race, or split, stop here for this run.
 
 ---
 

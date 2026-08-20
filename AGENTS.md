@@ -34,6 +34,18 @@ Do not skip phases. Do not skip mandatory steps.
 
 ---
 
+### PHASE 0.25 — Multi-Agent Coordination & Split Decision (MANDATORY when issue-driven/automation-driven)
+
+Applies whenever the task came from a shared queue (e.g. an `agent-task` GitHub issue picked up by automation) where other agent runs — past, concurrent, or future — may touch the same repo. You are your own supervisor here.
+
+1. **Staleness check:** reclaim abandoned `in-progress` locks (claim comment older than the run timeout + safety margin, no follow-up) instead of leaving them stuck forever.
+2. **Conflict check:** if your candidate issue's paths overlap an active `in-progress` issue, skip it this cycle silently — wait, don't collide.
+3. **Claim immediately, then re-verify — this closes a real race condition.** As soon as steps 1–2 clear, immediately post the claim comment + add `in-progress`, *before* any scope analysis or splitting. Then immediately re-fetch the issue's comments: if another claim comment has an earlier timestamp than yours, you lost the race — back off (remove your `in-progress` label, do nothing further, stop). Two concurrent runs must never both proceed past this point; skipping this step has caused duplicate work in practice (two runs each independently split the same parent issue).
+4. **Split decision (you decide):** if the scope doesn't fit one execution budget or spans independent surfaces (e.g. backend vs frontend vs a specific integration), split into sub-issues with disjoint `Owns (paths)` sections, convert the parent into a tracking issue, and stop — do not implement in this run. Otherwise proceed as a single task.
+5. **Traceability:** every issue/sub-issue you create or claim gets a status label (`agent-task`/`in-progress`/`needs-info`/`done`) + `component:*` + `type:*` label + a milestone (create if missing).
+
+---
+
 ### PHASE 0.5 — Read Related Skills (MANDATORY before Plan & before editing code)
 
 **Do not create a plan or edit code before reading related skills.**
@@ -147,6 +159,7 @@ If any item fails → **fix immediately**, then re-review.
 6. Each phase must have a **clear output** before moving to the next.
 7. "Quick fix" / "just one change" tasks → still require Phase 0 + 0.5 + 4 minimum.
 8. **Never push directly to `main`.** Every change goes through a branch + PR, with no exception for small/meta changes. Merging requires explicit user approval.
+9. **Run Phase 0.25 first for issue/automation-driven work.** Claim immediately and re-verify (tiebreak on claim-comment timestamp) before any scope analysis — never let two concurrent runs both proceed past the claim step on the same issue.
 
 ---
 
