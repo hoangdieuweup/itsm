@@ -1,0 +1,51 @@
+[importlinter]
+root_package = app
+
+[importlinter:contract:module-facades]
+name = Domain modules reach each other only through public.py
+type = forbidden
+source_modules =
+    app.auth
+forbidden_modules =
+    app.auth.repository
+    app.auth.models
+    app.auth.uow
+    app.auth.services
+allow_indirect_imports = True
+
+[importlinter:contract:root-is-mechanism]
+name = The root holds mechanism and never imports a module
+type = forbidden
+source_modules =
+    app.config
+    app.constants
+    app.exceptions
+    app.models
+    app.database
+    app.pagination
+    app.events
+    app.middleware
+    app.logging_config
+    app.docs
+    app.repository
+    app.uow
+    app.use_case
+    app.markers
+    app.retry
+forbidden_modules =
+    app.auth
+    app.integrations.cache
+    app.integrations.queue
+    app.integrations.storage
+    app.integrations.dx_core
+
+[importlinter:contract:integrations-are-leaves]
+name = Integrations never import a domain module
+type = forbidden
+source_modules =
+    app.integrations.cache
+    app.integrations.queue
+    app.integrations.storage
+    app.integrations.dx_core
+forbidden_modules =
+    app.auth
