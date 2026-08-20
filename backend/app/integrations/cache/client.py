@@ -1,6 +1,7 @@
 """Redis client with entity versioning and stampede protection."""
 
 import asyncio
+import json
 import logging
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
@@ -12,6 +13,7 @@ from redis.exceptions import RedisError
 from app.core.base.markers import helper, integration
 from app.integrations.cache.config import cache_settings
 from app.integrations.cache.constants import CacheDefaults
+from app.integrations.cache.exceptions import CacheUnavailable
 from app.integrations.cache.keys import CacheKeyBuilder
 
 logger = logging.getLogger(__name__)
@@ -86,6 +88,62 @@ class CacheClient:
             logger.info("cache invalidated entity=%s id=%s version=%s", entity, entity_id, version)
         except RedisError:
             logger.error("invalidation failed entity=%s id=%s", entity, entity_id, exc_info=True)
+
+    @integration
+    async def set_json(self, key: str, value: dict, *, ttl: int) -> None:
+        """Store a single-use or short-lived JSON value (not a versioned entity).
+
+        Raises CacheUnavailable instead of degrading, unlike get_or_load: a
+        PKCE state or an upstream token cache has no database to fall back
+        to, so a caller that cannot tolerate a missing Redis must know
+        immediately rather than silently losing the value.
+        """
+        try:
+            await self._redis.set(key, json.dumps(value), ex=ttl)
+        except RedisError as exc:
+            logger.error("cache write failed key=%s", key, exc_info=True)
+            raise CacheUnavailable() from exc
+
+    @integration
+    async def get_json(self, key: str) -> dict | None:
+        """Read a value written by set_json, or None if missing or unreadable."""
+        try:
+            raw = await self._redis.get(key)
+        except RedisError as exc:
+            logger.error("cache read failed key=%s", key, exc_info=True)
+            raise CacheUnavailable() from exc
+        if raw is None:
+            return None
+        try:
+            return json.loads(raw)
+        except ValueError:
+            logger.warning("undecodable payload key=%s", key)
+            return None
+
+    @integration
+    async def delete(self, key: str) -> None:
+        """Remove a key written by set_json. A no-op if it never existed."""
+        try:
+            await self._redis.delete(key)
+        except RedisError:
+            logger.warning("cache delete failed key=%s", key, exc_info=True)
+
+    @integration
+    async def try_acquire_lock(self, key: str, *, ttl: int) -> bool:
+        """Attempt to take a distributed mutex. True if this caller now holds it."""
+        try:
+            return bool(await self._redis.set(key, "1", ex=ttl, nx=True))
+        except RedisError as exc:
+            logger.error("lock acquire failed key=%s", key, exc_info=True)
+            raise CacheUnavailable() from exc
+
+    @integration
+    async def release_lock(self, key: str) -> None:
+        """Release a mutex acquired by try_acquire_lock."""
+        try:
+            await self._redis.delete(key)
+        except RedisError:
+            logger.warning("lock release failed key=%s", key, exc_info=True)
 
     @helper
     async def _version(self, entity: str, entity_id: int) -> int:

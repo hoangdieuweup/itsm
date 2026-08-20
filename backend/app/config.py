@@ -22,6 +22,13 @@ class Config(BaseSettings):
 
     CORS_ORIGINS: list[str] = []
 
+    # Network topology, same spirit as CORS_ORIGINS: where this backend's own
+    # public URL is (for building an OAuth redirect_uri) and where the SPA
+    # lives (for post-login/post-error redirects). Not owned by any one
+    # module — every module that redirects a browser needs both.
+    BACKEND_BASE_URL: str = "http://localhost:8000"
+    FRONTEND_BASE_URL: str = "http://localhost:3000"
+
     DOCS_USERNAME: str | None = None
     DOCS_PASSWORD: str | None = None
 

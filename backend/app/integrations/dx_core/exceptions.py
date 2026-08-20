@@ -23,3 +23,17 @@ class TokenExchangeFailed(IntegrationError):
 
     code = DxErrorCode.TOKEN_EXCHANGE_FAILED
     message = "Failed to exchange authorization code for tokens"
+
+
+class DxNotLinked(ValidationFailedError):
+    """Raised when a user has no dx_tokens row (never completed SSO, or was revoked)."""
+
+    code = DxErrorCode.NOT_LINKED
+    message = "User has no linked DX account"
+
+
+class DxRefreshFailed(IntegrationError):
+    """Raised when DX rejects a refresh token (expired, revoked)."""
+
+    code = DxErrorCode.REFRESH_FAILED
+    message = "Failed to refresh DX access token"

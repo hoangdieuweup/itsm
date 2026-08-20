@@ -25,3 +25,12 @@ class CacheKeyBuilder:
     def lock_key(entity: str, entity_id: int) -> str:
         """Build the key used to serialize loads across processes."""
         return f"lock:{entity}:{entity_id}"
+
+    @staticmethod
+    def session_key(namespace: str, identifier: str) -> str:
+        """Build a key for a short-lived, single-use, or mutex value that
+        isn't a versioned entity cache — e.g. an OAuth PKCE state, a per-user
+        refresh mutex, or a per-user upstream token cache. namespace is
+        supplied by the owning module's own constants.py, same convention as
+        entity_key's `entity` argument."""
+        return f"{namespace}:{identifier}"
