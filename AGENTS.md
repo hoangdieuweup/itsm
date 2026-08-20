@@ -11,8 +11,26 @@
 |-------|-----------|-------|
 | Frontend | **Next.js** (App Router) | TypeScript, modular architecture |
 | Backend | **FastAPI** | Python, modular scaffold |
-| UI/UX | Follow **ui-ux-pro-max** skill | If available in `.claude/skills/` |
+| UI/UX | **`ui-ux-pro-max` plugin — MANDATORY** | Not a repo skill, not optional. See rule below. |
 | Database | TBD | Will be updated when DB is chosen |
+
+---
+
+## Plugins vs. Skills (do not confuse the two)
+
+- **Skills** = repo-local instructions under `.claude/skills/` (`nextjs-modular-architecture`, `fastapi-modular-scaffold`, `full-stack-dev-workflow`, `reviewing-code-against-skills`). Version-controlled with this repo.
+- **Plugins** = globally-installed Claude Code capabilities (`ui-ux-pro-max`, `superpowers`) that live outside this repo (`~/.claude/plugins/`) and must be **invoked**, not just read. Each plugin has a fixed place in the workflow — they are not interchangeable:
+
+| Plugin | Invoke at | Purpose |
+|--------|-----------|---------|
+| **`superpowers`** | **Phase 0 → Phase 2** (receiving the request, understanding scope, planning) | Elevated planning/analysis capabilities used while turning the user's request into a concrete plan — invoke it while framing the task, *before* any UI code is written. |
+| **`ui-ux-pro-max`** | **Phase 3** (Implement), for any UI code | The mandatory design-check/reference step whenever writing or editing UI markup/styles — query its style/palette/font-pairing/a11y database and apply the result while implementing. Not a planning tool; it's consulted while the UI code is actually being written. |
+
+### `ui-ux-pro-max` plugin — mandatory whenever implementing UI code, no exceptions
+
+The backend scaffold shipped with quality gaps because architecture skills were treated as optional reading. **The same is not acceptable for UI/design work.** Any implementation step touching layout, a page, a component, color, typography, spacing, or visual design **MUST invoke the `ui-ux-pro-max` plugin during Phase 3** — querying its style/palette/font-pairing/a11y database and applying the result — before/while writing markup or CSS. "I already know Tailwind" is not a substitute. Skipping this plugin on a UI implementation step is a workflow violation, same severity as skipping `fastapi-modular-scaffold` on a backend task.
+
+- If the user supplies reference images/screenshots for layout or color concept, treat those as **hard constraints** to reconcile with `ui-ux-pro-max`'s recommendations (palette, contrast, a11y) — not as something to eyeball freehand.
 
 ---
 
@@ -50,13 +68,14 @@ Applies whenever the task came from a shared queue (e.g. an `agent-task` GitHub 
 
 **Do not create a plan or edit code before reading related skills.**
 
-| Scope | Required Skills/Plugins |
-|-------|----------------|
+| Scope | Required Skills (repo) |
+|-------|-------------------------|
 | Next.js / frontend | `.claude/skills/nextjs-modular-architecture/` |
-| UI / component / page / layout / styling | `ui-ux-pro-max` (if available) |
 | FastAPI / backend | `.claude/skills/fastapi-modular-scaffold/` |
-| Full-stack (with UI) | All of the above |
+| Full-stack | All repo skills above |
 | Every task | `.claude/skills/reviewing-code-against-skills/` |
+
+Also invoke the **`superpowers` plugin** here (it belongs to Phase 0 → Phase 2, not to implementation) while you finish framing the request and its constraints — see "Plugins vs. Skills" above.
 
 After reading, list **3–7 constraints** that will be applied (copied from skills, not made up).
 
@@ -64,7 +83,6 @@ After reading, list **3–7 constraints** that will be applied (copied from skil
 ```text
 Skills read:
 - nextjs-modular-architecture: <yes/no/skip>
-- ui-ux-pro-max: <yes/no/skip>
 - fastapi-modular-scaffold: <yes/no/skip>
 - reviewing-code-against-skills: yes
 
@@ -87,7 +105,7 @@ Constraints to apply:
 
 ### PHASE 2 — Plan (MANDATORY before editing code)
 
-Write a plan with this structure:
+Write a plan with this structure. Continue using the **`superpowers` plugin** here — planning is still within its Phase 0→2 scope.
 
 ```markdown
 # Plan: <task name>
@@ -95,6 +113,7 @@ Write a plan with this structure:
 ## Goal
 ## Scope (In / Out)
 ## Skills Applied (+ specific constraints)
+## Plugins to invoke during implementation (e.g. `ui-ux-pro-max` if UI is involved)
 ## Architecture Impact (Next.js / FastAPI modules affected)
 ## Steps (numbered)
 ## Test / Verify Checklist
@@ -110,10 +129,11 @@ Write a plan with this structure:
 1. Re-read Phase 0.5 constraints + plan before editing the first file.
 2. Follow the exact step order from the plan.
 3. Respect skill architecture in every change.
-4. If uncertain mid-implementation → look up docs, do not guess.
-5. Run tests / typecheck / lint if the repo has scripts.
+4. **Any UI code in this step (layout, component, page, color, typography, spacing) MUST invoke the `ui-ux-pro-max` plugin** — query its style/palette/font-pairing/a11y database and apply the result while writing the markup/CSS. This is a mandatory implementation-time check, not optional, not a planning-phase step.
+5. If uncertain mid-implementation → look up docs, do not guess.
+6. Run tests / typecheck / lint if the repo has scripts.
 
-**Output:** Code changes + summary of files modified.
+**Output:** Code changes + summary of files modified + note on which plugins were invoked (e.g. `ui-ux-pro-max` used for X).
 
 ---
 
@@ -123,7 +143,7 @@ Checklist:
 
 ```text
 [ ] nextjs-modular-architecture: module boundary, import direction, folder structure correct?
-[ ] ui-ux-pro-max: hierarchy, spacing, contrast, a11y, responsive, states?
+[ ] If UI touched: was ui-ux-pro-max actually invoked in Phase 3? hierarchy, spacing, contrast, a11y, responsive, states applied?
 [ ] fastapi-modular-scaffold: correct layer (router/service/schema)?
 [ ] No hardcoded secrets / sensitive URLs
 [ ] Sufficient error handling & validation
