@@ -9,7 +9,7 @@ from app.integrations.queue.constants import QueueDefaults
 class QueueConfig(BaseSettings):
     """Environment driven settings for RabbitMQ."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="QUEUE_", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="QUEUE__", extra="ignore")
 
     URL: AmqpDsn = "amqp://guest:guest@localhost:5672/"
     PREFETCH: int = QueueDefaults.DEFAULT_PREFETCH

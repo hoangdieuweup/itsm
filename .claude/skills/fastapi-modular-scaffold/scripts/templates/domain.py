@@ -126,7 +126,7 @@ from app.modules.{name}.constants import {cls}CacheKeys
 class {cls}Config(BaseSettings):
     """Environment driven settings for the {name} module."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="{upper}_", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="{upper}__", extra="ignore")
 
     CACHE_TTL: int = {cls}CacheKeys.TTL_SECONDS
     LIST_PAGE_SIZE: int = 50

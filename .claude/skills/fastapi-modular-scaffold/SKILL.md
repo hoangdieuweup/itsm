@@ -72,7 +72,7 @@ app/
 ├── modules/             domain modules — each owns everything it needs
 │   ├── identity/
 │   │   ├── constants.py     its enums, its error codes, its limits — grouped into classes, rule #16
-│   │   ├── config.py        its settings (IDENTITY_ prefix)
+│   │   ├── config.py        its settings (IDENTITY__ prefix)
 │   │   ├── exceptions.py    UserNotFound, EmailTaken — concrete errors
 │   │   ├── schemas.py       Pydantic — field_validator/field_serializer live here, rule #15/#16
 │   │   ├── models.py        ORM — only this module queries these tables
@@ -157,7 +157,7 @@ Reading the call site tells you where the constant came from. A bare relative im
 
 **10. Routers hold no business logic.** They translate HTTP to a use-case call. Domain errors map to status codes centrally in `main.py`.
 
-**11. Env var prefixes mirror the module's folder name, never a vendor name.** `integrations/cache/` reads `CACHE_*`, not `REDIS_*` — swapping Redis for another backend shouldn't force every deployment's `.env` to change. Same rule as domain modules already follow (`IDENTITY_*`). When the folder name itself contains an underscore (e.g. `integrations/dx_core/`), end the prefix in a double underscore (`DX_CORE__*`, not `DX_CORE_*`) so the module segment and the field name stay unambiguous — this also matches `pydantic-settings`' own `env_nested_delimiter` convention. Single-word folders (`cache`, `queue`, `storage`, `auth`) keep the plain single-`_` prefix.
+**11. Env var prefixes mirror the module's folder name, never a vendor name, and always end in a double underscore.** `integrations/cache/` reads `CACHE__*`, not `REDIS_*` and not `CACHE_*` — swapping Redis for another backend shouldn't force every deployment's `.env` to change, and the trailing `__` marks the variable as owned/nested under that module rather than a root-level, common setting. Same rule for every domain module (`IDENTITY__*`) and every integration, regardless of whether the folder name itself already contains an underscore (`integrations/dx_core/` → `DX_CORE__*`) or not (`cache` → `CACHE__*`, `auth` → `AUTH__*`) — one convention, no single-word exception to remember. Only the root, common settings in `app/config.py` (`DATABASE_URL`, `CORS_ORIGINS`, `ENV`, ...) stay unprefixed.
 
 **12. No file over ~500-600 lines, no function over cyclomatic complexity 15.** `ruff`'s `C901` enforces the second one; the first is a judgment call made at review time. Neither is a reason to write a flatter module — split the file into a subpackage instead. See `references/architecture.md#keeping-files-and-functions-small`.
 

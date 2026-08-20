@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class StorageConfig(BaseSettings):
     """Environment driven settings for object storage."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="STORAGE_", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="STORAGE__", extra="ignore")
 
     ENDPOINT: str = ""
     BUCKET: str = ""

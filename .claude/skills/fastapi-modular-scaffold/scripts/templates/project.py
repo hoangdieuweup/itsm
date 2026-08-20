@@ -382,13 +382,13 @@ def env_example(features: list[str]) -> str:
         "DOCS_PASSWORD=",
     ]
     if "cache" in features:
-        lines += ["", "CACHE_URL=redis://redis:6379/0", "CACHE_DEFAULT_TTL=300"]
+        lines += ["", "CACHE__URL=redis://redis:6379/0", "CACHE__DEFAULT_TTL=300"]
     if "queue" in features:
-        lines += ["", "QUEUE_URL=amqp://guest:guest@rabbitmq:5672/", "QUEUE_PREFETCH=20"]
+        lines += ["", "QUEUE__URL=amqp://guest:guest@rabbitmq:5672/", "QUEUE__PREFETCH=20"]
     if "storage" in features:
-        lines += ["", "STORAGE_ENDPOINT=http://minio:9000", "STORAGE_BUCKET=app", "STORAGE_ACCESS_KEY=minioadmin", "STORAGE_SECRET_KEY=minioadmin"]
+        lines += ["", "STORAGE__ENDPOINT=http://minio:9000", "STORAGE__BUCKET=app", "STORAGE__ACCESS_KEY=minioadmin", "STORAGE__SECRET_KEY=minioadmin"]
     if "tracing" in features:
-        lines += ["", "TRACING_ENABLED=true", "TRACING_OTLP_ENDPOINT=http://localhost:4317"]
+        lines += ["", "TRACING__ENABLED=true", "TRACING__OTLP_ENDPOINT=http://localhost:4317"]
     return "\n".join(lines) + "\n"
 
 
