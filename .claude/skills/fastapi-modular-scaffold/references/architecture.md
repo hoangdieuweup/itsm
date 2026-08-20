@@ -165,7 +165,7 @@ tag each class with its role.
 
 ## Configuration
 
-Settings are split the same way everything else is. `app/config.py` holds what the process needs to start — database URL, environment, CORS. Each module holds its own settings in its own `config.py` with an env prefix, so `IDENTITY_JWT_SECRET` is visibly owned by identity.
+Settings are split the same way everything else is. `app/config.py` holds what the process needs to start — database URL, environment, CORS. Each module holds its own settings in its own `config.py` with an env prefix ending in a double underscore, so `IDENTITY__JWT_SECRET` is visibly owned by identity.
 
 The reason is the same as for constants: a single global `Config` accumulates every setting any module ever needed, and reading it tells you nothing about who uses what. Splitting it also means a module carries its configuration with it if extracted.
 

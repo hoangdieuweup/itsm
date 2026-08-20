@@ -48,7 +48,7 @@ from app.integrations.cache.constants import CacheDefaults
 class CacheConfig(BaseSettings):
     """Environment driven settings for Redis."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="CACHE_", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="CACHE__", extra="ignore")
 
     URL: RedisDsn = "redis://localhost:6379/0"
     DEFAULT_TTL: int = CacheDefaults.DEFAULT_TTL_SECONDS
@@ -294,7 +294,7 @@ from app.integrations.queue.constants import QueueDefaults
 class QueueConfig(BaseSettings):
     """Environment driven settings for RabbitMQ."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="QUEUE_", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="QUEUE__", extra="ignore")
 
     URL: AmqpDsn = "amqp://guest:guest@localhost:5672/"
     PREFETCH: int = QueueDefaults.DEFAULT_PREFETCH
@@ -659,7 +659,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class StorageConfig(BaseSettings):
     """Environment driven settings for object storage."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="STORAGE_", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="STORAGE__", extra="ignore")
 
     ENDPOINT: str = ""
     BUCKET: str = ""
@@ -808,7 +808,7 @@ from app.integrations.tracing.constants import TracingDefaults
 class TracingConfig(BaseSettings):
     """Environment driven settings for OpenTelemetry export."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="TRACING_", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="TRACING__", extra="ignore")
 
     ENABLED: bool = True
     OTLP_ENDPOINT: str = TracingDefaults.DEFAULT_OTLP_ENDPOINT

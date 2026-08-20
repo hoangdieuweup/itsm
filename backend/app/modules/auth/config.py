@@ -14,7 +14,7 @@ from app.config import settings
 class AuthConfig(BaseSettings):
     """Environment driven settings for the auth module's own session."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="AUTH_", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="AUTH__", extra="ignore")
 
     JWT_SECRET: str = "change-me-in-env"
     ACCESS_TOKEN_TTL_SECONDS: int = 1800

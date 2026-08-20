@@ -9,7 +9,7 @@ from app.integrations.cache.constants import CacheDefaults
 class CacheConfig(BaseSettings):
     """Environment driven settings for Redis."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="CACHE_", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="CACHE__", extra="ignore")
 
     URL: RedisDsn = "redis://localhost:6379/0"
     DEFAULT_TTL: int = CacheDefaults.DEFAULT_TTL_SECONDS
