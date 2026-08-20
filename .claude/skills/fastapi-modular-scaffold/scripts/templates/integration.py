@@ -65,7 +65,7 @@ def cache_exceptions() -> str:
     return '''
 """Errors owned by the cache integration."""
 
-from app.exceptions import IntegrationError
+from app.core.exceptions import IntegrationError
 from app.integrations.cache.constants import CacheErrorCode
 
 
@@ -127,7 +127,7 @@ from redis.exceptions import RedisError
 from app.integrations.cache.config import cache_settings
 from app.integrations.cache.constants import CacheDefaults
 from app.integrations.cache.keys import CacheKeyBuilder
-from app.markers import helper, integration
+from app.core.base.markers import helper, integration
 
 logger = logging.getLogger(__name__)
 
@@ -311,7 +311,7 @@ def queue_exceptions() -> str:
     return '''
 """Errors owned by the queue integration."""
 
-from app.exceptions import IntegrationError
+from app.core.exceptions import IntegrationError
 from app.integrations.queue.constants import QueueErrorCode
 
 
@@ -408,11 +408,11 @@ import aio_pika
 import structlog
 from aio_pika.abc import AbstractChannel, AbstractExchange, AbstractRobustConnection
 
-from app.events import DomainEvent
+from app.core.events import DomainEvent
 from app.integrations.queue.config import queue_settings
 from app.integrations.queue.exceptions import BrokerNotConnected, PublishFailed
 from app.integrations.queue.topology import QueueTopology
-from app.markers import helper, integration
+from app.core.base.markers import helper, integration
 
 logger = logging.getLogger(__name__)
 
@@ -579,7 +579,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Protocol
 {redis_import}
-from app.markers import integration
+from app.core.base.markers import integration
 
 logger = logging.getLogger(__name__)
 
@@ -677,7 +677,7 @@ def storage_exceptions() -> str:
     return '''
 """Errors owned by the storage integration."""
 
-from app.exceptions import IntegrationError, NotFoundError
+from app.core.exceptions import IntegrationError, NotFoundError
 from app.integrations.storage.constants import StorageErrorCode
 
 
@@ -708,8 +708,8 @@ import aioboto3
 from app.integrations.storage.config import storage_settings
 from app.integrations.storage.constants import StorageDefaults
 from app.integrations.storage.exceptions import UploadFailed
-from app.markers import helper, integration
-from app.retry import retry
+from app.core.base.markers import helper, integration
+from app.core.retry import retry
 
 logger = logging.getLogger(__name__)
 

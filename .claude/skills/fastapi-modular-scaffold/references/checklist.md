@@ -10,7 +10,7 @@ Run this before the first real traffic, and again after any structural change.
 - [ ] No cache key built outside `integrations/cache/keys.py`
 - [ ] No `os.getenv` outside a `config.py`
 - [ ] No `utils.py` or `helpers.py` at the root
-- [ ] `app/exceptions.py` names no domain entity
+- [ ] `app/core/exceptions.py` names no domain entity
 - [ ] `app/constants.py` holds no business limit
 - [ ] No module's `constants.py` imports another module's `constants.py`
 - [ ] No repository calls `commit()`
@@ -66,7 +66,7 @@ Run this before the first real traffic, and again after any structural change.
 - [ ] No route ever puts `ErrorPayload.message` in front of a user — that's the frontend i18n system's job, keyed on `error.code`
 - [ ] `main.py` handles `RequestValidationError`, not just `AppError` and `Exception` — otherwise a schema `field_validator` failure returns FastAPI's default `{"detail": [...]}` instead of the envelope
 - [ ] A schema's `field_validator`/`field_serializer` for a field calls into that module's `rules.py`/`utils/` rather than reimplementing the check inline — one implementation of the rule, invoked from both the wire boundary and the use case
-- [ ] `app/database.py`'s `get_session` commits on success and rolls back on failure — required for any `--minimal` module, since its repository only ever calls `flush()`
+- [ ] `app/core/database.py`'s `get_session` commits on success and rolls back on failure — required for any `--minimal` module, since its repository only ever calls `flush()`
 
 ## Operations
 

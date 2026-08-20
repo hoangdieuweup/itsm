@@ -21,7 +21,7 @@ The default mistake is a global `role` column on `User`. It can't express "admin
 from sqlalchemy import ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
+from app.core.database import Base
 
 
 class Organization(Base):
@@ -101,7 +101,7 @@ Routes ask "can this user do X," never "does this user have role Y." That indire
 from fastapi import Depends, HTTPException, status
 
 from app.access.repository import AbstractAccessRepository
-from app.database import get_session
+from app.core.database import get_session
 from app.identity.dependencies import get_current_user
 from app.identity.schemas import IdentityRead
 

@@ -505,7 +505,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy import pool
 
 from app.config import settings
-from app.database import Base
+from app.core.database import Base
 {imports}
 
 config = context.config
@@ -624,7 +624,7 @@ uv run alembic upgrade head
 
 1. A module reaches another only through its `public.py`. `lint-imports` enforces it.
 2. Constants, enums, config, exceptions and helpers live in the module that owns the concept.
-3. The root holds mechanism, never a business concept. If `app/exceptions.py` starts
+3. The root holds mechanism, never a business concept. If `app/core/exceptions.py` starts
    naming domain entities, the boundary has already leaked.
 4. `rules.py` holds pure decisions; `utils.py` holds formatting and normalization.
 5. Cross module imports name the module: `from app.identity import constants as identity_constants`.

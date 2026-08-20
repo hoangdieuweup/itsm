@@ -13,7 +13,7 @@ def constants(name: str) -> str:
 """Constants and enums owned by the {name} module.
 
 Other modules import these with an explicit alias:
-    from app.{name} import constants as {name}_constants
+    from app.modules.{name} import constants as {name}_constants
 """
 
 from enum import StrEnum
@@ -74,8 +74,8 @@ about {name}: what counts as missing, what counts as a conflict. The mechanism
 they build on lives in app.exceptions.
 """
 
-from app.exceptions import ConflictError, NotFoundError, ValidationFailedError
-from app.{name}.constants import ErrorCode
+from app.core.exceptions import ConflictError, NotFoundError, ValidationFailedError
+from app.modules.{name}.constants import ErrorCode
 
 
 class {cls}NotFound(NotFoundError):
@@ -120,7 +120,7 @@ dumping ground and lets a module be extracted with its configuration intact.
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.{name}.constants import {cls}CacheKeys
+from app.modules.{name}.constants import {cls}CacheKeys
 
 
 class {cls}Config(BaseSettings):
@@ -156,10 +156,10 @@ from datetime import datetime
 
 from pydantic import field_validator
 
-from app.models import CustomModel, FrozenModel
-from app.{name}.constants import {cls}Status
-from app.{name}.rules import {cls}Rules
-from app.{name}.utils import {cls}TextUtils
+from app.core.models import CustomModel, FrozenModel
+from app.modules.{name}.constants import {cls}Status
+from app.modules.{name}.rules import {cls}Rules
+from app.modules.{name}.utils import {cls}TextUtils
 
 
 class {cls}Read(FrozenModel):
@@ -216,8 +216,8 @@ from datetime import datetime
 from sqlalchemy import DateTime, Enum, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
-from app.{name}.constants import {cls}Limits, {cls}Status
+from app.core.database import Base
+from app.modules.{name}.constants import {cls}Limits, {cls}Status
 
 
 class {cls}(Base):
@@ -248,8 +248,8 @@ what keeps these testable without fixtures, and it is the difference between
 this class and utils/, which holds non business helpers.
 """
 
-from app.markers import rule
-from app.{name}.constants import {cls}Limits, {cls}Status
+from app.core.base.markers import rule
+from app.modules.{name}.constants import {cls}Limits, {cls}Status
 
 
 class {cls}Rules:
@@ -293,7 +293,7 @@ another kind of helper. Anything that encodes a business decision belongs in
 rules.py instead, so the two can be reviewed and tested on different terms.
 """
 
-from app.{name}.utils.text import {cls}TextUtils
+from app.modules.{name}.utils.text import {cls}TextUtils
 
 __all__ = ["{cls}TextUtils"]
 '''
@@ -307,7 +307,7 @@ def utils_text(name: str) -> str:
 
 import re
 
-from app.markers import helper
+from app.core.base.markers import helper
 
 _WHITESPACE = re.compile(r"\\s+")
 
@@ -335,7 +335,7 @@ def repository(name: str, with_cache: bool) -> str:
     cls = _cls(name)
     if with_cache:
         cache_import = "from app.integrations.cache.client import CacheClient"
-        const_import = f"from app.{name}.constants import {cls}CacheKeys, {cls}Status"
+        const_import = f"from app.modules.{name}.constants import {cls}CacheKeys, {cls}Status"
         init_sig = "session: AsyncSession, cache: CacheClient"
         init_body = "        self._session = session\n        self._cache = cache"
         get_body = f'''        return await self._cache.get_or_load(
@@ -348,16 +348,16 @@ def repository(name: str, with_cache: bool) -> str:
         row = await self._session.scalar(select({cls}).where({cls}.id == entity_id))
         return {cls}Read.model_validate(row) if row else None
 '''
-        marker_import = "from app.markers import database, helper"
+        marker_import = "from app.core.base.markers import database, helper"
     else:
         cache_import = ""
-        const_import = f"from app.{name}.constants import {cls}Status"
+        const_import = f"from app.modules.{name}.constants import {cls}Status"
         init_sig = "session: AsyncSession"
         init_body = "        self._session = session"
         get_body = f'''        row = await self._session.scalar(select({cls}).where({cls}.id == entity_id))
         return {cls}Read.model_validate(row) if row else None'''
         loader = ""
-        marker_import = "from app.markers import database"
+        marker_import = "from app.core.base.markers import database"
 
     return f'''
 """Single access path to the {name} tables."""
@@ -370,10 +370,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 {cache_import}
 {const_import}
 {marker_import}
-from app.repository import AbstractRepository
-from app.{name}.exceptions import {cls}NotFound
-from app.{name}.models import {cls}
-from app.{name}.schemas import {cls}Read
+from app.core.base.repository import AbstractRepository
+from app.modules.{name}.exceptions import {cls}NotFound
+from app.modules.{name}.models import {cls}
+from app.modules.{name}.schemas import {cls}Read
 
 
 class Abstract{cls}Repository(AbstractRepository[{cls}Read]):
@@ -475,7 +475,7 @@ def uow(name: str, with_cache: bool) -> str:
             "        self._stale.clear()\n"
             f'        logger.warning("{name} unit of work rolled back")'
         )
-        marker_import = "from app.markers import database, helper"
+        marker_import = "from app.core.base.markers import database, helper"
     else:
         cache_import = ""
         init_sig = "session: AsyncSession"
@@ -489,7 +489,7 @@ def uow(name: str, with_cache: bool) -> str:
             "        await self._session.rollback()\n"
             f'        logger.warning("{name} unit of work rolled back")'
         )
-        marker_import = "from app.markers import database"
+        marker_import = "from app.core.base.markers import database"
 
     return f'''
 """Transaction boundary for the {name} module."""
@@ -500,8 +500,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 {cache_import}
 {marker_import}
-from app.uow import AbstractUnitOfWork
-from app.{name}.repository import Abstract{cls}Repository, {cls}Repository
+from app.core.base.uow import AbstractUnitOfWork
+from app.modules.{name}.repository import Abstract{cls}Repository, {cls}Repository
 
 logger = logging.getLogger(__name__)
 
@@ -536,8 +536,8 @@ def events(name: str) -> str:
     return f'''
 """Events published by the {name} module."""
 
-from app.events import DomainEvent
-from app.{name}.constants import {cls}Events, {cls}Status
+from app.core.events import DomainEvent
+from app.modules.{name}.constants import {cls}Events, {cls}Status
 
 
 class {cls}Created(DomainEvent):
@@ -572,12 +572,12 @@ def service_read(name: str) -> str:
     return f'''
 """Read use case of the {name} module."""
 
-from app.markers import use_case
-from app.pagination import Page, PaginationParams
-from app.use_case import AbstractUseCase
-from app.{name}.exceptions import {cls}NotFound
-from app.{name}.repository import Abstract{cls}Repository
-from app.{name}.schemas import {cls}Read
+from app.core.base.markers import use_case
+from app.core.pagination import Page, PaginationParams
+from app.core.base.use_case import AbstractUseCase
+from app.modules.{name}.exceptions import {cls}NotFound
+from app.modules.{name}.repository import Abstract{cls}Repository
+from app.modules.{name}.schemas import {cls}Read
 
 
 class Get{cls}(AbstractUseCase):
@@ -618,7 +618,7 @@ def service_write(name: str, with_uow: bool) -> str:
     """Render the write use case."""
     cls = _cls(name)
     if with_uow:
-        dep_import = f"from app.{name}.uow import Abstract{cls}UnitOfWork"
+        dep_import = f"from app.modules.{name}.uow import Abstract{cls}UnitOfWork"
         init_sig = f"uow: Abstract{cls}UnitOfWork, events: EventBus"
         init_body = "        self._uow = uow\n        self._events = events"
         lookup = f"        existing = await self._uow.{name}.find_by_name(name)"
@@ -627,7 +627,7 @@ def service_write(name: str, with_uow: bool) -> str:
             await self._uow.commit()
 '''
     else:
-        dep_import = f"from app.{name}.repository import Abstract{cls}Repository"
+        dep_import = f"from app.modules.{name}.repository import Abstract{cls}Repository"
         init_sig = f"repo: Abstract{cls}Repository, events: EventBus"
         init_body = "        self._repo = repo\n        self._events = events"
         lookup = "        existing = await self._repo.find_by_name(name)"
@@ -636,15 +636,15 @@ def service_write(name: str, with_uow: bool) -> str:
     return f'''
 """Write use case of the {name} module."""
 
-from app.events import EventBus
-from app.markers import use_case
-from app.use_case import AbstractUseCase
+from app.core.events import EventBus
+from app.core.base.markers import use_case
+from app.core.base.use_case import AbstractUseCase
 {dep_import}
-from app.{name}.events import {cls}Created
-from app.{name}.exceptions import Invalid{cls}Name, {cls}NameTaken
-from app.{name}.rules import {cls}Rules
-from app.{name}.schemas import {cls}Read
-from app.{name}.utils import {cls}TextUtils
+from app.modules.{name}.events import {cls}Created
+from app.modules.{name}.exceptions import Invalid{cls}Name, {cls}NameTaken
+from app.modules.{name}.rules import {cls}Rules
+from app.modules.{name}.schemas import {cls}Read
+from app.modules.{name}.utils import {cls}TextUtils
 
 
 class Create{cls}(AbstractUseCase):
@@ -708,7 +708,7 @@ async def get_repo(uow: Abstract{cls}UnitOfWork = Depends(get_uow)) -> Abstract{
     """Expose the repository held by the unit of work."""
     return uow.{name}
 '''
-        uow_import = f"from app.{name}.uow import Abstract{cls}UnitOfWork, {cls}UnitOfWork"
+        uow_import = f"from app.modules.{name}.uow import Abstract{cls}UnitOfWork, {cls}UnitOfWork"
         write_dep = f'''
 async def create_{name}_service(
     uow: Abstract{cls}UnitOfWork = Depends(get_uow),
@@ -730,14 +730,14 @@ abstraction. See references/layer-examples.md.
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_session
-from app.events import EventBus, get_event_bus
+from app.core.database import get_session
+from app.core.events import EventBus, get_event_bus
 {cache_type}
 {cache_import}
-from app.{name}.repository import Abstract{cls}Repository, {cls}Repository
-from app.{name}.schemas import {cls}Read
-from app.{name}.services.create_{name} import Create{cls}
-from app.{name}.services.read_{name} import Get{cls}, List{cls}s
+from app.modules.{name}.repository import Abstract{cls}Repository, {cls}Repository
+from app.modules.{name}.schemas import {cls}Read
+from app.modules.{name}.services.create_{name} import Create{cls}
+from app.modules.{name}.services.read_{name} import Get{cls}, List{cls}s
 {uow_import}
 
 {root}
@@ -769,12 +769,12 @@ def router(name: str) -> str:
 
 from fastapi import APIRouter, Depends, status
 
-from app.models import ApiResponse
-from app.pagination import Page, PaginationParams, pagination_params
-from app.{name}.dependencies import create_{name}_service, list_{name}_service, valid_{name}_id
-from app.{name}.schemas import {cls}Create, {cls}Read
-from app.{name}.services.create_{name} import Create{cls}
-from app.{name}.services.read_{name} import List{cls}s
+from app.core.models import ApiResponse
+from app.core.pagination import Page, PaginationParams, pagination_params
+from app.modules.{name}.dependencies import create_{name}_service, list_{name}_service, valid_{name}_id
+from app.modules.{name}.schemas import {cls}Create, {cls}Read
+from app.modules.{name}.services.create_{name} import Create{cls}
+from app.modules.{name}.services.read_{name} import List{cls}s
 
 router = APIRouter(prefix="/{name}", tags=["{name}"])
 
@@ -819,10 +819,10 @@ module impossible to extract later.
 
 from fastapi import Depends
 
-from app.markers import facade
-from app.{name}.dependencies import get_repo
-from app.{name}.repository import Abstract{cls}Repository
-from app.{name}.schemas import {cls}Read
+from app.core.base.markers import facade
+from app.modules.{name}.dependencies import get_repo
+from app.modules.{name}.repository import Abstract{cls}Repository
+from app.modules.{name}.schemas import {cls}Read
 
 
 class {cls}Api:

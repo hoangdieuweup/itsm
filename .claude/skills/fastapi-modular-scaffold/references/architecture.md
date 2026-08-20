@@ -15,7 +15,7 @@ depend on neither. Domain modules reach each other only sideways, through
 `public.py`.
 
 `service` depends on `Abstract{X}Repository`/`Abstract{X}UnitOfWork` — contracts
-owned by the root (`app/repository.py`, `app/uow.py`), not on the concrete
+owned by the root (`app/core/base/repository.py`, `app/core/base/uow.py`), not on the concrete
 SQLAlchemy class `repository.py` also defines. `dependencies.py` is the
 composition root: the one place a concrete class is named and constructed.
 See `references/layer-examples.md` for the full worked example, including why
@@ -160,7 +160,7 @@ file and one class per concern, the same way `services/` is one file per use cas
 This does not reach into `router.py`, `dependencies.py`, or `lifespan.py` — a FastAPI dependency
 provider is a plain function `Depends()` calls directly, which is a framework entry point, not the
 scattered helper this rule targets. See `references/layer-examples.md` for the full worked example,
-including the `@database`/`@helper`/`@rule`/`@use_case`/`@facade` decorators in `app/markers.py` that
+including the `@database`/`@helper`/`@rule`/`@use_case`/`@facade` decorators in `app/core/base/markers.py` that
 tag each class with its role.
 
 ## Configuration

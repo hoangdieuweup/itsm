@@ -1,10 +1,10 @@
 # API contract: camelCase, the response envelope, and i18n
 
-The wire format is a contract with whatever consumes it — usually a frontend on a different stack with different naming conventions. This file is the single source of truth for that contract; `app/models.py` is where it's enforced in code.
+The wire format is a contract with whatever consumes it — usually a frontend on a different stack with different naming conventions. This file is the single source of truth for that contract; `app/core/models.py` is where it's enforced in code.
 
 ## camelCase on the wire, snake_case in Python
 
-`CustomModel`/`FrozenModel` (`app/models.py`) set `alias_generator=to_camel` plus `populate_by_name=True`. Every schema that inherits from them — which is all of them, including `Page` — gets this for free:
+`CustomModel`/`FrozenModel` (`app/core/models.py`) set `alias_generator=to_camel` plus `populate_by_name=True`. Every schema that inherits from them — which is all of them, including `Page` — gets this for free:
 
 ```python
 class IdentityRead(FrozenModel):
@@ -25,7 +25,7 @@ Every endpoint returns the same shape, success or failure, REST or SSE:
 { "success": false, "data": null, "error": { "code": "identity_not_found", "message": "Resource not found", "context": {} } }
 ```
 
-`ApiResponse[T]` and `ErrorPayload` (`app/models.py`) are the two pieces. A router returns `ApiResponse(success=True, data=result)`; the three exception handlers in `main.py` build the failure half automatically — a route never constructs an error envelope by hand:
+`ApiResponse[T]` and `ErrorPayload` (`app/core/models.py`) are the two pieces. A router returns `ApiResponse(success=True, data=result)`; the three exception handlers in `main.py` build the failure half automatically — a route never constructs an error envelope by hand:
 
 - `handle_app_error` for `AppError` subclasses (a domain error a service raised)
 - `handle_validation_error` for `RequestValidationError` — this is what a schema's `field_validator` failure turns into (see `references/layer-examples.md#schemaspy--validation-and-serialization-live-on-the-schema`); without this handler, a bad request body would return FastAPI's own default `{"detail": [...]}` shape instead of the envelope, since `RequestValidationError` isn't an `AppError`

@@ -46,7 +46,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from testcontainers.postgres import PostgresContainer
 
-from app.database import Base, get_session
+from app.core.database import Base, get_session
 from app.main import app
 {cache_import}
 
@@ -114,8 +114,8 @@ def test_rules(name: str) -> str:
 
 import pytest
 
-from app.{name}.constants import {cls}Limits, {cls}Status
-from app.{name}.rules import {cls}Rules
+from app.modules.{name}.constants import {cls}Limits, {cls}Status
+from app.modules.{name}.rules import {cls}Rules
 
 
 @pytest.mark.parametrize(
@@ -156,7 +156,7 @@ def test_services(name: str, with_uow: bool) -> str:
     cls = _cls(name)
 
     if with_uow:
-        uow_import = f"from app.{name}.uow import Abstract{cls}UnitOfWork\n"
+        uow_import = f"from app.modules.{name}.uow import Abstract{cls}UnitOfWork\n"
         double = f'''
 class Fake{cls}UnitOfWork(Abstract{cls}UnitOfWork):
     """In-memory unit of work: no session, no network, no fixtures."""
@@ -215,12 +215,12 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.events import DomainEvent, EventBus
-from app.{name}.constants import {cls}Status
-from app.{name}.exceptions import {cls}NameTaken
-from app.{name}.repository import Abstract{cls}Repository
-{uow_import}from app.{name}.schemas import {cls}Read
-from app.{name}.services.create_{name} import Create{cls}
+from app.core.events import DomainEvent, EventBus
+from app.modules.{name}.constants import {cls}Status
+from app.modules.{name}.exceptions import {cls}NameTaken
+from app.modules.{name}.repository import Abstract{cls}Repository
+{uow_import}from app.modules.{name}.schemas import {cls}Read
+from app.modules.{name}.services.create_{name} import Create{cls}
 
 
 class InMemoryEventBus(EventBus):

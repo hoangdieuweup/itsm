@@ -18,13 +18,13 @@ A second question resolves most of the remainder: **if this module were extracte
 | `MAX_SEATS`, `RETRY_LIMIT` | `<module>/constants.py`, as a `Limits`-style class attribute | Business limit, changes with the business |
 | `ErrorCode` string enum | `<module>/constants.py` | Client-facing contract of that module |
 | `OrderNotFound`, `SeatLimitReached` | `<module>/exceptions.py` | Knows what an order is |
-| `AppError`, `NotFoundError` | `app/exceptions.py` | Mechanism: base classes and HTTP mapping |
+| `AppError`, `NotFoundError` | `app/core/exceptions.py` | Mechanism: base classes and HTTP mapping |
 | `JWT_SECRET`, module TTLs | `<module>/config.py` | Nobody else reads them |
 | `DATABASE_URL`, `CORS_ORIGINS`, `ENV` | `app/config.py` | The process needs them to start |
 | `can_cancel_order()` | `<module>/rules.py`, as a `@rule`-decorated class's `@staticmethod` | A decision |
 | `normalize_email()`, `slugify()` | `<module>/utils/`, as a `@helper`-decorated class's `@staticmethod` | A transform |
-| `Page`, `PaginationParams` | `app/pagination.py` | Mechanism, no domain knowledge |
-| `CustomModel`, `FrozenModel` | `app/models.py` | Mechanism |
+| `Page`, `PaginationParams` | `app/core/pagination.py` | Mechanism, no domain knowledge |
+| `CustomModel`, `FrozenModel` | `app/core/models.py` | Mechanism |
 | `Environment` enum | `app/constants.py` | About the process, not the business |
 | Redis key construction | `integrations/cache/keys.py`, as a `CacheKeyBuilder`-style class | One place, or invalidation cannot be reasoned about |
 
@@ -42,7 +42,7 @@ The rule is about shape within the owning file, not about where cross-module acc
 (`public.py` still owns that). It does not reach `router.py`, `dependencies.py` or `lifespan.py` — a
 FastAPI dependency provider is a plain function `Depends()` calls directly, a framework entry point,
 not the scattered helper this rule targets. See `references/layer-examples.md` for the full pattern,
-including the `@database`/`@helper`/`@rule`/`@use_case`/`@facade` markers in `app/markers.py` that tag
+including the `@database`/`@helper`/`@rule`/`@use_case`/`@facade` markers in `app/core/base/markers.py` that tag
 each class with its role.
 
 ## rules.py against utils/
@@ -78,7 +78,7 @@ The only structural difference from a domain module is absence: no `models.py` (
 Each of these means the boundary has already leaked:
 
 - `app/utils.py`, `app/utils/` or `app/helpers.py` exists at the root
-- `app/exceptions.py` mentions a domain entity by name
+- `app/core/exceptions.py` mentions a domain entity by name
 - `app/constants.py` holds a business limit
 - Global `Config` has a setting only one module reads
 - Two modules import the same helper from a third module that is neither's owner
