@@ -1,0 +1,13 @@
+{
+  "errors": {
+    "somethingWentWrong": "Something went wrong",
+    "tryAgain": "Try again",
+    "unknown": "Something went wrong."
+  },
+  "meta": {
+    "appName": "ITSM",
+    "appDescription": "IT service management for WeUpBook",
+    "copyright": "© {year} Weupbook — All rights reserved.",
+    "loginTitle": "Sign in — ITSM"
+  }
+}

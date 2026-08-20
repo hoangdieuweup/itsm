@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+import { setRequestLocale } from "next-intl/server";
 import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { createQueryClient } from "@/shared/lib/query-client";
 import { AuthGuard, UserMenu, authKeys, fetchAuthSession } from "@/modules/auth";
@@ -10,9 +12,14 @@ import { AuthGuard, UserMenu, authKeys, fetchAuthSession } from "@/modules/auth"
  */
 export default async function DashboardLayout({
   children,
+  params,
 }: {
   children: React.ReactNode;
+  params: Promise<{ locale: string }>;
 }) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+
   const queryClient = createQueryClient();
   await queryClient.prefetchQuery({
     queryKey: authKeys.session(),
@@ -23,13 +30,21 @@ export default async function DashboardLayout({
     <HydrationBoundary state={dehydrate(queryClient)}>
       <AuthGuard>
         <div className="flex flex-1 flex-col">
-          <header className="flex items-center justify-between border-b px-6 py-3">
-            <span className="font-semibold">ITSM</span>
-            <UserMenu />
-          </header>
+          <DashboardHeader />
           <main className="flex flex-1 flex-col p-6">{children}</main>
         </div>
       </AuthGuard>
     </HydrationBoundary>
+  );
+}
+
+function DashboardHeader() {
+  const t = useTranslations("common.meta");
+
+  return (
+    <header className="flex items-center justify-between border-b px-6 py-3">
+      <span className="font-semibold">{t("appName")}</span>
+      <UserMenu />
+    </header>
   );
 }

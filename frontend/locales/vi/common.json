@@ -1,0 +1,13 @@
+{
+  "errors": {
+    "somethingWentWrong": "Đã xảy ra lỗi",
+    "tryAgain": "Thử lại",
+    "unknown": "Đã xảy ra lỗi không xác định."
+  },
+  "meta": {
+    "appName": "ITSM",
+    "appDescription": "Quản lý dịch vụ CNTT cho WeUpBook",
+    "copyright": "© {year} Weupbook — All rights reserved.",
+    "loginTitle": "Đăng nhập — ITSM"
+  }
+}
