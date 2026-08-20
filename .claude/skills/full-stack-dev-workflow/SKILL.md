@@ -49,6 +49,25 @@ involving Next.js and/or FastAPI. Do not skip phases. Do not skip mandatory step
 
 ---
 
+## PHASE 0.25 — Multi-Agent Coordination & Split Decision (mandatory when issue-driven / automation-driven; skip for direct interactive chat with one user)
+
+**Applies whenever this task was picked up from a shared queue (e.g. a GitHub issue polled by an automation)** where other agent runs — past, concurrent, or future — may touch the same repo. You act as your own supervisor here: no external process decides this for you.
+
+1. **Staleness check (recover abandoned locks).** List other issues currently marked as claimed/in-progress in the same tracker. For each:
+   - If its claim comment is older than this automation's execution timeout + a safety margin (e.g. timeout + 10 min) with no follow-up completion/PR/hand-back comment → treat it as **abandoned**, not active. Post a short comment explaining the previous run likely timed out or crashed, remove the stale in-progress marker, and (if that issue is unrelated to yours) leave it available for the next poll to pick up — do not silently leave a dead lock in place forever.
+2. **Conflict check (avoid parallel agents colliding on the same files).** Determine which paths/modules *your* candidate task would touch (from the issue body/labels, or your own read of the codebase). Compare against paths declared or reasonably inferable for any **still-active** (non-stale) in-progress issue:
+   - **Overlap found** (same files/modules, or one depends on output the other hasn't produced yet) → **do not claim this issue now.** Skip it this cycle silently (no spam comment needed for a routine skip) and let a future poll re-check. This is "wait," not "fail."
+   - **No overlap** → safe to proceed to claim.
+3. **Split decision (you decide, not a human, not a fixed rule).** Once you've read the issue/spec enough to understand real scope (this may require a lightweight pass — doesn't need full Phase 0.5 depth yet):
+   - Estimate whether the work is a single coherent, independently-reviewable, mergeable unit that plausibly fits one execution budget (see Phase 2/3 budget-awareness).
+   - **If it clearly fits** → proceed as a single task (no split needed just because it's "issue-driven" — don't over-split trivial work).
+   - **If it doesn't fit, or spans genuinely independent surfaces** (e.g. backend scaffold vs. frontend scaffold vs. a specific integration) → act as supervisor: create separate sub-issues, each with an explicit **"Owns (paths)"** section listing the directories/files it is responsible for so future conflict checks (step 2) can rely on it. Keep the paths **disjoint** across sub-issues so parallel agents can't collide. Convert the original issue into a tracking/epic issue (remove the pickup label, link the sub-issues), comment explaining the split and why, and stop — do not implement anything yourself in this run. The next poll(s) will pick up the sub-issues normally.
+   - When in doubt between splitting and not — prefer **not splitting** trivial/ambiguous cases and instead ask (Phase 0 rule: ask once, don't guess) rather than fragmenting a task that didn't need it.
+
+**Output (Phase 0.25):** One line per check — "Staleness: none found / reclaimed #N", "Conflict: none / skipped #N due to overlap with #M", "Split: not needed / split into #A, #B, #C (owns: …)". If you skipped or split, stop here for this run.
+
+---
+
 ## PHASE 0.5 — Read Related Skills (mandatory, before Plan and before editing code)
 
 **Do not create a plan or edit code before reading related skills.**
@@ -147,7 +166,7 @@ Constraints to apply:
    - **nextjs-modular-architecture** (boundary, folder, no domain leaking)
    - **ui-ux-pro-max** when UI is involved (hierarchy, spacing, a11y, responsive, states)
    - **fastapi-modular-scaffold** (router → service → repo, clear schemas)
-3. **If running under a bounded execution budget** (e.g. an automation/cron runner with a fixed timeout, not an interactive chat session): scope the plan so at least the first coherent, independently-mergeable unit of work (e.g. backend scaffold only, or one module) fits comfortably within the budget with room for Phase 4 review. Do not plan a single pass that spans backend scaffold + frontend scaffold + a full OAuth integration if that realistically needs more time than is available — split it into multiple issues/PRs instead (state this split explicitly in the plan and in the issue comment) rather than silently running out of time mid-implementation.
+3. **If running under a bounded execution budget** (e.g. an automation/cron runner with a fixed timeout, not an interactive chat session): scope the plan so the unit of work fits comfortably within the budget with room for Phase 4 review. This should normally already be true — Phase 0.25 is responsible for splitting oversized issue-driven work *before* this point. If you reach Phase 2 and only now realize the scope is too large (e.g. Phase 0.25 was skipped, or the scope grew during Plan), go back and apply Phase 0.25's split decision rather than plowing ahead into a run you can't finish.
 4. **Do not implement** until the plan is complete.
 
 **Output (Phase 2):** `PLAN.md` file written (with Skills Applied section). Notify user "Plan complete, proceed with implementation?" for large tasks; small tasks may continue directly.
@@ -242,6 +261,7 @@ Constraints to apply:
 6. Each phase must have a **clear output** before moving to the next.
 7. When the user says "quick fix" / "just one change" → still run Phase 0 + **0.5** + 4 minimum; Phase 1–2 can be shortened if truly trivial (but you still must read related skills).
 8. **Architectural review findings get at most 2 fix→review rounds** (Phase 4). Never loop indefinitely trying to satisfy a skill's rules — if still failing after 2 rounds, or if genuinely ambiguous at any point, **escalate instead of guessing**: ask the user, or if issue-driven, comment on the issue + label `needs-info` + stop. Never ship a PR that silently violates its own governing skill's rules.
+9. **When issue-driven / running alongside other agents, run Phase 0.25 first.** You are your own supervisor: reclaim stale locks instead of leaving them stuck forever, skip (wait) instead of colliding with another active claim on overlapping paths, and split oversized work into disjoint sub-issues instead of guessing you can finish it in one bounded run. Never let two agents edit the same files concurrently, and never let a claimed issue sit locked with no trace of what happened to it.
 
 ---
 
@@ -272,4 +292,4 @@ You:
 
 ---
 
-End of skill. Start every task with Phase 0 → Phase 0.5.
+End of skill. Start every task with Phase 0 → Phase 0.25 (if issue/automation-driven) → Phase 0.5.
