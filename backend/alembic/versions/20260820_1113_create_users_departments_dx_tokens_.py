@@ -63,6 +63,7 @@ def upgrade() -> None:
         sa.Column("access_token", sa.Text(), nullable=False),
         sa.Column("refresh_token", sa.Text(), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("scopes", sa.Text(), server_default="", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(

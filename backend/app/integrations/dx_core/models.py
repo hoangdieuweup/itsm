@@ -1,10 +1,7 @@
 """ORM model owned by the dx_core integration. No other module may query this table.
 
-Structural skeleton: the columns exist so the SSO integration sub-issue has a
-place to write encrypted tokens into, but nothing writes to this table yet —
-the Fernet encryption in app.core.crypto is out of scope for this issue (see
-issue #3's "Not owned by this issue" section). access_token/refresh_token
-store ciphertext (base64), never plaintext, once that lands.
+access_token/refresh_token store Fernet ciphertext (base64), never plaintext
+— see app.core.crypto.FernetCodec and app.integrations.dx_core.repository.
 """
 
 from datetime import datetime
@@ -27,6 +24,7 @@ class DxToken(Base):
     access_token: Mapped[str] = mapped_column(Text)
     refresh_token: Mapped[str] = mapped_column(Text)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    scopes: Mapped[str] = mapped_column(Text, default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
