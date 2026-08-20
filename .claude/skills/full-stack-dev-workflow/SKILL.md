@@ -30,6 +30,7 @@ involving Next.js and/or FastAPI. Do not skip phases. Do not skip mandatory step
 |--------------|------|-------------|
 | **firecrawl MCP** | tool | Look up official docs when **not fully certain** about an API, config, or best practice. Do not guess. |
 | **gitnexus / git** | tool | Understand the repo, branch, commit history, PR, and conflicts before editing / committing. |
+| **gitnexus MCP** (impact/detect_changes/check/context) | tool — **MANDATORY** | `npx gitnexus analyze` at Phase 0 to index. `impact()` at Phase 2 for blast-radius before changing symbols. `detect_changes()` + `check()` at Phase 4 to verify changes match plan. Loop-fix if unexpected impact found. |
 | **nextjs-modular-architecture** (`.claude/skills/nextjs-modular-architecture`) | skill | Any change on the Next.js side (App Router, module boundary, folder structure, TanStack Query, shadcn/ui). |
 | **fastapi-modular-scaffold** (`.claude/skills/fastapi-modular-scaffold`) | skill | Any change on the FastAPI side (router, service, schema, dependency, module ownership). |
 | **reviewing-code-against-skills** (`.claude/skills/reviewing-code-against-skills`) | skill | After coding — review the diff against the architecture + UI skills above. |
@@ -45,12 +46,13 @@ involving Next.js and/or FastAPI. Do not skip phases. Do not skip mandatory step
    - Current branch, working tree status
    - Recently modified files / related modules
    - Repo commit conventions
-3. Determine scope:
+3. **Run `npx gitnexus analyze`** if the index is stale or this is the first task in the session. This ensures the code graph is up-to-date for impact analysis in later phases.
+4. Determine scope:
    - Frontend only / Backend only / Full-stack
    - New feature / Bugfix / Refactor
-4. If critical information is missing → **ask the user once**, do not guess.
+5. If critical information is missing → **ask the user once**, do not guess.
 
-**Output (Phase 0):** 3–5 line summary of task understanding + scope.
+**Output (Phase 0):** 3–5 line summary of task understanding + scope + confirmation that gitnexus index is current.
 
 ---
 
@@ -145,7 +147,13 @@ Constraints to apply:
 
 **Only write the plan after Phase 0.5 is complete.**
 
-1. Write a concise plan in `PLAN.md` (or `.agents_tmp/PLAN.md`) with this structure:
+**GitNexus impact assessment is MANDATORY in this phase.** For every existing symbol you plan to modify:
+1. Run `impact(target: "<symbol>", direction: "upstream")` to see what depends on it.
+2. If risk is HIGH or CRITICAL → document mitigation in the plan.
+3. Use `context()` to drill into high-risk dependents.
+4. Include the impact summary in the "Impact Assessment" section of the plan.
+
+5. Write a concise plan in `PLAN.md` (or `.agents_tmp/PLAN.md`) with this structure:
 
 ```markdown
 # Plan: <task name>
@@ -167,6 +175,12 @@ Constraints to apply:
 - ui-ux-pro-max: <mandatory during Phase 3 if UI is involved — name the surfaces / n/a>
 - (specific constraints to follow)
 
+## Impact Assessment (GitNexus)
+- Symbols to modify: ...
+- Risk level per symbol: ...
+- Affected processes/modules: ...
+- Mitigation for HIGH/CRITICAL: ...
+
 ## Architecture Impact
 - Next.js modules affected:
 - UI surfaces / components affected:
@@ -185,14 +199,14 @@ Constraints to apply:
 - ...
 ```
 
-2. Every step in the plan **must respect** the constraints read in Phase 0.5:
+6. Every step in the plan **must respect** the constraints read in Phase 0.5:
    - **nextjs-modular-architecture** (boundary, folder, no domain leaking)
    - **fastapi-modular-scaffold** (router → service → repo, clear schemas)
    - If UI is involved, the plan's **Plugins** section must explicitly state `ui-ux-pro-max` will be invoked during Phase 3 for each affected surface — do not leave this implicit.
-3. **If running under a bounded execution budget** (e.g. an automation/cron runner with a fixed timeout, not an interactive chat session): scope the plan so the unit of work fits comfortably within the budget with room for Phase 4 review. This should normally already be true — Phase 0.25 is responsible for splitting oversized issue-driven work *before* this point. If you reach Phase 2 and only now realize the scope is too large (e.g. Phase 0.25 was skipped, or the scope grew during Plan), go back and apply Phase 0.25's split decision rather than plowing ahead into a run you can't finish.
-4. **Do not implement** until the plan is complete.
+7. **If running under a bounded execution budget** (e.g. an automation/cron runner with a fixed timeout, not an interactive chat session): scope the plan so the unit of work fits comfortably within the budget with room for Phase 4 review. This should normally already be true — Phase 0.25 is responsible for splitting oversized issue-driven work *before* this point. If you reach Phase 2 and only now realize the scope is too large (e.g. Phase 0.25 was skipped, or the scope grew during Plan), go back and apply Phase 0.25's split decision rather than plowing ahead into a run you can't finish.
+8. **Do not implement** until the plan is complete.
 
-**Output (Phase 2):** `PLAN.md` file written (with Skills Applied section). Notify user "Plan complete, proceed with implementation?" for large tasks; small tasks may continue directly.
+**Output (Phase 2):** `PLAN.md` file written (with Skills Applied + Impact Assessment sections). Notify user "Plan complete, proceed with implementation?" for large tasks; small tasks may continue directly.
 
 ---
 
@@ -221,10 +235,23 @@ Constraints to apply:
 
 ## PHASE 4 — Review Against Skills (mandatory, bounded fix loop)
 
+**Step 1: GitNexus Change Detection (MANDATORY before checklist)**
+
+1. Run `detect_changes(scope: "all")` to analyze all uncommitted changes.
+2. Run `check()` to verify no circular imports were introduced.
+3. Compare the detected impact against the Phase 2 impact assessment:
+   - Are there unexpected affected processes/symbols not in the plan?
+   - Did the blast radius grow beyond what was planned?
+4. If unexpected impact is found → **STOP. Update the plan, fix the code, re-run detect_changes. Loop until the actual impact matches the planned impact.**
+
+**Step 2: Skills Review**
+
 1. Use **reviewing-code-against-skills** on the diff just created.
 2. Mandatory checklist:
 
 ```text
+[ ] GitNexus detect_changes: actual impact matches planned impact from Phase 2?
+[ ] GitNexus check: no circular imports or structural issues?
 [ ] nextjs-modular-architecture: module boundary, import direction, folder structure correct?
 [ ] If UI involved: was ui-ux-pro-max actually invoked in Phase 3 (not skipped)? hierarchy, spacing, contrast, a11y, responsive, loading/empty/error states applied per its output?
 [ ] fastapi-modular-scaffold: correct layer (router/service/schema), no heavy logic in router?
@@ -236,6 +263,8 @@ Constraints to apply:
 
 A UI change where `ui-ux-pro-max` was **not** invoked during Phase 3 fails this checklist outright — treat it as an architectural finding (Phase 3 must be redone with the plugin invoked), not a note to remember for next time.
 
+**Step 3: Finding Classification & Fix Loop**
+
 3. Classify every finding from the report, per `reviewing-code-against-skills`' own distinction:
    - **Mechanical** — lint/format/type errors, auto-fixable by tooling (`ruff --fix`, `eslint --fix`, `prettier`). Fix immediately, re-run tooling. **No round limit** — this is cheap and deterministic.
    - **Architectural** — module boundary violation, cross-module import, wrong layer, missing SSR prefetch, N+1 query, missing auth check, etc. These need a real decision, not a mechanical fix.
@@ -244,9 +273,11 @@ A UI change where `ui-ux-pro-max` was **not** invoked during Phase 3 fails this 
    - Round 1: fix per the plan/skill's rule, re-run **reviewing-code-against-skills**.
    - Round 2 (only if findings remain): fix again, re-review.
    - **Do not attempt a 3rd round.** If findings are still failing after 2 rounds, that is a signal the spec/constraint is ambiguous or contradictory — not a reason to keep guessing.
+   - **After each fix round:** re-run `detect_changes(scope: "all")` + `check()` to verify the fix didn't introduce new unexpected impact.
 
 5. **Escalate instead of guessing** — trigger this immediately (don't wait for round 2 to finish) whenever:
    - Unresolved architectural findings remain after round 2, OR
+   - `detect_changes` keeps revealing unexpected blast radius after fixes, OR
    - At any point you are genuinely uncertain how to resolve a finding (conflicting skill rules, missing spec detail, ambiguous requirement).
 
    When escalating:
@@ -255,9 +286,9 @@ A UI change where `ui-ux-pro-max` was **not** invoked during Phase 3 fails this 
    - If working directly with a user in chat (no issue tracker involved): ask the user one focused question and wait for their answer before continuing.
    - Never merge, never self-approve, never silently ship code that fails its own architecture skill's rules just to "finish".
 
-6. Only proceed to Phase 5 when: all mechanical findings are fixed, all architectural findings are resolved within the 2-round cap, and tests/typecheck pass.
+6. Only proceed to Phase 5 when: all GitNexus checks pass (actual impact = planned, no circular imports), all mechanical findings are fixed, all architectural findings are resolved within the 2-round cap, and tests/typecheck pass.
 
-**Output (Phase 4):** "Review PASS" + short note (fixes applied, rounds used) — or "Escalated: see issue #<n>" / "Escalated: asked user" if the loop was exhausted or ambiguity was hit.
+**Output (Phase 4):** "Review PASS" + GitNexus detect_changes summary + short note (fixes applied, rounds used) — or "Escalated: see issue #<n>" / "Escalated: asked user" if the loop was exhausted or ambiguity was hit.
 
 ---
 
@@ -314,6 +345,7 @@ A UI change where `ui-ux-pro-max` was **not** invoked during Phase 3 fails this 
 10. **Every issue and PR gets traceability metadata** — status label, `component:*` label, `type:*` label, and milestone (Phase 0.25 / Phase 5). Create missing labels/milestones rather than skipping them. Never invent a version/tagging scheme unprompted — follow the repo's existing convention, or ask once if none exists.
 11. **Never push directly to `main` or `develop`.** Every change — code, docs, or skill files — goes through a branch (Gitflow-style prefix: `feature/`, `fix/`, `refactor/`, `chore/` → PR into `develop`; `hotfix/` → PR into `main`) and a PR. This has no exceptions for "small" or "meta" changes. Merging `develop` or `main` requires explicit user approval.
 12. **`develop` → `main` always means a version bump + tag.** This is a release, not a routine merge — never merge `develop` into `main` without bumping the version in every versioned manifest and tagging the resulting commit. A regular PR into `develop` never gets its own version bump.
+13. **GitNexus is mandatory for impact-aware development.** Run `npx gitnexus analyze` at Phase 0 to keep the index current. Run `impact()` at Phase 2 for every symbol being modified. Run `detect_changes()` + `check()` at Phase 4 to verify changes. If Phase 4 detects unexpected impact or structural issues → loop-fix until clean. Skipping GitNexus checks is the same severity as skipping skill reads.
 
 ---
 

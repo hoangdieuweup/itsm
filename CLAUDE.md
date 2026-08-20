@@ -12,7 +12,41 @@
 | Frontend | **Next.js** (App Router) | TypeScript, modular architecture |
 | Backend | **FastAPI** | Python, modular scaffold |
 | UI/UX | Follow **ui-ux-pro-max** skill | If available in `.claude/skills/` |
+| Code Intelligence | **GitNexus** (MCP + CLI) | `npx gitnexus analyze` for indexing, MCP tools for impact/review |
 | Database | TBD | Will be updated when DB is chosen |
+
+---
+
+## GitNexus — Code Intelligence (MANDATORY)
+
+GitNexus provides graph-based code intelligence for impact analysis, change detection, and structural checks. It is used in **three phases** of the workflow:
+
+### CLI: `npx gitnexus analyze`
+
+Run **at Phase 0** (or whenever the codebase has significantly changed) to index/re-index the project graph. This builds the symbol graph that all MCP tools depend on.
+
+```bash
+# Index the project (run from repo root)
+npx gitnexus analyze
+
+# With PDG (program dependence graph) for deeper analysis
+npx gitnexus analyze --pdg
+```
+
+### MCP Tools (used in Plan & Review phases)
+
+| Tool | Phase | Purpose |
+|------|-------|---------|
+| `impact` | **Phase 2** (Plan) | Blast-radius analysis — before changing a symbol, check what depends on it (upstream). Returns risk level (LOW/MEDIUM/HIGH/CRITICAL) and affected processes. |
+| `detect_changes` | **Phase 4** (Review) | Analyze uncommitted changes — maps git diff hunks to symbols, shows affected processes. Use `scope: "all"` for both staged+unstaged. |
+| `check` | **Phase 4** (Review) | Structural checks — detects circular imports and other graph anomalies. |
+| `context` | **Phase 2 & 4** | 360° view of a symbol — all callers, callees, imports, process participation. Use to drill into high-risk items from `impact` or `detect_changes`. |
+
+### Mandatory Usage Rules
+
+1. **Before planning changes to existing symbols** → run `impact(target, direction: "upstream")` on each symbol you intend to modify. Include the risk assessment and affected processes in the Plan (Phase 2).
+2. **After implementing** → run `detect_changes(scope: "all")` to see what your changes actually affect. Cross-reference with the impact assessment from Phase 2. Run `check()` to verify no circular imports were introduced.
+3. **If `detect_changes` reveals unexpected impact or `check` finds issues** → this is a review failure. Fix the code, re-run the tools, and loop until clean.
 
 ---
 
@@ -30,12 +64,13 @@ Do not skip phases. Do not skip mandatory steps.
    - Current branch, working tree status
    - Recently modified files / related modules
    - Repo commit conventions
-3. Determine scope:
+3. **Run `npx gitnexus analyze`** if the index is stale or this is the first task in the session. This ensures the code graph is up-to-date for impact analysis in later phases.
+4. Determine scope:
    - Frontend only / Backend only / Full-stack
    - New feature / Bugfix / Refactor
-4. If critical information is missing → **ask the user once**, do not guess.
+5. If critical information is missing → **ask the user once**, do not guess.
 
-**Output (Phase 0):** 3–5 line summary of task understanding + scope.
+**Output (Phase 0):** 3–5 line summary of task understanding + scope + confirmation that gitnexus index is current.
 
 ---
 
@@ -92,6 +127,12 @@ Constraints to apply:
 
 **Only write the plan after Phase 0.5 is complete.**
 
+**GitNexus impact assessment is MANDATORY in this phase.** For every existing symbol you plan to modify:
+1. Run `impact(target: "<symbol>", direction: "upstream")` to see what depends on it.
+2. If risk is HIGH or CRITICAL → document mitigation in the plan.
+3. Use `context()` to drill into high-risk dependents.
+4. Include the impact summary in the "Impact Assessment" section of the plan.
+
 The plan must follow this structure:
 
 ```markdown
@@ -109,6 +150,12 @@ The plan must follow this structure:
 - ui-ux-pro-max: ... (mandatory if UI is involved)
 - fastapi-modular-scaffold: ...
 - (specific constraints to follow)
+
+## Impact Assessment (GitNexus)
+- Symbols to modify: ...
+- Risk level per symbol: ...
+- Affected processes/modules: ...
+- Mitigation for HIGH/CRITICAL: ...
 
 ## Architecture Impact
 - Next.js modules affected:
@@ -154,9 +201,20 @@ Every step **must respect** Phase 0.5 constraints.
 
 Use the `reviewing-code-against-skills` skill on the diff just created.
 
-Mandatory checklist:
+**Step 1: GitNexus Change Detection (MANDATORY before checklist)**
+
+1. Run `detect_changes(scope: "all")` to analyze all uncommitted changes.
+2. Run `check()` to verify no circular imports were introduced.
+3. Compare the detected impact against the Phase 2 impact assessment:
+   - Are there unexpected affected processes/symbols not in the plan?
+   - Did the blast radius grow beyond what was planned?
+4. If unexpected impact is found → **STOP. Update the plan, fix the code, re-run detect_changes. Loop until the actual impact matches the planned impact.**
+
+**Step 2: Skills Checklist**
 
 ```text
+[ ] GitNexus detect_changes: actual impact matches planned impact from Phase 2?
+[ ] GitNexus check: no circular imports or structural issues?
 [ ] nextjs-modular-architecture: module boundary, import direction, folder structure correct?
 [ ] ui-ux-pro-max (if UI involved): hierarchy, spacing, contrast, a11y, responsive, loading/empty/error states?
 [ ] fastapi-modular-scaffold: correct layer (router/service/schema), no heavy logic in router?
@@ -166,10 +224,15 @@ Mandatory checklist:
 [ ] Diff contains no junk files (.env, node_modules, __pycache__…)
 ```
 
-If any item fails → **fix immediately**, then re-review.
-Only proceed to Phase 5 when review **PASSES**.
+**Step 3: Fix Loop (MANDATORY if any check fails)**
 
-**Output (Phase 4):** "Review PASS" + short note (or list of fixes applied).
+If ANY item fails:
+1. Fix the code.
+2. Re-run `detect_changes(scope: "all")` + `check()`.
+3. Re-evaluate the entire checklist.
+4. **Repeat until ALL items pass.** Do not proceed to Phase 5 with any failing check.
+
+**Output (Phase 4):** "Review PASS" + GitNexus detect_changes summary + short note (or list of fixes applied).
 
 ---
 
@@ -196,6 +259,7 @@ Only proceed to Phase 5 when review **PASSES**.
 5. **Do not refactor beyond task scope** unless the user agrees.
 6. Each phase must have a **clear output** before moving to the next.
 7. "Quick fix" / "just one change" tasks → still require Phase 0 + 0.5 + 4 minimum; Phase 1–2 can be shortened if truly trivial.
+8. **GitNexus is mandatory for impact-aware development.** Run `npx gitnexus analyze` at Phase 0 to keep the index current. Run `impact()` at Phase 2 for every symbol being modified. Run `detect_changes()` + `check()` at Phase 4 to verify changes. If Phase 4 detects unexpected impact or structural issues → loop-fix until clean. Skipping GitNexus checks is the same severity as skipping skill reads.
 
 ---
 
