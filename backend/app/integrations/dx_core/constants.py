@@ -9,7 +9,7 @@ from enum import StrEnum
 
 
 class DxEndpoints:
-    """Fixed paths on the DX OAuth2 server, joined with WEUPBOOK_API_BASE_URL."""
+    """Fixed paths on the DX OAuth2 server, joined with DX_CORE__API_BASE_URL."""
 
     AUTHORIZE = "/oauth2/authorize"
     TOKEN = "/oauth2/token"
