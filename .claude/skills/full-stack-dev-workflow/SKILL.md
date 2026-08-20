@@ -171,7 +171,7 @@ Constraints to apply:
 
 ---
 
-## PHASE 4 — Review Against Skills (mandatory)
+## PHASE 4 — Review Against Skills (mandatory, bounded fix loop)
 
 1. Use **reviewing-code-against-skills** on the diff just created.
 2. Mandatory checklist:
@@ -186,10 +186,28 @@ Constraints to apply:
 [ ] Diff contains no junk files (.env, node_modules, __pycache__…)
 ```
 
-3. If any item fails → **fix immediately**, then re-review.
-4. Only proceed to Phase 5 when review PASSES.
+3. Classify every finding from the report, per `reviewing-code-against-skills`' own distinction:
+   - **Mechanical** — lint/format/type errors, auto-fixable by tooling (`ruff --fix`, `eslint --fix`, `prettier`). Fix immediately, re-run tooling. **No round limit** — this is cheap and deterministic.
+   - **Architectural** — module boundary violation, cross-module import, wrong layer, missing SSR prefetch, N+1 query, missing auth check, etc. These need a real decision, not a mechanical fix.
 
-**Output (Phase 4):** "Review PASS" + short note (or list of fixes applied).
+4. **Architectural findings get at most 2 fix→review rounds:**
+   - Round 1: fix per the plan/skill's rule, re-run **reviewing-code-against-skills**.
+   - Round 2 (only if findings remain): fix again, re-review.
+   - **Do not attempt a 3rd round.** If findings are still failing after 2 rounds, that is a signal the spec/constraint is ambiguous or contradictory — not a reason to keep guessing.
+
+5. **Escalate instead of guessing** — trigger this immediately (don't wait for round 2 to finish) whenever:
+   - Unresolved architectural findings remain after round 2, OR
+   - At any point you are genuinely uncertain how to resolve a finding (conflicting skill rules, missing spec detail, ambiguous requirement).
+
+   When escalating:
+   - **Stop implementing further.** Do not force a fix you are not confident is correct, and do not mark the task done.
+   - If this task originated from a GitHub issue (issue-driven / automation workflow): post a comment on that issue stating exactly what is ambiguous or still failing — quote the specific skill rule and the specific file/line — add label `needs-info`, remove `in-progress` if present, and **stop**. Do not open a PR that silently ships known-unresolved architectural violations.
+   - If working directly with a user in chat (no issue tracker involved): ask the user one focused question and wait for their answer before continuing.
+   - Never merge, never self-approve, never silently ship code that fails its own architecture skill's rules just to "finish".
+
+6. Only proceed to Phase 5 when: all mechanical findings are fixed, all architectural findings are resolved within the 2-round cap, and tests/typecheck pass.
+
+**Output (Phase 4):** "Review PASS" + short note (fixes applied, rounds used) — or "Escalated: see issue #<n>" / "Escalated: asked user" if the loop was exhausted or ambiguity was hit.
 
 ---
 
@@ -218,6 +236,7 @@ Constraints to apply:
 5. **Do not refactor beyond task scope** unless the user agrees.
 6. Each phase must have a **clear output** before moving to the next.
 7. When the user says "quick fix" / "just one change" → still run Phase 0 + **0.5** + 4 minimum; Phase 1–2 can be shortened if truly trivial (but you still must read related skills).
+8. **Architectural review findings get at most 2 fix→review rounds** (Phase 4). Never loop indefinitely trying to satisfy a skill's rules — if still failing after 2 rounds, or if genuinely ambiguous at any point, **escalate instead of guessing**: ask the user, or if issue-driven, comment on the issue + label `needs-info` + stop. Never ship a PR that silently violates its own governing skill's rules.
 
 ---
 
