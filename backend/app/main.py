@@ -6,15 +6,15 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.auth.router import router as auth_router
 from app.config import settings
 from app.constants import Environment
-from app.docs import DOCS_DISABLED, DOCS_ENABLED, mount_protected_docs
-from app.exceptions import AppError
+from app.core.docs import DOCS_DISABLED, DOCS_ENABLED, mount_protected_docs
+from app.core.exceptions import AppError
+from app.core.logging_config import setup_logging
+from app.core.middleware import RequestIdMiddleware
+from app.core.models import ApiResponse, ErrorPayload
 from app.lifespan import lifespan
-from app.logging_config import setup_logging
-from app.middleware import RequestIdMiddleware
-from app.models import ApiResponse, ErrorPayload
+from app.modules.auth.router import router as auth_router
 
 setup_logging()
 log = structlog.get_logger(__name__)

@@ -1,6 +1,6 @@
 """Errors owned by the queue integration."""
 
-from app.exceptions import IntegrationError
+from app.core.exceptions import IntegrationError
 from app.integrations.queue.constants import QueueErrorCode
 
 

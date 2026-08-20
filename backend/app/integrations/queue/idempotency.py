@@ -14,7 +14,7 @@ from typing import Protocol
 
 from redis.asyncio import Redis
 
-from app.markers import integration
+from app.core.base.markers import integration
 
 logger = logging.getLogger(__name__)
 

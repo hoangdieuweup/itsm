@@ -7,9 +7,9 @@ module impossible to extract later.
 
 from fastapi import Depends
 
-from app.auth.dependencies import get_current_user
-from app.auth.schemas import UserRead
-from app.markers import facade
+from app.core.base.markers import facade
+from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.schemas import UserRead
 
 
 class AuthApi:

@@ -2,6 +2,8 @@
 
 from abc import ABC, abstractmethod
 
+from app.core.base.markers import database
+
 
 class AbstractUnitOfWork(ABC):
     """Async context manager owning one transaction boundary.
@@ -19,11 +21,13 @@ class AbstractUnitOfWork(ABC):
         if exc_type is not None:
             await self.rollback()
 
+    @database
     @abstractmethod
     async def commit(self) -> None:
         """Commit the transaction, applying any deferred side effect only on success."""
         raise NotImplementedError
 
+    @database
     @abstractmethod
     async def rollback(self) -> None:
         """Roll back the transaction, undoing any deferred side effect too."""

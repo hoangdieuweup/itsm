@@ -13,11 +13,11 @@ import aio_pika
 import structlog
 from aio_pika.abc import AbstractChannel, AbstractExchange, AbstractRobustConnection
 
-from app.events import DomainEvent
+from app.core.base.markers import helper, integration
+from app.core.events import DomainEvent
 from app.integrations.queue.config import queue_settings
 from app.integrations.queue.exceptions import BrokerNotConnected, PublishFailed
 from app.integrations.queue.topology import QueueTopology
-from app.markers import helper, integration
 
 logger = logging.getLogger(__name__)
 

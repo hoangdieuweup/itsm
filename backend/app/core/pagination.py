@@ -5,7 +5,7 @@ from typing import Generic, TypeVar
 from fastapi import Query
 from pydantic import BaseModel
 
-from app.models import CustomModel
+from app.core.models import CustomModel
 
 T = TypeVar("T")
 

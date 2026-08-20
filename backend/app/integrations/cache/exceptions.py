@@ -1,6 +1,6 @@
 """Errors owned by the cache integration."""
 
-from app.exceptions import IntegrationError
+from app.core.exceptions import IntegrationError
 from app.integrations.cache.constants import CacheErrorCode
 
 

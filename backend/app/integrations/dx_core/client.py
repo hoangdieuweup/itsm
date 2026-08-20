@@ -8,7 +8,7 @@ implement (generate_pkce_pair → exchange_code → fetch_userinfo, refresh,
 revoke).
 """
 
-from app.models import FrozenModel
+from app.core.models import FrozenModel
 
 
 class DxPkcePair(FrozenModel):

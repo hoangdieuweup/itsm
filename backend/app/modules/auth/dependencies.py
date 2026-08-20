@@ -15,9 +15,9 @@ signature other modules already depend on.
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.schemas import UserRead
-from app.auth.uow import AbstractAuthUnitOfWork, AuthUnitOfWork
-from app.database import get_session
+from app.core.database import get_session
+from app.modules.auth.schemas import UserRead
+from app.modules.auth.uow import AbstractAuthUnitOfWork, AuthUnitOfWork
 
 
 async def get_uow(session: AsyncSession = Depends(get_session)) -> AuthUnitOfWork:

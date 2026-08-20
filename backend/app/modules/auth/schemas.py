@@ -2,8 +2,8 @@
 
 from datetime import datetime
 
-from app.auth.constants import UserRole, UserStatus
-from app.models import FrozenModel
+from app.core.models import FrozenModel
+from app.modules.auth.constants import UserRole, UserStatus
 
 
 class DepartmentRead(FrozenModel):

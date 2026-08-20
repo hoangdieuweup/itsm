@@ -11,7 +11,7 @@ from app.auth import (
     models as auth_models,  # noqa: F401 -- registers auth's tables on Base.metadata for autogenerate
 )
 from app.config import settings
-from app.database import Base
+from app.core.database import Base
 from app.integrations.dx_core import (
     models as dx_core_models,  # noqa: F401 -- registers dx_tokens on Base.metadata for autogenerate
 )
