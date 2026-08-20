@@ -3,7 +3,9 @@ name: full-stack-dev-workflow
 description: >
   Standard workflow for building features/bugfixes on the Next.js + FastAPI stack in this project.
   You MUST read related architecture skills (nextjs-modular-architecture, fastapi-modular-scaffold,
-  ui-ux-pro-max when UI is involved, reviewing-code-against-skills) BEFORE planning and BEFORE editing code.
+  reviewing-code-against-skills) BEFORE planning and BEFORE editing code, invoke the superpowers
+  plugin while receiving the request and planning (Phase 0-2), and invoke the ui-ux-pro-max plugin
+  during implementation (Phase 3) whenever UI code is written — it is mandatory, not optional.
   Use when starting a new coding task (feature/fix/refactor) on Next.js and/or FastAPI,
   or when the user explicitly requests "follow the workflow" / "/feature" / "/fix" / "/implement".
 triggers:
@@ -19,17 +21,20 @@ triggers:
 You are the coding agent for this project. **Always follow this workflow** when working on features/bugfixes/refactors
 involving Next.js and/or FastAPI. Do not skip phases. Do not skip mandatory steps.
 
-## Related Skills / Tools in This Project
+## Skills vs. Plugins — do not confuse the two
 
-| Skill / Tool | When to Use |
-|--------------|-------------|
-| **firecrawl MCP** | Look up official docs when **not fully certain** about an API, config, or best practice. Do not guess. |
-| **gitnexus / git** | Understand the repo, branch, commit history, PR, and conflicts before editing / committing. |
-| **nextjs-modular-architecture** (`.claude/skills/nextjs-modular-architecture`) | Any change on the Next.js side (App Router, module boundary, folder structure, TanStack Query, shadcn/ui). |
-| **fastapi-modular-scaffold** (`.claude/skills/fastapi-modular-scaffold`) | Any change on the FastAPI side (router, service, schema, dependency, module ownership). |
-| **ui-ux-pro-max** (plugin) | Any UI/UX change (layout, component, spacing, a11y, visual hierarchy, responsive). |
-| **reviewing-code-against-skills** (`.claude/skills/reviewing-code-against-skills`) | After coding — review the diff against the architecture + UI skills above. |
-| **superpowers** | Elevated capabilities when needed (sandbox, special tools). Only use when a phase requires it. |
+- **Skills** (`.claude/skills/...` in this repo, version-controlled): repo-specific architecture rules you *read*.
+- **Plugins** (global, installed under `~/.claude/plugins/`, outside this repo): capabilities you *invoke*, each with a fixed place in the workflow — never interchangeable, never optional where marked mandatory.
+
+| Skill / Plugin | Type | When to Use |
+|--------------|------|-------------|
+| **firecrawl MCP** | tool | Look up official docs when **not fully certain** about an API, config, or best practice. Do not guess. |
+| **gitnexus / git** | tool | Understand the repo, branch, commit history, PR, and conflicts before editing / committing. |
+| **nextjs-modular-architecture** (`.claude/skills/nextjs-modular-architecture`) | skill | Any change on the Next.js side (App Router, module boundary, folder structure, TanStack Query, shadcn/ui). |
+| **fastapi-modular-scaffold** (`.claude/skills/fastapi-modular-scaffold`) | skill | Any change on the FastAPI side (router, service, schema, dependency, module ownership). |
+| **reviewing-code-against-skills** (`.claude/skills/reviewing-code-against-skills`) | skill | After coding — review the diff against the architecture + UI skills above. |
+| **superpowers** | **plugin** | Invoke during **Phase 0 → Phase 2** — receiving/understanding the request and building the plan. Elevated planning/analysis capability, used *before* any code is written. |
+| **ui-ux-pro-max** | **plugin — MANDATORY for UI** | Invoke during **Phase 3 (Implement)**, every time UI code is written or edited (layout, component, page, color, typography, spacing). Query its style/palette/font-pairing/a11y database and apply the result while writing the markup/CSS — this is an implementation-time check, not a planning-time skim. Skipping it on any UI implementation step is a workflow violation, same severity as skipping `fastapi-modular-scaffold` on a backend task. |
 
 ---
 
@@ -84,31 +89,35 @@ involving Next.js and/or FastAPI. Do not skip phases. Do not skip mandatory step
 
 1. Determine which skills **apply to the task** based on Phase 0 scope:
 
-   | Scope | Required Skills/Plugins |
+   | Scope | Required Skills (repo, read) |
    |-------|------------------------|
    | Next.js / frontend | **nextjs-modular-architecture** |
-   | UI / component / page / layout / styling | **ui-ux-pro-max** |
    | FastAPI / backend | **fastapi-modular-scaffold** |
-   | Full-stack (with UI) | **nextjs-modular-architecture** + **ui-ux-pro-max** + **fastapi-modular-scaffold** |
+   | Full-stack | **nextjs-modular-architecture** + **fastapi-modular-scaffold** |
    | Every coding task | **reviewing-code-against-skills** (to know the review criteria for later) |
    | Meta/tooling task (not touching Next.js/FastAPI/UI code) | Skip the table above; only cross-reference existing folder/skill conventions in the repo |
+
+   Note: **`ui-ux-pro-max` is a plugin invoked in Phase 3 (Implement)**, not a skill read here — do not treat this table as covering it. If the task involves UI, flag that fact now so Phase 2's plan explicitly calls out the mandatory `ui-ux-pro-max` invocation for Phase 3.
 
 2. **Read the full content** of each relevant skill (not just the name). Memorize key constraints:
    - Folder / module boundary
    - Import direction / layers (router → service → …; `shared → entities → modules → app`)
    - Forbidden patterns / required patterns
-   - **ui-ux-pro-max**: spacing, hierarchy, contrast, a11y, responsive, states (loading/empty/error)
-3. List **3–7 bullet constraints** to apply in the plan (copied from skills, not made up).
-4. If the repo contains other skills (`.claude/skills/`, `AGENTS.md`, …) relevant to the task domain → read those too.
+3. **Invoke the `superpowers` plugin** as part of this planning pass (Phase 0 → Phase 2 is its scope) — use it to strengthen the request/constraint analysis before Phase 2's plan is written.
+4. List **3–7 bullet constraints** to apply in the plan (copied from skills, not made up).
+5. If the repo contains other skills (`.claude/skills/`, `AGENTS.md`, …) relevant to the task domain → read those too.
 
 **Output (Phase 0.5):**
 ```text
 Skills read:
 - nextjs-modular-architecture: <yes/no/skip>
-- ui-ux-pro-max: <yes/no/skip>
 - fastapi-modular-scaffold: <yes/no/skip>
 - reviewing-code-against-skills: yes
 - (other skills if applicable)
+
+Plugins:
+- superpowers: invoked (planning pass)
+- ui-ux-pro-max: <flagged for mandatory Phase 3 invocation / n/a — no UI in scope>
 
 Constraints to apply:
 - ...
@@ -150,8 +159,12 @@ Constraints to apply:
 
 ## Skills Applied
 - nextjs-modular-architecture: ...
-- ui-ux-pro-max: ... (mandatory if UI is involved)
 - fastapi-modular-scaffold: ...
+- (specific constraints to follow)
+
+## Plugins
+- superpowers: invoked during this planning pass (Phase 0-2)
+- ui-ux-pro-max: <mandatory during Phase 3 if UI is involved — name the surfaces / n/a>
 - (specific constraints to follow)
 
 ## Architecture Impact
@@ -174,8 +187,8 @@ Constraints to apply:
 
 2. Every step in the plan **must respect** the constraints read in Phase 0.5:
    - **nextjs-modular-architecture** (boundary, folder, no domain leaking)
-   - **ui-ux-pro-max** when UI is involved (hierarchy, spacing, a11y, responsive, states)
    - **fastapi-modular-scaffold** (router → service → repo, clear schemas)
+   - If UI is involved, the plan's **Plugins** section must explicitly state `ui-ux-pro-max` will be invoked during Phase 3 for each affected surface — do not leave this implicit.
 3. **If running under a bounded execution budget** (e.g. an automation/cron runner with a fixed timeout, not an interactive chat session): scope the plan so the unit of work fits comfortably within the budget with room for Phase 4 review. This should normally already be true — Phase 0.25 is responsible for splitting oversized issue-driven work *before* this point. If you reach Phase 2 and only now realize the scope is too large (e.g. Phase 0.25 was skipped, or the scope grew during Plan), go back and apply Phase 0.25's split decision rather than plowing ahead into a run you can't finish.
 4. **Do not implement** until the plan is complete.
 
@@ -189,19 +202,20 @@ Constraints to apply:
 2. Follow the **exact step order in PLAN.md**.
 3. Every change must respect:
    - **nextjs-modular-architecture** when touching frontend
-   - **ui-ux-pro-max** when touching UI (component, page, layout, style)
    - **fastapi-modular-scaffold** when touching backend
-4. Prefer:
+4. **Any UI code written or edited in this phase (component, page, layout, style, color, typography) MUST invoke the `ui-ux-pro-max` plugin** — query its style/palette/font-pairing/a11y database and apply the result *while* writing the markup/CSS, not as an afterthought. This is mandatory, not conditional on "if it seems needed" — skipping it is a workflow violation.
+   - If the user supplied reference images (layout/color concept), reconcile them with `ui-ux-pro-max`'s output (palette, contrast, a11y) rather than eyeballing colors/spacing freehand.
+5. Prefer:
    - Small, commit-able changes
    - Clear variable/file names following repo conventions
-5. Run tests / typecheck / lint locally if the repo has scripts.
-6. If **uncertain** mid-implementation → go back to **firecrawl MCP**, do not guess. If conflict with a skill → **prioritize the skill**, add a note in the plan.
-7. **If running under a bounded execution budget:** track elapsed time against the budget. If it becomes clear the current unit of work will not finish (implementation + Phase 4 review + commit) within budget, **stop implementing new files immediately** and leave the work in a recoverable state:
+6. Run tests / typecheck / lint locally if the repo has scripts.
+7. If **uncertain** mid-implementation → go back to **firecrawl MCP**, do not guess. If conflict with a skill → **prioritize the skill**, add a note in the plan.
+8. **If running under a bounded execution budget:** track elapsed time against the budget. If it becomes clear the current unit of work will not finish (implementation + Phase 4 review + commit) within budget, **stop implementing new files immediately** and leave the work in a recoverable state:
    - If a coherent, reviewable slice is already committed → commit and push what's done, note in the issue/PR exactly what's left, and stop (do not claim `done`).
    - If nothing coherent is committed yet → do **not** leave the issue/lock in a state that looks actively in-progress forever. Revert the claim: comment explaining the task was too large for one run and needs to be split into smaller issues/PRs, then hand it back (e.g. remove the in-progress marker) so it is not permanently stuck.
    - Never let the clock run out silently while holding a claim with no trace of what happened.
 
-**Output (Phase 3):** Code changes + summary of files modified.
+**Output (Phase 3):** Code changes + summary of files modified + confirmation `ui-ux-pro-max` was invoked for any UI surfaces touched (or "n/a — no UI in this change").
 
 ---
 
@@ -212,13 +226,15 @@ Constraints to apply:
 
 ```text
 [ ] nextjs-modular-architecture: module boundary, import direction, folder structure correct?
-[ ] ui-ux-pro-max (if UI involved): hierarchy, spacing, contrast, a11y, responsive, loading/empty/error states?
+[ ] If UI involved: was ui-ux-pro-max actually invoked in Phase 3 (not skipped)? hierarchy, spacing, contrast, a11y, responsive, loading/empty/error states applied per its output?
 [ ] fastapi-modular-scaffold: correct layer (router/service/schema), no heavy logic in router?
 [ ] No hardcoded secrets / sensitive URLs
 [ ] Sufficient error handling & validation
 [ ] Tests / typecheck pass (if available)
 [ ] Diff contains no junk files (.env, node_modules, __pycache__…)
 ```
+
+A UI change where `ui-ux-pro-max` was **not** invoked during Phase 3 fails this checklist outright — treat it as an architectural finding (Phase 3 must be redone with the plugin invoked), not a note to remember for next time.
 
 3. Classify every finding from the report, per `reviewing-code-against-skills`' own distinction:
    - **Mechanical** — lint/format/type errors, auto-fixable by tooling (`ruff --fix`, `eslint --fix`, `prettier`). Fix immediately, re-run tooling. **No round limit** — this is cheap and deterministic.
@@ -319,11 +335,11 @@ User: "Add an order creation endpoint + order form UI"
 
 You:
 1. Phase 0 → summarize scope: full-stack (with UI)
-2. **Phase 0.5 → read nextjs-modular-architecture + ui-ux-pro-max + fastapi-modular-scaffold + reviewing-code-against-skills; list constraints**
+2. **Phase 0.5 → read nextjs-modular-architecture + fastapi-modular-scaffold + reviewing-code-against-skills; invoke `superpowers` plugin for the planning pass; list constraints (flag that `ui-ux-pro-max` will be mandatory in Phase 3)**
 3. Phase 1 → firecrawl FastAPI dependency / Next.js form patterns if needed
-4. Phase 2 → write PLAN.md (with Skills Applied + API schema + page/UI module)
-5. Phase 3 → implement following constraints read earlier (UI follows ui-ux-pro-max)
-6. Phase 4 → reviewing-code-against-skills (including UI checklist)
+4. Phase 2 → write PLAN.md (with Skills Applied + Plugins section + API schema + page/UI module)
+5. **Phase 3 → implement; invoke `ui-ux-pro-max` plugin while building the UI (form, page, colors) — mandatory, not skippable**
+6. Phase 4 → reviewing-code-against-skills (checklist confirms `ui-ux-pro-max` was actually invoked)
 7. Phase 5 → commit when user confirms
 
 ---
