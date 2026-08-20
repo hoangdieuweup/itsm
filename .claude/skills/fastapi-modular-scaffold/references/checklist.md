@@ -19,6 +19,7 @@ Run this before the first real traffic, and again after any structural change.
 - [ ] `ruff check` reports no `PLC0415` (import inside a function body) — a local import that exists to dodge a circular import means the real fix is moving code across a layer boundary, not keeping the local import
 - [ ] Every domain module has a `tests/<module>/` folder — no module without one, no test colocated inside `app/`, no flat `tests/test_everything.py`
 - [ ] `.env.prod` exists, is gitignored, and every secret in it differs from `.env` — check by diffing key-by-key, not just confirming the file exists
+- [ ] `.env.example` documents every `Settings` field with its own Python-side default — run `uv run python scripts/check_env_example.py` after adding or renaming a `Settings` field; it fails loudly if any field's fully-prefixed env var name is missing from `.env.example`
 - [ ] If the `queue` integration is present, `app/worker.py` runs as its own container/process — never imported into or started from `app/main.py`
 - [ ] No `if user.role == "..."` (or similar role-string comparison) anywhere in a router or service — permission checks go through `require_permission(resource, action)`, never a hardcoded role name (see `references/rbac.md`)
 - [ ] Every permission check is scoped to an `organization_id` — a check with no organization scope is the global-role mistake `references/rbac.md` exists to prevent
