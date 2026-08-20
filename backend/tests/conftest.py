@@ -34,6 +34,21 @@ async def engine(postgres_url: str):
 
 
 @pytest.fixture
+async def cache_client() -> AsyncIterator[CacheClient]:
+    """Provide a CacheClient backed by the real test Redis (CACHE_URL).
+
+    For tests that need real set_json/get_json/TTL semantics directly
+    (e.g. a use case that blacklists a token) rather than only exercising
+    the HTTP layer through the `client` fixture's dependency override.
+    """
+    redis = Redis.from_url(str(cache_settings.URL))
+    cache = CacheClient(redis, cache_settings.DEFAULT_TTL)
+    yield cache
+    await redis.flushdb()
+    await redis.aclose()
+
+
+@pytest.fixture
 async def client(engine) -> AsyncIterator[AsyncClient]:
     """Provide an HTTP client backed by the test database.
 

@@ -45,6 +45,16 @@ class AuthCookies:
     REFRESH_TOKEN = "refresh_token"
 
 
+class AuthCacheNamespaces:
+    """Redis key namespaces owned by the auth module.
+
+    Passed to CacheKeyBuilder.session_key(namespace, identifier) — see
+    app/integrations/cache/keys.py; no other file constructs these keys.
+    """
+
+    TOKEN_BLACKLIST = "auth:blacklist"
+
+
 class ErrorCode(StrEnum):
     """Stable error codes returned to clients by this module."""
 
