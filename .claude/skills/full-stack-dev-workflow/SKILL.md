@@ -239,23 +239,38 @@ Constraints to apply:
 
 ---
 
-## PHASE 5 — Commit / PR / Traceability (when user requests or task is complete)
+## PHASE 5 — Branch / Commit / PR / Traceability (when user requests or task is complete)
 
-1. Use **git / gitnexus** to check:
-   - `git status` / diff
-   - Correct branch
-2. Commit messages follow repo conventions (prefer Conventional Commits if the repo uses them):
+1. **Never commit or push directly to `main`** (or `master`), for any change — including trivial docs/skill-only edits. `main` only receives changes through a merged PR. This applies to every agent run: interactive chat, automation, and any parallel agent under Phase 0.25.
+
+2. **Branch naming (Gitflow-style prefixes, trunk-based flow unless the repo already defines full Gitflow with `develop`/`release/*`):**
+   - `feature/<short-slug>` — new feature (e.g. `feature/sso-login`)
+   - `fix/<short-slug>` — bugfix
+   - `refactor/<short-slug>` — refactor, no behavior change
+   - `chore/<short-slug>` — tooling, deps, meta/docs-only (e.g. this skill file)
+   - `hotfix/<short-slug>` — urgent production fix branched from `main`
+   - If the repo already has its own branch-naming convention (check recent branch/PR history first) — **follow that instead** of inventing a new one.
+
+3. Before branching: `git checkout main && git pull` (or fetch) to branch from the latest `main`, avoiding stale-base conflicts — especially important when Phase 0.25 conflict-checking is in play with multiple agents.
+
+4. Commit messages follow repo conventions (prefer Conventional Commits if the repo uses them):
    - `feat: ...`
    - `fix: ...`
    - `refactor: ...`
-3. Do not commit secrets or build artifacts.
-4. If PR is needed: open a PR with summary = Goal + Steps completed + Test checklist. The PR must also carry traceability metadata, same principle as issues (Phase 0.25):
+   - `chore: ...` / `docs: ...` for non-functional changes
+
+5. Do not commit secrets or build artifacts.
+
+6. Push the branch (not `main`) and open a PR: summary = Goal + Steps completed + Test checklist. The PR must also carry traceability metadata, same principle as issues (Phase 0.25):
    - **Reference the issue** it closes (`Closes #N`) so status flows back automatically on merge.
    - **Same labels as the issue** (`component:*`, `type:*`) plus the PR's own state label if the repo uses one (e.g. `needs-review`).
    - **Same milestone as the issue**, so `git tag`/release notes for that milestone can enumerate every merged PR.
-5. **Versioning:** if this change is part of a tracked release (has a milestone) and the repo has an existing tagging convention (check `git tag -l`, `CHANGELOG.md`, or prior release commits) — follow it. Do not invent a new versioning scheme unprompted; if none exists and this is the first release-worthy change, ask the user once what scheme to adopt (e.g. SemVer `vMAJOR.MINOR.PATCH`) rather than guessing. Do not create the tag/release yourself unless the user explicitly asks for a release — opening the PR with correct milestone/labels is normally enough; tagging happens at release time, not per-PR.
 
-**Output (Phase 5):** Commit hash or PR link, with issue reference, labels, and milestone confirmed set.
+7. **Versioning:** if this change is part of a tracked release (has a milestone) and the repo has an existing tagging convention (check `git tag -l`, `CHANGELOG.md`, or prior release commits) — follow it. Do not invent a new versioning scheme unprompted; if none exists and this is the first release-worthy change, ask the user once what scheme to adopt (e.g. SemVer `vMAJOR.MINOR.PATCH`) rather than guessing. Do not create the tag/release yourself unless the user explicitly asks for a release — opening the PR with correct milestone/labels is normally enough; tagging happens at release time, not per-PR.
+
+8. **Merging into `main`** only happens when the user explicitly asks for it. For fully automated issue-driven work, opening the PR is normally the end of the run's responsibility — leave merging to the user/maintainer unless the automation's own instructions explicitly grant merge authority.
+
+**Output (Phase 5):** Branch name + PR link (never a bare commit hash on `main`), with issue reference, labels, and milestone confirmed set.
 
 ---
 
@@ -271,6 +286,7 @@ Constraints to apply:
 8. **Architectural review findings get at most 2 fix→review rounds** (Phase 4). Never loop indefinitely trying to satisfy a skill's rules — if still failing after 2 rounds, or if genuinely ambiguous at any point, **escalate instead of guessing**: ask the user, or if issue-driven, comment on the issue + label `needs-info` + stop. Never ship a PR that silently violates its own governing skill's rules.
 9. **When issue-driven / running alongside other agents, run Phase 0.25 first.** You are your own supervisor: reclaim stale locks instead of leaving them stuck forever, skip (wait) instead of colliding with another active claim on overlapping paths, and split oversized work into disjoint sub-issues instead of guessing you can finish it in one bounded run. Never let two agents edit the same files concurrently, and never let a claimed issue sit locked with no trace of what happened to it.
 10. **Every issue and PR gets traceability metadata** — status label, `component:*` label, `type:*` label, and milestone (Phase 0.25 / Phase 5). Create missing labels/milestones rather than skipping them. Never invent a version/tagging scheme unprompted — follow the repo's existing convention, or ask once if none exists.
+11. **Never push directly to `main`.** Every change — code, docs, or skill files — goes through a branch (Gitflow-style prefix: `feature/`, `fix/`, `refactor/`, `chore/`, `hotfix/`) and a PR. This has no exceptions for "small" or "meta" changes. Merging `main` requires explicit user approval.
 
 ---
 
