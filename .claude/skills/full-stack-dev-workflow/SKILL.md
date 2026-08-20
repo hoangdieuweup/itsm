@@ -147,7 +147,8 @@ Constraints to apply:
    - **nextjs-modular-architecture** (boundary, folder, no domain leaking)
    - **ui-ux-pro-max** when UI is involved (hierarchy, spacing, a11y, responsive, states)
    - **fastapi-modular-scaffold** (router → service → repo, clear schemas)
-3. **Do not implement** until the plan is complete.
+3. **If running under a bounded execution budget** (e.g. an automation/cron runner with a fixed timeout, not an interactive chat session): scope the plan so at least the first coherent, independently-mergeable unit of work (e.g. backend scaffold only, or one module) fits comfortably within the budget with room for Phase 4 review. Do not plan a single pass that spans backend scaffold + frontend scaffold + a full OAuth integration if that realistically needs more time than is available — split it into multiple issues/PRs instead (state this split explicitly in the plan and in the issue comment) rather than silently running out of time mid-implementation.
+4. **Do not implement** until the plan is complete.
 
 **Output (Phase 2):** `PLAN.md` file written (with Skills Applied section). Notify user "Plan complete, proceed with implementation?" for large tasks; small tasks may continue directly.
 
@@ -166,6 +167,10 @@ Constraints to apply:
    - Clear variable/file names following repo conventions
 5. Run tests / typecheck / lint locally if the repo has scripts.
 6. If **uncertain** mid-implementation → go back to **firecrawl MCP**, do not guess. If conflict with a skill → **prioritize the skill**, add a note in the plan.
+7. **If running under a bounded execution budget:** track elapsed time against the budget. If it becomes clear the current unit of work will not finish (implementation + Phase 4 review + commit) within budget, **stop implementing new files immediately** and leave the work in a recoverable state:
+   - If a coherent, reviewable slice is already committed → commit and push what's done, note in the issue/PR exactly what's left, and stop (do not claim `done`).
+   - If nothing coherent is committed yet → do **not** leave the issue/lock in a state that looks actively in-progress forever. Revert the claim: comment explaining the task was too large for one run and needs to be split into smaller issues/PRs, then hand it back (e.g. remove the in-progress marker) so it is not permanently stuck.
+   - Never let the clock run out silently while holding a claim with no trace of what happened.
 
 **Output (Phase 3):** Code changes + summary of files modified.
 
