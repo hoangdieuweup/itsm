@@ -1,20 +1,25 @@
 "use client";
 
-import { useState } from "react";
-
+import { useLocale } from "next-intl";
+import { usePathname, useRouter } from "@/shared/lib/i18n/navigation";
+import { routing, type Locale } from "@/shared/lib/i18n/routing";
 import { cn } from "@/shared/lib/utils";
 
-const LOCALES = ["VI", "EN"] as const;
-type Locale = (typeof LOCALES)[number];
-
 /**
- * Presentational-only pill toggle. No i18n routing is wired here — this
- * project has no i18n library yet (checked `package.json` per
- * nextjs-modular-architecture's i18n rule), so this only tracks local UI
- * state until a real locale system lands.
+ * Pill toggle that switches the active locale via next-intl's locale-aware
+ * router. Replaces the old presentational-only toggle.
+ *
+ * a11y (ui-ux-pro-max): role="group" with aria-label, each button uses
+ * aria-pressed for toggle state, focus-visible ring for keyboard navigation.
  */
 export function LanguageSwitch() {
-  const [active, setActive] = useState<Locale>("VI");
+  const locale = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  function switchLocale(nextLocale: Locale) {
+    router.replace(pathname, { locale: nextLocale });
+  }
 
   return (
     <div
@@ -22,20 +27,20 @@ export function LanguageSwitch() {
       aria-label="Language"
       className="inline-flex items-center rounded-full bg-muted p-0.5 text-xs font-semibold"
     >
-      {LOCALES.map((locale) => (
+      {routing.locales.map((loc) => (
         <button
-          key={locale}
+          key={loc}
           type="button"
-          aria-pressed={active === locale}
-          onClick={() => setActive(locale)}
+          aria-pressed={locale === loc}
+          onClick={() => switchLocale(loc)}
           className={cn(
             "rounded-full px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-            active === locale
+            locale === loc
               ? "bg-orange-700 text-white"
               : "text-muted-foreground hover:text-foreground"
           )}
         >
-          {locale}
+          {loc.toUpperCase()}
         </button>
       ))}
     </div>

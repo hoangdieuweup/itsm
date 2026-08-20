@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { LogIn } from "lucide-react";
 
 import { Button } from "@/shared/ui/button";
@@ -15,6 +16,9 @@ import { LanguageSwitch } from "./language-switch";
  * (backend SSO service) is merged.
  */
 export function LoginForm() {
+  const t = useTranslations("auth");
+  const tc = useTranslations("common.meta");
+
   return (
     <m.div
       initial={{ opacity: 0, y: 8 }}
@@ -28,17 +32,17 @@ export function LoginForm() {
         <div className="flex w-full flex-col justify-center gap-6 p-8 sm:p-10 lg:w-[55%]">
           <div className="flex items-start justify-between gap-4">
             <span className="text-xs font-semibold text-orange-700">
-              Marketing Department
+              {t("login.departmentLabel")}
             </span>
             <LanguageSwitch />
           </div>
 
           <div className="space-y-2">
             <h1 className="font-heading text-2xl font-bold text-foreground sm:text-3xl">
-              Đăng nhập
+              {t("login.title")}
             </h1>
             <p className="text-sm text-muted-foreground">
-              Sử dụng tài khoản WeUpBook DX của bạn để tiếp tục.
+              {t("login.subtitle")}
             </p>
           </div>
 
@@ -48,11 +52,11 @@ export function LoginForm() {
             className="h-11 w-full justify-center gap-2 rounded-xl bg-linear-to-r from-orange-700 to-red-800 text-base font-semibold text-white shadow-md hover:from-orange-800 hover:to-red-900 disabled:opacity-60"
           >
             <LogIn className="size-4" aria-hidden />
-            Continue with WeUpBook DX
+            {t("login.continueButton")}
           </Button>
 
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} Weupbook — All rights reserved.
+            {tc("copyright", { year: new Date().getFullYear() })}
           </p>
         </div>
       </Card>

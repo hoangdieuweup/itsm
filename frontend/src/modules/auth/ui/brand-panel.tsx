@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Caveat } from "next/font/google";
 import { BarChart3, Building2, ClipboardCheck } from "lucide-react";
 
@@ -12,10 +15,11 @@ const caveat = Caveat({
   variable: "--font-logo",
 });
 
-const FEATURE_PILLS = [
-  { icon: ClipboardCheck, label: "Structured training" },
-  { icon: BarChart3, label: "Real-time reporting" },
-  { icon: Building2, label: "Department management" },
+const FEATURE_ICONS = [ClipboardCheck, BarChart3, Building2] as const;
+const FEATURE_KEYS = [
+  "structuredTraining",
+  "realTimeReporting",
+  "departmentManagement",
 ] as const;
 
 /**
@@ -25,6 +29,8 @@ const FEATURE_PILLS = [
  * `ui-ux-pro-max` plugin isn't available in this environment).
  */
 export function BrandPanel() {
+  const t = useTranslations("auth.brand");
+
   return (
     <div
       className={cn(
@@ -47,29 +53,29 @@ export function BrandPanel() {
 
       <div className="relative mt-10 flex flex-col gap-6">
         <div className="space-y-3">
-          <h2 className="text-3xl leading-tight font-bold text-balance lg:text-4xl">
-            Nền tảng đào tạo
-            <br />
-            thế hệ mới
+          <h2 className="text-3xl leading-tight font-bold text-balance lg:text-4xl whitespace-pre-line">
+            {t("tagline")}
           </h2>
           <p className="max-w-sm text-sm leading-relaxed text-white/90">
-            Quản lý đào tạo, theo dõi tiến độ và vận hành phòng ban của bạn
-            trong một nền tảng duy nhất.
+            {t("description")}
           </p>
         </div>
 
         <ul className="flex flex-col gap-2.5">
-          {FEATURE_PILLS.map(({ icon: Icon, label }) => (
-            <li
-              key={label}
-              className="inline-flex w-fit items-center gap-2 rounded-full border border-white/30 bg-white/10 py-1.5 pr-4 pl-2.5 text-sm font-medium backdrop-blur-sm"
-            >
-              <span className="flex size-5 items-center justify-center rounded-full bg-white/20">
-                <Icon className="size-3" aria-hidden />
-              </span>
-              {label}
-            </li>
-          ))}
+          {FEATURE_KEYS.map((key, i) => {
+            const Icon = FEATURE_ICONS[i];
+            return (
+              <li
+                key={key}
+                className="inline-flex w-fit items-center gap-2 rounded-full border border-white/30 bg-white/10 py-1.5 pr-4 pl-2.5 text-sm font-medium backdrop-blur-sm"
+              >
+                <span className="flex size-5 items-center justify-center rounded-full bg-white/20">
+                  <Icon className="size-3" aria-hidden />
+                </span>
+                {t(`features.${key}`)}
+              </li>
+            );
+          })}
         </ul>
       </div>
 
