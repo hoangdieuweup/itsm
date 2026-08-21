@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 
 from app.core.models import ApiResponse
 from app.core.pagination import Page, PaginationParams, pagination_params
-from app.modules.rbac.public import require_permission
+from app.modules.rbac.public import RbacApi, get_rbac_api, require_permission
 from app.modules.users.dependencies import get_uow
 from app.modules.users.schemas import UserRead, UserStatusUpdate
 from app.modules.users.services.update_user_status import UpdateUserStatus
@@ -21,10 +21,15 @@ router = APIRouter(prefix="/users", tags=["users"])
 async def list_users(
     pagination: PaginationParams = Depends(pagination_params),
     uow: AbstractUsersUnitOfWork = Depends(get_uow),
+    rbac: RbacApi = Depends(get_rbac_api),
     _user: UserRead = Depends(require_permission("user", "read")),
 ) -> ApiResponse[Page[UserRead]]:
     """List users for the admin user-management page."""
     items, total = await uow.users.list_page(pagination.limit, pagination.offset)
+    if items:
+        user_ids = [u.id for u in items]
+        role_map = await rbac.get_role_names_for_users(user_ids)
+        items = [u.model_copy(update={"role_name": role_map.get(u.id, "member")}) for u in items]
     page = Page[UserRead](items=items, total=total, limit=pagination.limit, offset=pagination.offset)
     return ApiResponse[Page[UserRead]](success=True, data=page)
 
@@ -34,8 +39,11 @@ async def update_user_status(
     user_id: int,
     body: UserStatusUpdate,
     use_case: UpdateUserStatus = Depends(get_update_user_status),
+    rbac: RbacApi = Depends(get_rbac_api),
     _user: UserRead = Depends(require_permission("user", "update_status")),
 ) -> ApiResponse[UserRead]:
     """Block or unblock a user. Blocking the last admin is rejected — see rbac's bus-factor rule."""
     updated = await use_case.execute(user_id, body.status)
+    role_summary = await rbac.role_summary_for_user(user_id)
+    updated = updated.model_copy(update={"role_name": role_summary.role_name or "member"})
     return ApiResponse[UserRead](success=True, data=updated)

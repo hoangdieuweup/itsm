@@ -13,7 +13,7 @@ from app.core.database import Base
 
 
 class DxToken(Base):
-    """Encrypted WeUpBook DX token set for one user, one row per user."""
+    """Encrypted WeUp DX token set for one user, one row per user."""
 
     __tablename__ = "dx_tokens"
 

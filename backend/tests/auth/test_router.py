@@ -1,7 +1,7 @@
 """Integration tests for app.modules.auth.router.
 
 Real Postgres + real Redis (via the `client`/`cache_client` fixtures), fake
-DX HTTP client only — no real network call ever reaches WeUpBook DX. This
+DX HTTP client only — no real network call ever reaches WeUp DX. This
 covers what the unit tests in test_services.py deliberately can't: cookies,
 redirects, the ApiResponse envelope, and the blacklist actually round
 tripping through Redis end to end.
@@ -12,7 +12,9 @@ from urllib.parse import parse_qs, urlparse
 
 from httpx import AsyncClient
 
+from app.config import settings
 from app.integrations.dx_core.client import DxCoreClient, DxDepartment, DxUserProfile
+from app.integrations.dx_core.config import dx_core_settings
 from app.integrations.dx_core.dependencies import get_dx_core_client
 from app.main import app
 from app.modules.auth.constants import AuthCookies
@@ -30,6 +32,7 @@ class _FakeDxCoreClient:
     """Overrides only the network methods; PKCE/authorize-URL logic stays real
     (bound from the real DxCoreClient, which do no I/O — see their own markers)."""
 
+    CALLBACK_PATH = DxCoreClient.CALLBACK_PATH
     generate_pkce_pair = DxCoreClient.generate_pkce_pair
     build_authorize_url = DxCoreClient.build_authorize_url
     _redirect_uri = DxCoreClient._redirect_uri
@@ -73,7 +76,7 @@ async def _start_and_get_state(client: AsyncClient) -> str:
     assert response.status_code == 302
     location = response.headers["location"]
     query = parse_qs(urlparse(location).query)
-    assert query["client_id"] == ["local-test-client-id"]
+    assert query["client_id"] == [dx_core_settings.CLIENT_ID]
     assert query["code_challenge_method"] == ["S256"]
     return query["state"][0]
 
@@ -103,7 +106,7 @@ class TestOAuthCallback:
         )
 
         assert response.status_code == 302
-        assert response.headers["location"] == "http://localhost:3000"
+        assert response.headers["location"] == f"{settings.FRONTEND_BASE_URL}"
         cookie_names = {c for c in response.cookies}
         assert {AuthCookies.ACCESS_TOKEN, AuthCookies.REFRESH_TOKEN} <= cookie_names
 
@@ -128,7 +131,7 @@ class TestOAuthCallback:
         response = await client.get("/api/v1/auth/oauth/dx/callback", params={"error": "access_denied"})
 
         assert response.status_code == 302
-        assert response.headers["location"] == "http://localhost:3000/login?error=sso_denied"
+        assert response.headers["location"] == f"{settings.FRONTEND_BASE_URL}/login?error=sso_denied"
 
     async def test_unknown_or_expired_state_redirects_with_sso_state_error(self, client: AsyncClient) -> None:
         response = await client.get(
@@ -136,7 +139,7 @@ class TestOAuthCallback:
         )
 
         assert response.status_code == 302
-        assert response.headers["location"] == "http://localhost:3000/login?error=sso_state"
+        assert response.headers["location"] == f"{settings.FRONTEND_BASE_URL}/login?error=sso_state"
 
     async def test_state_is_single_use(self, client: AsyncClient) -> None:
         _install_fake_dx_client(_profile(email="erin@example.com", sub="dx-sub-router-3"))
@@ -145,13 +148,13 @@ class TestOAuthCallback:
             "/api/v1/auth/oauth/dx/callback", params={"code": "auth-code", "state": state}
         )
         assert first.status_code == 302
-        assert first.headers["location"] == "http://localhost:3000"
+        assert first.headers["location"] == f"{settings.FRONTEND_BASE_URL}"
 
         second = await client.get(
             "/api/v1/auth/oauth/dx/callback", params={"code": "auth-code", "state": state}
         )
 
-        assert second.headers["location"] == "http://localhost:3000/login?error=sso_state"
+        assert second.headers["location"] == f"{settings.FRONTEND_BASE_URL}/login?error=sso_state"
 
 
 class TestMeWithoutSession:

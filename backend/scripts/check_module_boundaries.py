@@ -87,9 +87,11 @@ def _target_module(import_path: str) -> str | None:
 
 
 def _is_public_import(import_path: str, target_mod: str) -> bool:
-    """True when the import resolves to ``app.modules.<target>.public``."""
-    expected = f"{MODULE_IMPORT_PREFIX}{target_mod}.public"
-    return import_path == expected
+    """True when the import resolves to ``app.modules.<target>.public`` or ``app.modules.<target>.constants``."""
+    return import_path in (
+        f"{MODULE_IMPORT_PREFIX}{target_mod}.public",
+        f"{MODULE_IMPORT_PREFIX}{target_mod}.constants",
+    )
 
 
 # ── Core check ─────────────────────────────────────────────────────────────

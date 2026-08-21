@@ -9,12 +9,23 @@ from app.modules.auth.public import AuthApi, get_auth_api
 from app.modules.rbac.constants import RbacDefaults
 from app.modules.rbac.dependencies import get_uow
 from app.modules.rbac.exceptions import PermissionDenied
+from app.modules.rbac.models import Permission, Role, UserRole
 from app.modules.rbac.rules import RbacRules
 from app.modules.rbac.schemas import RoleSummary
 from app.modules.rbac.services.assign_default_role import AssignDefaultRole
 from app.modules.rbac.services.assign_role import AssignRole
 from app.modules.rbac.uow import AbstractRbacUnitOfWork
 from app.modules.users.public import UserRead, UsersApi, get_users_api
+
+__all__ = [
+    "Permission",
+    "Role",
+    "UserRole",
+    "RbacApi",
+    "get_rbac_api",
+    "get_assign_role",
+    "require_permission",
+]
 
 
 class RbacApi:
@@ -38,6 +49,11 @@ class RbacApi:
         return RoleSummary(
             role_name=role.name, permissions=[f"{p.resource}.{p.action}" for p in role.permissions]
         )
+
+    @facade
+    async def get_role_names_for_users(self, user_ids: list[int]) -> dict[int, str]:
+        """Return a mapping of user_id -> role_name for a batch of users."""
+        return await self._uow.user_roles.get_roles_for_users(user_ids)
 
     @facade
     async def is_last_admin(self, user_id: int) -> bool:

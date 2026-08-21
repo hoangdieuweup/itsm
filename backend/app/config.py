@@ -1,6 +1,9 @@
 """Global settings. Module specific settings live in that module's config.py."""
 
-from pydantic import PostgresDsn
+import json
+from typing import Any
+
+from pydantic import PostgresDsn, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.constants import Environment, LogLevel
@@ -22,10 +25,18 @@ class Config(BaseSettings):
 
     CORS_ORIGINS: list[str] = []
 
-    # Network topology, same spirit as CORS_ORIGINS: where this backend's own
-    # public URL is (for building an OAuth redirect_uri) and where the SPA
-    # lives (for post-login/post-error redirects). Not owned by any one
-    # module — every module that redirects a browser needs both.
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, v: Any) -> list[str]:
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            if v.startswith("[") and v.endswith("]"):
+                return json.loads(v)
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
+
     BACKEND_BASE_URL: str = "http://localhost:8000"
     FRONTEND_BASE_URL: str = "http://localhost:3000"
 

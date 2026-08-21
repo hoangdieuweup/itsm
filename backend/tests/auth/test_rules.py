@@ -3,7 +3,7 @@
 import pytest
 
 from app.modules.auth.rules import AuthRules
-from app.modules.users.constants import UserStatus
+from app.modules.common.constants import UserStatus
 
 
 @pytest.mark.parametrize(

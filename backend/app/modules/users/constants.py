@@ -3,14 +3,6 @@
 from enum import StrEnum
 
 
-class UserStatus(StrEnum):
-    """Lifecycle state of a user account."""
-
-    ACTIVE = "active"
-    PENDING = "pending"
-    BLOCKED = "blocked"
-
-
 class UserLimits:
     """Numeric limits owned by the users module."""
 
