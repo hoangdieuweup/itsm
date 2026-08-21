@@ -28,7 +28,7 @@ from app.modules.auth.services.authenticate import AuthenticateWithDx
 from app.modules.auth.services.logout import LogoutUser
 from app.modules.auth.services.refresh_token import RefreshToken
 from app.modules.auth.utils import AuthSessionResponses, get_authenticate_with_dx
-from app.modules.rbac.public import RbacApi, get_rbac_api
+from app.modules.rbac.public import RbacApi, RbacDefaults, get_rbac_api
 from app.modules.users.public import UserRead
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -120,10 +120,13 @@ async def me(
     """Return the signed in user's profile plus their roles and permissions —
     what the frontend's PermissionProvider seeds from."""
     summary = await rbac.role_summary_for_user(user.id)
+    primary_role = summary.role_name or (
+        summary.roles[0] if summary.roles else RbacDefaults.DEFAULT_ROLE_NAME
+    )
     user_with_roles = user.model_copy(
         update={
             "role_names": summary.roles,
-            "role_name": summary.role_name or (summary.roles[0] if summary.roles else "member"),
+            "role_name": primary_role,
         }
     )
     body = MeResponse(

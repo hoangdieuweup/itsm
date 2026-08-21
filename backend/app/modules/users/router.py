@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends
 
 from app.core.models import ApiResponse
 from app.core.pagination import Page, PaginationParams, pagination_params
-from app.modules.rbac.public import RbacApi, get_rbac_api, require_permission
+from app.modules.rbac.public import RbacApi, RbacDefaults, get_rbac_api, require_permission
 from app.modules.users.dependencies import get_uow
 from app.modules.users.schemas import UserRead, UserStatusUpdate
 from app.modules.users.services.update_user_status import UpdateUserStatus
@@ -34,8 +34,8 @@ async def list_users(
         items = [
             u.model_copy(
                 update={
-                    "role_names": role_map.get(u.id, ["member"]),
-                    "role_name": (role_map.get(u.id) or ["member"])[0],
+                    "role_names": role_map.get(u.id, [RbacDefaults.DEFAULT_ROLE_NAME]),
+                    "role_name": (role_map.get(u.id) or [RbacDefaults.DEFAULT_ROLE_NAME])[0],
                 }
             )
             for u in items
@@ -55,10 +55,13 @@ async def update_user_status(
     """Block or unblock a user. Blocking the last admin is rejected — see rbac's bus-factor rule."""
     updated = await use_case.execute(user_id, body.status)
     role_summary = await rbac.role_summary_for_user(user_id)
+    primary_role = role_summary.role_name or (
+        role_summary.roles[0] if role_summary.roles else RbacDefaults.DEFAULT_ROLE_NAME
+    )
     updated = updated.model_copy(
         update={
             "role_names": role_summary.roles,
-            "role_name": role_summary.role_name or (role_summary.roles[0] if role_summary.roles else "member"),
+            "role_name": primary_role,
         }
     )
     return ApiResponse[UserRead](success=True, data=updated)

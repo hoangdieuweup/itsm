@@ -2,8 +2,9 @@
 may import from rbac — enforced by scripts/check_module_boundaries.py.
 """
 
-from fastapi import Depends
 from uuid import UUID
+
+from fastapi import Depends
 
 from app.core.base.markers import facade
 from app.modules.auth.public import AuthApi, get_auth_api
@@ -23,6 +24,7 @@ __all__ = [
     "Permission",
     "Role",
     "UserRole",
+    "RbacDefaults",
     "RbacApi",
     "get_rbac_api",
     "get_assign_role",
