@@ -114,7 +114,7 @@ export function RolesPageContent() {
               {page.items.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">
-                    {t("noRoles")}
+                    {t("empty")}
                   </td>
                 </tr>
               ) : (
@@ -147,12 +147,12 @@ export function RolesPageContent() {
                                 : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
                             }`}
                           >
-                            {isSystem ? t("badge.system") : t("badge.custom")}
+                            {isSystem ? t("types.system") : t("types.custom")}
                           </span>
                           {isProtectedAdminRole(role) && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" title={t("adminRoleProtectedTooltip")}>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" title={t("actions.adminProtectedTooltip")}>
                               <Key className="size-3" />
-                              {t("badge.protected")}
+                              {t("badges.adminProtected")}
                             </span>
                           )}
                         </div>

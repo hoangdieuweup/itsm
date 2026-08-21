@@ -20,6 +20,8 @@ export function DashboardShell({ children }: DashboardShellProps) {
   const getPageTitle = () => {
     if (pathname === ROUTES.adminUsers) return t("users");
     if (pathname === ROUTES.adminRoles) return t("roles");
+    if (pathname.startsWith(ROUTES.adminProjects)) return t("projects");
+    if (pathname === ROUTES.adminAuditLog) return t("auditLog");
     return t("dashboard");
   };
 

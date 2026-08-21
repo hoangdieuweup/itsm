@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Link, usePathname } from "@/shared/lib/i18n/navigation";
 import { ROUTES } from "@/shared/constants/routes";
+import { ACTIONS, RESOURCES } from "@/shared/constants/permissions";
 import { Can } from "@/entities/permission";
 import { LanguageSwitch } from "@/modules/auth/ui/language-switch";
 import { useAuthSession } from "@/modules/auth/hooks/use-auth-session";
@@ -283,28 +284,28 @@ export function DashboardSidebar({
       label: t("users"),
       icon: Users,
       active: pathname === ROUTES.adminUsers,
-      permission: { action: "read", resource: "user" },
+      permission: { action: ACTIONS.READ, resource: RESOURCES.USER },
     },
     {
       href: ROUTES.adminRoles,
       label: t("roles"),
       icon: Shield,
       active: pathname === ROUTES.adminRoles,
-      permission: { action: "read", resource: "role" },
+      permission: { action: ACTIONS.READ, resource: RESOURCES.ROLE },
     },
     {
       href: ROUTES.adminProjects,
       label: t("projects"),
       icon: FolderKanban,
       active: pathname === ROUTES.adminProjects,
-      permission: { action: "read", resource: "project" },
+      permission: { action: ACTIONS.READ, resource: RESOURCES.PROJECT },
     },
     {
       href: ROUTES.adminAuditLog,
       label: t("auditLog"),
       icon: ScrollText,
       active: pathname === ROUTES.adminAuditLog,
-      permission: { action: "read", resource: "audit_log" },
+      permission: { action: ACTIONS.READ, resource: RESOURCES.AUDIT_LOG },
     },
   ];
 

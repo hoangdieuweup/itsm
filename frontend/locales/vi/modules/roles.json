@@ -11,10 +11,24 @@
     "system": "Hệ thống",
     "custom": "Tùy chỉnh"
   },
+  "badge": {
+    "system": "Hệ thống",
+    "custom": "Tùy chỉnh",
+    "protected": "Toàn quyền"
+  },
+  "badges": {
+    "system": "Hệ thống",
+    "custom": "Tùy chỉnh",
+    "protected": "Toàn quyền",
+    "adminProtected": "Toàn quyền"
+  },
   "resources": {
     "role": "Vai trò (Role)",
     "permission": "Quyền hạn (Permission)",
-    "user": "Người dùng (User)"
+    "user": "Người dùng (User)",
+    "project": "Dự án (Project)",
+    "environment": "Môi trường (Environment)",
+    "audit_log": "Nhật ký kiểm toán (Audit Log)"
   },
   "catalog": {
     "permissions": {
@@ -31,6 +45,21 @@
         "read": "Xem danh sách người dùng",
         "update_status": "Khóa / Mở khóa tài khoản",
         "assign_role": "Gán vai trò cho người dùng"
+      },
+      "project": {
+        "create": "Tạo dự án mới",
+        "read": "Xem danh sách & chi tiết dự án",
+        "update": "Chỉnh sửa dự án & liên kết",
+        "delete": "Xóa dự án"
+      },
+      "environment": {
+        "create": "Tạo môi trường triển khai",
+        "read": "Xem môi trường dự án",
+        "update": "Chỉnh sửa môi trường",
+        "delete": "Xóa môi trường"
+      },
+      "audit_log": {
+        "read": "Xem nhật ký kiểm toán hệ thống"
       }
     }
   },
@@ -61,9 +90,7 @@
     "deleteConfirm": "Bạn có chắc chắn muốn xóa vai trò này không? Thao tác này không thể hoàn tác.",
     "adminProtectedTooltip": "Vai trò hệ thống được bảo vệ, không thể xóa hoặc sửa quyền."
   },
-  "badges": {
-    "adminProtected": "Toàn quyền"
-  },
+  "adminRoleProtectedTooltip": "Vai trò hệ thống được bảo vệ, không thể xóa hoặc sửa quyền.",
   "errors": {
     "rbac_role_not_found": "Không tìm thấy vai trò.",
     "rbac_duplicate_role_name": "Tên vai trò này đã tồn tại trong hệ thống.",
