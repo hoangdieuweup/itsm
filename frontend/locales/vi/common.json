@@ -45,5 +45,9 @@
   "noPermission": {
     "title": "Truy cập bị từ chối",
     "description": "Bạn không có quyền truy cập trang này."
+  },
+  "confirmDialog": {
+    "confirm": "Xác nhận",
+    "cancel": "Hủy"
   }
 }

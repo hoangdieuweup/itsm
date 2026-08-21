@@ -45,5 +45,9 @@
   "noPermission": {
     "title": "Access Denied",
     "description": "You don't have permission to view this page."
+  },
+  "confirmDialog": {
+    "confirm": "Confirm",
+    "cancel": "Cancel"
   }
 }

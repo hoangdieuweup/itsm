@@ -57,7 +57,8 @@
     "edit": "Sửa",
     "view": "Xem chi tiết",
     "delete": "Xóa",
-    "deleteConfirm": "Bạn có chắc chắn muốn xóa vai trò này không?",
+    "deleteDialogTitle": "Xóa vai trò",
+    "deleteConfirm": "Bạn có chắc chắn muốn xóa vai trò này không? Thao tác này không thể hoàn tác.",
     "adminProtectedTooltip": "Vai trò hệ thống được bảo vệ, không thể xóa hoặc sửa quyền."
   },
   "badges": {
