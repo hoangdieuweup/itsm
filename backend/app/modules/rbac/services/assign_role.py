@@ -2,7 +2,7 @@
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
-from app.modules.rbac.constants import RbacTypes
+from app.modules.rbac.constants import RbacCacheKeys, RbacTypes
 from app.modules.rbac.exceptions import (
     CannotModifyProtectedAdmin,
     CannotRemoveLastAdmin,
@@ -46,4 +46,5 @@ class AssignRole(AbstractUseCase):
                 raise CannotRemoveLastAdmin()
 
         await self._uow.user_roles.assign(user_id, role_id)
+        self._uow.mark_stale(RbacCacheKeys.USER_ROLE_ENTITY, user_id)
         await self._uow.commit()

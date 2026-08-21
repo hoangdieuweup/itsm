@@ -121,6 +121,10 @@ class FakeRbacUnitOfWork(AbstractRbacUnitOfWork):
         self.permissions = FakePermissionRepository()
         self.user_roles = FakeUserRoleRepository(self.roles)
         self.commits = 0
+        self.stale: list[tuple[str, int]] = []
+
+    def mark_stale(self, entity: str, entity_id: int) -> None:
+        self.stale.append((entity, entity_id))
 
     async def commit(self) -> None:
         self.commits += 1

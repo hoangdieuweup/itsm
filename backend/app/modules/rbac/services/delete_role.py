@@ -2,6 +2,7 @@
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
+from app.modules.rbac.constants import RbacCacheKeys
 from app.modules.rbac.exceptions import RoleInUse, RoleNotFound, SystemRoleImmutable
 from app.modules.rbac.rules import RbacRules
 from app.modules.rbac.uow import AbstractRbacUnitOfWork
@@ -24,4 +25,5 @@ class DeleteRole(AbstractUseCase):
         if await self._uow.roles.count_users_with_role(role_id) > 0:
             raise RoleInUse()
         await self._uow.roles.delete(role_id)
+        self._uow.mark_stale(RbacCacheKeys.ROLE_ENTITY, role_id)
         await self._uow.commit()

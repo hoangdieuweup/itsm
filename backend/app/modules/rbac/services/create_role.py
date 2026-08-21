@@ -2,6 +2,7 @@
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
+from app.modules.rbac.constants import RbacCacheKeys
 from app.modules.rbac.exceptions import DuplicateRoleName, UnknownPermissionId
 from app.modules.rbac.schemas import RoleRead
 from app.modules.rbac.uow import AbstractRbacUnitOfWork
@@ -21,5 +22,6 @@ class CreateRole(AbstractUseCase):
         if len(found) != len(set(permission_ids)):
             raise UnknownPermissionId()
         role = await self._uow.roles.create(name=name, is_system=False, permission_ids=permission_ids)
+        self._uow.mark_stale(RbacCacheKeys.ROLE_ENTITY, role.id)
         await self._uow.commit()
         return role

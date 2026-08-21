@@ -8,6 +8,8 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
+from app.integrations.cache.client import CacheClient
+from app.integrations.cache.dependencies import get_cache
 from app.modules.rbac.services.assign_default_role import AssignDefaultRole
 from app.modules.rbac.services.create_role import CreateRole
 from app.modules.rbac.services.delete_role import DeleteRole
@@ -15,9 +17,11 @@ from app.modules.rbac.services.update_role import UpdateRole
 from app.modules.rbac.uow import AbstractRbacUnitOfWork, RbacUnitOfWork
 
 
-async def get_uow(session: AsyncSession = Depends(get_session)) -> RbacUnitOfWork:
+async def get_uow(
+    session: AsyncSession = Depends(get_session), cache: CacheClient = Depends(get_cache)
+) -> RbacUnitOfWork:
     """Provide a request scoped unit of work. The one place the concrete class is named."""
-    return RbacUnitOfWork(session)
+    return RbacUnitOfWork(session, cache)
 
 
 async def get_create_role(uow: AbstractRbacUnitOfWork = Depends(get_uow)) -> CreateRole:

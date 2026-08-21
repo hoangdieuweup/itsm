@@ -44,6 +44,14 @@ class RbacDefaults:
     DEFAULT_ROLE_NAME = MEMBER_ROLE_NAME
 
 
+class RbacCacheKeys:
+    """Cache identity owned by the rbac module. See references/caching.md."""
+
+    ROLE_ENTITY = "role"
+    USER_ROLE_ENTITY = "user_role"
+    TTL_SECONDS = 300
+
+
 class RbacLimits:
     """Numeric limits owned by the rbac module."""
 
