@@ -28,6 +28,7 @@ from app.modules.auth.services.issue_tokens import IssueTokens
 from app.modules.auth.services.logout import LogoutUser
 from app.modules.auth.services.sync_external_user import SyncExternalUser
 from app.modules.auth.uow import AbstractAuthUnitOfWork, AuthUnitOfWork
+from app.modules.rbac.public import RbacApi, get_rbac_api
 
 
 async def get_uow(session: AsyncSession = Depends(get_session)) -> AuthUnitOfWork:
@@ -98,9 +99,10 @@ async def get_authenticate_with_dx(
     sync_user: SyncExternalUser = Depends(get_sync_external_user),
     issue_tokens: IssueTokens = Depends(get_issue_tokens),
     events: EventBus = Depends(get_event_bus),
+    rbac_api: RbacApi = Depends(get_rbac_api),
 ) -> AuthenticateWithDx:
     """Provide the DX OAuth2 callback use case."""
-    return AuthenticateWithDx(uow, dx_tokens, dx_client, sync_user, issue_tokens, events)
+    return AuthenticateWithDx(uow, dx_tokens, dx_client, sync_user, issue_tokens, events, rbac_api)
 
 
 async def get_logout_user(

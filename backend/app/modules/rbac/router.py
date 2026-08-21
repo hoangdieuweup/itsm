@@ -10,7 +10,7 @@ from app.modules.auth.schemas import UserRead
 from app.modules.rbac.dependencies import get_create_role, get_delete_role, get_update_role
 from app.modules.rbac.dependencies import get_uow as get_rbac_uow
 from app.modules.rbac.exceptions import RoleNotFound
-from app.modules.rbac.public import get_assign_role, require_permission
+from app.modules.rbac.guards import get_assign_role, require_permission
 from app.modules.rbac.schemas import PermissionRead, RoleAssignment, RoleCreate, RoleRead, RoleUpdate
 from app.modules.rbac.services.assign_role import AssignRole
 from app.modules.rbac.services.create_role import CreateRole

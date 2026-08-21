@@ -1,20 +1,20 @@
-"""Contract exposed to other modules — and the require_permission dependency
-every other module's router gates its endpoints with. This is the ONLY file
-another module may import from rbac.
+"""Data facade exposed to other modules — RbacApi has no dependency on auth,
+which is what lets auth's own composition root (auth/dependencies.py,
+auth/services/authenticate.py) import from here without a circular import.
+
+For gating a router's endpoints behind a permission check, see guards.py
+instead — that file needs auth.public (to resolve the current user), which
+is exactly the dependency this file stays free of.
 """
 
 from fastapi import Depends
 
 from app.core.base.markers import facade
-from app.modules.auth.public import AuthApi, get_auth_api
-from app.modules.auth.schemas import UserRead
 from app.modules.rbac.constants import RbacDefaults
 from app.modules.rbac.dependencies import get_uow
-from app.modules.rbac.exceptions import PermissionDenied
 from app.modules.rbac.rules import RbacRules
 from app.modules.rbac.schemas import RoleSummary
 from app.modules.rbac.services.assign_default_role import AssignDefaultRole
-from app.modules.rbac.services.assign_role import AssignRole
 from app.modules.rbac.uow import AbstractRbacUnitOfWork
 
 
@@ -54,28 +54,3 @@ class RbacApi:
 async def get_rbac_api(uow: AbstractRbacUnitOfWork = Depends(get_uow)) -> RbacApi:
     """Provide the facade to other modules."""
     return RbacApi(uow)
-
-
-async def get_assign_role(
-    uow: AbstractRbacUnitOfWork = Depends(get_uow),
-    auth_api: AuthApi = Depends(get_auth_api),
-) -> AssignRole:
-    """Provide the assign-role use case, wired to auth's user-existence check."""
-    return AssignRole(uow, auth_api.get_user_by_id)
-
-
-def require_permission(resource: str, action: str):
-    """Return a dependency that 403s unless the current user's role grants
-    resource.action. Routes ask 'can this user do X,' never 'does this user
-    have role Y' — see references/rbac.md."""
-
-    async def check(
-        auth_api: AuthApi = Depends(get_auth_api),
-        uow: AbstractRbacUnitOfWork = Depends(get_uow),
-    ) -> UserRead:
-        user = auth_api.current_user()
-        if not await uow.user_roles.user_has_permission(user.id, resource, action):
-            raise PermissionDenied(resource=resource, action=action)
-        return user
-
-    return check
