@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -85,7 +85,9 @@ class RoleRepository(AbstractRoleRepository):
         for permission_id in permission_ids:
             self._session.add(RolePermission(role_id=row.id, permission_id=permission_id))
         await self._session.flush()
-        return await self.get_by_id(row.id)  # type: ignore[return-value]
+        result = await self.get_by_id(row.id)
+        assert result is not None  # the row we just inserted always exists
+        return result
 
     @database
     async def update(self, role_id: int, *, name: str | None, permission_ids: list[int] | None) -> RoleRead:
@@ -96,13 +98,13 @@ class RoleRepository(AbstractRoleRepository):
         if name is not None:
             row.name = name
         if permission_ids is not None:
-            await self._session.execute(
-                RolePermission.__table__.delete().where(RolePermission.role_id == role_id)
-            )
+            await self._session.execute(delete(RolePermission).where(RolePermission.role_id == role_id))
             for permission_id in permission_ids:
                 self._session.add(RolePermission(role_id=role_id, permission_id=permission_id))
         await self._session.flush()
-        return await self.get_by_id(role_id)  # type: ignore[return-value]
+        result = await self.get_by_id(role_id)
+        assert result is not None  # role_id was already confirmed to exist above
+        return result
 
     @database
     async def delete(self, role_id: int) -> None:

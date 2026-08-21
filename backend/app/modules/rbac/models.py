@@ -58,5 +58,3 @@ class UserRole(Base):
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="RESTRICT"), index=True)
-
-    role: Mapped["Role"] = relationship(lazy="joined")
