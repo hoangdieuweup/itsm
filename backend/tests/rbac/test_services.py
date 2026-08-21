@@ -5,6 +5,7 @@ import pytest
 
 from app.modules.rbac.constants import RbacDefaults
 from app.modules.rbac.exceptions import (
+    CannotModifyProtectedAdmin,
     CannotRemoveLastAdmin,
     DuplicateRoleName,
     RoleInUse,
@@ -132,6 +133,10 @@ def _admin_role(*, grants: int) -> RoleRead:
     return RoleRead(id=10, name=RbacDefaults.ADMIN_ROLE_NAME, is_system=True, permissions=[])
 
 
+async def _not_protected(user_id: int) -> bool:
+    return False
+
+
 class TestCreateRole:
     async def test_creates_role_with_given_permissions(self) -> None:
         uow = FakeRbacUnitOfWork()
@@ -220,7 +225,7 @@ class TestAssignRole:
         async def user_lookup(user_id: int):
             return object()  # any non-None sentinel — AssignRole only checks for None
 
-        await AssignRole(uow, user_lookup).execute(42, 1)
+        await AssignRole(uow, user_lookup, _not_protected).execute(42, 1)
 
         assert uow.user_roles.grants[42] == 1
 
@@ -232,7 +237,7 @@ class TestAssignRole:
             return None
 
         with pytest.raises(TargetUserNotFound):
-            await AssignRole(uow, user_lookup).execute(42, 1)
+            await AssignRole(uow, user_lookup, _not_protected).execute(42, 1)
 
     async def test_rejects_reassigning_the_last_admin_away(self) -> None:
         uow = FakeRbacUnitOfWork()
@@ -244,7 +249,7 @@ class TestAssignRole:
             return object()
 
         with pytest.raises(CannotRemoveLastAdmin):
-            await AssignRole(uow, user_lookup).execute(42, 1)
+            await AssignRole(uow, user_lookup, _not_protected).execute(42, 1)
 
     async def test_missing_target_role_raises(self) -> None:
         uow = FakeRbacUnitOfWork()
@@ -253,7 +258,22 @@ class TestAssignRole:
             return object()
 
         with pytest.raises(RoleNotFound):
-            await AssignRole(uow, user_lookup).execute(42, 404)
+            await AssignRole(uow, user_lookup, _not_protected).execute(42, 404)
+
+    async def test_rejects_modifying_a_protected_admin(self) -> None:
+        uow = FakeRbacUnitOfWork()
+        uow.roles.seed(RoleRead(id=1, name="support", is_system=False, permissions=[]))
+
+        async def user_lookup(user_id: int):
+            return object()
+
+        async def is_protected(user_id: int) -> bool:
+            return True
+
+        with pytest.raises(CannotModifyProtectedAdmin):
+            await AssignRole(uow, user_lookup, is_protected).execute(42, 1)
+
+        assert 42 not in uow.user_roles.grants
 
 
 class TestAssignDefaultRole:
