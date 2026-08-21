@@ -1,94 +1,104 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Caveat } from "next/font/google";
-import { BarChart3, Building2, ClipboardCheck } from "lucide-react";
+import Image from "next/image";
+import { Monitor, ShieldAlert, TicketCheck } from "lucide-react";
 
-import { cn } from "@/shared/lib/utils";
+import { m } from "@/shared/lib/motion";
 
-// Scoped to this module only — the app-wide layout keeps Geist. A script
-// face is used strictly for the small logo wordmark per the split-screen
-// design brief ("script/cursive wordmark style").
-const caveat = Caveat({
-  subsets: ["latin"],
-  weight: ["600"],
-  variable: "--font-logo",
-});
-
-const FEATURE_ICONS = [ClipboardCheck, BarChart3, Building2] as const;
-const FEATURE_KEYS = [
-  "structuredTraining",
-  "realTimeReporting",
-  "departmentManagement",
-] as const;
-
-/**
- * Left branding panel of the split-screen login layout (Concept A layout,
- * Concept B orange→red accent — see PR description for the contrast math
- * behind these exact gradient stops, computed by hand since the
- * `ui-ux-pro-max` plugin isn't available in this environment).
- */
 export function BrandPanel() {
   const t = useTranslations("auth.brand");
 
   return (
-    <div
-      className={cn(
-        caveat.variable,
-        "relative hidden flex-col justify-between overflow-hidden bg-linear-to-br from-orange-700 via-red-800 to-red-900 p-8 text-white lg:flex lg:w-[45%] lg:p-10"
-      )}
-    >
-      {/* Decorative texture, purely visual — no semantic content */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(255,255,255,0.12),transparent_45%),radial-gradient(circle_at_85%_90%,rgba(255,255,255,0.1),transparent_40%)]"
+    <div className="relative hidden flex-col justify-between overflow-hidden text-white lg:flex lg:w-[48%]">
+      {/* ── Wave background image ── */}
+      <Image
+        src="/images/auth-wave-bg.jpg"
+        alt=""
+        fill
+        priority
+        className="object-cover"
+        sizes="48vw"
       />
 
-      <span
-        className="relative text-3xl font-semibold tracking-wide"
-        style={{ fontFamily: "var(--font-logo)" }}
-      >
-        Weup
-      </span>
+      {/* ── Content overlay ── */}
+      <div className="relative z-10 flex flex-1 flex-col justify-between p-10 xl:p-14">
+        {/* ── Logo ── */}
+        <m.div
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="flex items-center gap-3"
+        >
+          <div className="flex size-9 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
+            <span className="text-lg font-extrabold leading-none">W</span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-xl font-bold tracking-wide">WEUP</span>
+            <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold tracking-widest">
+              ITSM
+            </span>
+          </div>
+        </m.div>
 
-      <div className="relative mt-10 flex flex-col gap-6">
-        <div className="space-y-3">
-          <h2 className="text-3xl leading-tight font-bold text-balance lg:text-4xl whitespace-pre-line">
-            {t("tagline")}
-          </h2>
-          <p className="max-w-sm text-sm leading-relaxed text-white/90">
-            {t("description")}
-          </p>
-        </div>
+        {/* ── Tagline + description + features ── */}
+        <m.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
+          className="flex flex-col gap-8"
+        >
+          <div className="space-y-4">
+            <h2 className="text-4xl leading-[1.15] font-extrabold text-balance whitespace-pre-line xl:text-[2.75rem]">
+              {t("tagline")}
+            </h2>
+            <p className="max-w-md text-[15px] leading-relaxed text-blue-100">
+              {t("description")}
+            </p>
+          </div>
 
-        <ul className="flex flex-col gap-2.5">
-          {FEATURE_KEYS.map((key, i) => {
-            const Icon = FEATURE_ICONS[i];
-            return (
-              <li
+          <ul className="flex flex-col gap-3">
+            {FEATURE_ENTRIES.map(({ key, Icon }, i) => (
+              <m.li
                 key={key}
-                className="inline-flex w-fit items-center gap-2 rounded-full border border-white/30 bg-white/10 py-1.5 pr-4 pl-2.5 text-sm font-medium backdrop-blur-sm"
+                initial={{ opacity: 0, x: -24 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{
+                  duration: 0.35,
+                  delay: 0.3 + i * 0.1,
+                  ease: "easeOut",
+                }}
+                className="inline-flex w-fit items-center gap-3 rounded-xl border border-white/15 bg-white/10 py-2.5 pr-5 pl-3 text-sm font-medium backdrop-blur-sm transition-all duration-200 hover:bg-white/[0.18] hover:border-white/25"
               >
-                <span className="flex size-5 items-center justify-center rounded-full bg-white/20">
-                  <Icon className="size-3" aria-hidden />
+                <span className="flex size-8 items-center justify-center rounded-lg bg-white/20">
+                  <Icon className="size-4" aria-hidden />
                 </span>
                 {t(`features.${key}`)}
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+              </m.li>
+            ))}
+          </ul>
+        </m.div>
 
-      <div
-        className="relative flex items-center gap-1.5"
-        role="presentation"
-        aria-hidden
-      >
-        <span className="h-1.5 w-6 rounded-full bg-white" />
-        <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
-        <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
-        <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
+        {/* ── Bottom accent ── */}
+        <m.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.6 }}
+          className="flex items-center gap-2"
+          role="presentation"
+          aria-hidden
+        >
+          <span className="h-1 w-8 rounded-full bg-white/60" />
+          <span className="h-1 w-2 rounded-full bg-white/25" />
+          <span className="h-1 w-2 rounded-full bg-white/25" />
+        </m.div>
       </div>
     </div>
   );
 }
+
+const FEATURE_ENTRIES = [
+  { key: "incidentManagement", Icon: ShieldAlert },
+  { key: "requestTracking", Icon: TicketCheck },
+  { key: "assetManagement", Icon: Monitor },
+] as const;

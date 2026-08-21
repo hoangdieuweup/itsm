@@ -6,25 +6,28 @@ import { ApiRequestError } from "@/shared/lib/api-client";
 /**
  * Translates an API error into a user-facing message via i18n.
  *
- * - If the error is an `ApiRequestError` and a translation exists for its
- *   `code`, that translation is returned.
- * - Otherwise the non-localized `error.message` is used as a fallback so a
- *   new backend error code doesn't crash the UI while translators catch up.
- * - Non-API errors get the generic "unknown" message.
- *
- * Lives in `shared/lib/` because it's generic infrastructure, not owned by
- * any one module — per nextjs-modular-architecture's i18n-and-errors.md.
+ * - When `moduleNamespace` is provided (e.g. "users", "roles", "auth"), it checks
+ *   `{moduleNamespace}.errors.{code}` or `{moduleNamespace}.{code}` first.
+ * - Otherwise checks `common.errors.{code}`.
+ * - Falls back to `error.message` or `common.errors.unknown`.
  */
-export function useApiErrorMessage() {
-  const t = useTranslations("common.errors");
+export function useApiErrorMessage(moduleNamespace?: string) {
+  const tModule = useTranslations(moduleNamespace || "common");
+  const tCommon = useTranslations("common.errors");
 
   return (error: unknown): string => {
-    if (error instanceof ApiRequestError && t.has(error.code)) {
-      return t(error.code as Parameters<typeof t>[0]);
-    }
     if (error instanceof ApiRequestError) {
+      if (moduleNamespace && tModule.has(`errors.${error.code}`)) {
+        return tModule(`errors.${error.code}` as Parameters<typeof tModule>[0]);
+      }
+      if (moduleNamespace && tModule.has(error.code)) {
+        return tModule(error.code as Parameters<typeof tModule>[0]);
+      }
+      if (tCommon.has(error.code)) {
+        return tCommon(error.code as Parameters<typeof tCommon>[0]);
+      }
       return error.message;
     }
-    return t("unknown");
+    return tCommon("unknown");
   };
 }

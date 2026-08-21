@@ -2,14 +2,29 @@ import { z } from "zod";
 import { userSchema } from "@/entities/user";
 
 /**
- * Structural skeleton — no real session state yet. Shape will be finalized
- * by the SSO integration sub-issue (#5) alongside the backend session
- * contract; kept here so `ui/` and `hooks/` below have something to type
- * against without reaching into backend response shapes directly.
+ * Mirrors the backend's MeResponse: user profile + resolved role/permissions.
+ * The session discriminant (`status`) is frontend-only — the backend doesn't
+ * track it; the fetch either succeeds (authenticated) or 401s (unauthenticated).
  */
-export const authSessionSchema = z.object({
-  status: z.enum(["authenticated", "unauthenticated", "loading"]),
-  user: userSchema.nullable(),
+export const meResponseSchema = z.object({
+  user: userSchema,
+  roleName: z.string(),
+  permissions: z.array(z.string()),
 });
+
+export const authSessionSchema = z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("authenticated"),
+    user: userSchema,
+    roleName: z.string(),
+    permissions: z.array(z.string()),
+  }),
+  z.object({
+    status: z.literal("unauthenticated"),
+    user: z.null(),
+    roleName: z.literal(""),
+    permissions: z.array(z.string()).length(0),
+  }),
+]);
 
 export type AuthSession = z.infer<typeof authSessionSchema>;

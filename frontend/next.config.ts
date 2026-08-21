@@ -4,7 +4,7 @@ import createNextIntlPlugin from "next-intl/plugin";
 const withNextIntl = createNextIntlPlugin("./src/shared/lib/i18n/request.ts");
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  allowedDevOrigins: ["itsm.agentsplatform.cloud"],
 };
 
 export default withNextIntl(nextConfig);

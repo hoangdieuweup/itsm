@@ -1,5 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { LoginForm } from "@/modules/auth";
+import { redirect } from "next/navigation";
+import { LoginForm, fetchAuthSession } from "@/modules/auth";
+import { ROUTES } from "@/shared/constants/routes";
 
 export async function generateMetadata({
   params,
@@ -21,6 +23,11 @@ export default async function LoginPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+
+  const session = await fetchAuthSession();
+  if (session.status === "authenticated") {
+    redirect(`/${locale}${ROUTES.dashboard}`);
+  }
 
   return <LoginForm />;
 }

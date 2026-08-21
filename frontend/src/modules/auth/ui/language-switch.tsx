@@ -36,7 +36,7 @@ export function LanguageSwitch() {
           className={cn(
             "rounded-full px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
             locale === loc
-              ? "bg-orange-700 text-white"
+              ? "bg-blue-600 text-white"
               : "text-muted-foreground hover:text-foreground"
           )}
         >

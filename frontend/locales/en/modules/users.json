@@ -1,0 +1,30 @@
+{
+  "title": "Users",
+  "description": "Manage user accounts and activity status.",
+  "columns": {
+    "name": "Full Name",
+    "email": "Email",
+    "role": "Role",
+    "status": "Status",
+    "employeeCode": "Employee Code",
+    "lastLogin": "Last Login",
+    "actions": "Actions"
+  },
+  "status": {
+    "active": "Active",
+    "blocked": "Blocked"
+  },
+  "actions": {
+    "block": "Block",
+    "unblock": "Unblock",
+    "blocking": "Updating...",
+    "blockConfirm": "Are you sure you want to block this user?",
+    "unblockConfirm": "Are you sure you want to unblock this user?"
+  },
+  "errors": {
+    "users_user_not_found": "User not found.",
+    "users_cannot_block_last_admin": "This is the last user with the admin role — reassign it before blocking them.",
+    "users_cannot_modify_protected_admin": "This account is permanently protected and cannot be blocked."
+  },
+  "empty": "No users found."
+}

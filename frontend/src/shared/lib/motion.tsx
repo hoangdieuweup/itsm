@@ -1,6 +1,6 @@
 "use client";
 
-import { LazyMotion, domAnimation, m } from "framer-motion";
+import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 
 /**
  * Loads the animation engine once via LazyMotion instead of every page that
@@ -11,4 +11,4 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
   return <LazyMotion features={domAnimation}>{children}</LazyMotion>;
 }
 
-export { m };
+export { m, AnimatePresence };
