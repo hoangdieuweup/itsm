@@ -246,3 +246,74 @@ class TestDeleteProject:
             await DeleteProject(uow).execute(uuid4())
 
         assert uow.commits == 0
+
+
+from app.modules.projects.services.create_environment import CreateEnvironment
+from app.modules.projects.services.update_environment import UpdateEnvironment
+from app.modules.projects.services.delete_environment import DeleteEnvironment
+
+
+class TestCreateEnvironment:
+    async def test_creates_environment(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+
+        env = await CreateEnvironment(uow).execute(
+            project.id, EnvironmentType.DEV, "dev", "https://dev.website-a.example"
+        )
+
+        assert env.type is EnvironmentType.DEV
+        assert uow.commits == 1
+
+    async def test_rejects_unknown_project(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+
+        with pytest.raises(ProjectNotFound):
+            await CreateEnvironment(uow).execute(uuid4(), EnvironmentType.DEV, "dev", None)
+
+    async def test_rejects_duplicate_type_for_same_project(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+        await uow.environments.create(project_id=project.id, type=EnvironmentType.DEV, name="dev", base_url=None)
+
+        with pytest.raises(EnvironmentTypeAlreadyExists):
+            await CreateEnvironment(uow).execute(project.id, EnvironmentType.DEV, "dev-2", None)
+
+
+class TestUpdateEnvironment:
+    async def test_updates_name_and_base_url(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+        env = await uow.environments.create(
+            project_id=project.id, type=EnvironmentType.DEV, name="dev", base_url=None
+        )
+
+        updated = await UpdateEnvironment(uow).execute(env.id, name="development", base_url="https://d.example")
+
+        assert updated.name == "development"
+        assert updated.base_url == "https://d.example"
+
+    async def test_rejects_unknown_environment(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+
+        with pytest.raises(EnvironmentNotFound):
+            await UpdateEnvironment(uow).execute(uuid4(), name="x", base_url=None)
+
+
+class TestDeleteEnvironment:
+    async def test_deletes_environment(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+        env = await uow.environments.create(
+            project_id=project.id, type=EnvironmentType.DEV, name="dev", base_url=None
+        )
+
+        await DeleteEnvironment(uow).execute(env.id)
+
+        assert await uow.environments.get_by_id(env.id) is None
+
+    async def test_rejects_unknown_environment(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+
+        with pytest.raises(EnvironmentNotFound):
+            await DeleteEnvironment(uow).execute(uuid4())
