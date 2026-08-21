@@ -40,6 +40,13 @@ class AuthCookies:
     SameSite = Literal["lax", "none", "strict"]
 
 
+class AuthCacheKeys:
+    """Cache identity owned by the auth module. See references/caching.md."""
+
+    ENTITY = "user"
+    TTL_SECONDS = 300
+
+
 class AuthCacheNamespaces:
     """Redis key namespaces owned by the auth module.
 

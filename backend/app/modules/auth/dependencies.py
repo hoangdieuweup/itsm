@@ -35,9 +35,11 @@ from app.modules.auth.services.sync_external_user import SyncExternalUser
 from app.modules.auth.uow import AbstractAuthUnitOfWork, AuthUnitOfWork
 
 
-async def get_uow(session: AsyncSession = Depends(get_session)) -> AuthUnitOfWork:
+async def get_uow(
+    session: AsyncSession = Depends(get_session), cache: CacheClient = Depends(get_cache)
+) -> AuthUnitOfWork:
     """Provide a request scoped unit of work. The one place the concrete class is named."""
-    return AuthUnitOfWork(session)
+    return AuthUnitOfWork(session, cache)
 
 
 async def get_dx_token_repository(

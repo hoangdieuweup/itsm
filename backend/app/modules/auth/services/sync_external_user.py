@@ -3,6 +3,7 @@
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
 from app.integrations.dx_core.client import DxUserProfile
+from app.modules.auth.constants import AuthCacheKeys
 from app.modules.auth.schemas import UserRead
 from app.modules.auth.uow import AbstractAuthUnitOfWork
 
@@ -33,6 +34,7 @@ class SyncExternalUser(AbstractUseCase):
                 employee_code=profile.employee_code,
                 email_confirmed=profile.email_verified,
             )
+            self._uow.mark_stale(AuthCacheKeys.ENTITY, user.id)
             return user, True
 
         user = await self._uow.users.update_profile(
@@ -43,4 +45,5 @@ class SyncExternalUser(AbstractUseCase):
             employee_code=profile.employee_code,
             email_confirmed=profile.email_verified,
         )
+        self._uow.mark_stale(AuthCacheKeys.ENTITY, user.id)
         return user, False

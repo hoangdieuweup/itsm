@@ -2,7 +2,7 @@
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
-from app.modules.auth.constants import UserStatus
+from app.modules.auth.constants import AuthCacheKeys, UserStatus
 from app.modules.auth.exceptions import CannotBlockLastAdmin, CannotModifyProtectedAdmin
 from app.modules.auth.rules import AuthRules
 from app.modules.auth.schemas import UserRead
@@ -31,5 +31,6 @@ class UpdateUserStatus(AbstractUseCase):
             if await self._rbac_api.is_last_admin(user_id):
                 raise CannotBlockLastAdmin()
         updated = await self._uow.users.set_status(user_id, status)
+        self._uow.mark_stale(AuthCacheKeys.ENTITY, user_id)
         await self._uow.commit()
         return updated

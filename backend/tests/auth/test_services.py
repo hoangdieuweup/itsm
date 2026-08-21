@@ -121,6 +121,10 @@ class FakeAuthUnitOfWork(AbstractAuthUnitOfWork):
         self.users = FakeUserRepository()
         self.commits = 0
         self.rollbacks = 0
+        self.stale: list[tuple[str, int]] = []
+
+    def mark_stale(self, entity: str, entity_id: int) -> None:
+        self.stale.append((entity, entity_id))
 
     async def commit(self) -> None:
         self.commits += 1

@@ -6,9 +6,10 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.base.markers import database
+from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
-from app.modules.auth.constants import UserStatus
+from app.integrations.cache.client import CacheClient
+from app.modules.auth.constants import AuthCacheKeys, UserStatus
 from app.modules.auth.models import User
 from app.modules.auth.schemas import UserRead
 
@@ -74,12 +75,21 @@ class AbstractUserRepository(AbstractRepository[UserRead]):
 class UserRepository(AbstractUserRepository):
     """SQLAlchemy implementation. Every read of the users table goes through this class."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, cache: CacheClient) -> None:
         self._session = session
+        self._cache = cache
 
     @database
     async def get_by_id(self, entity_id: int) -> UserRead | None:
-        """Return one user, or None when it does not exist."""
+        """Return one user, or None when it does not exist. Cache-aside: a
+        miss loads from the database and populates the cache."""
+        return await self._cache.get_or_load(
+            AuthCacheKeys.ENTITY, entity_id, UserRead, lambda: self._load_by_id(entity_id)
+        )
+
+    @helper
+    async def _load_by_id(self, entity_id: int) -> UserRead | None:
+        """Direct database read backing get_by_id's cache-aside loader."""
         row = await self._session.scalar(select(User).where(User.id == entity_id))
         return UserRead.model_validate(row) if row else None
 
