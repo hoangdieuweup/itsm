@@ -3,7 +3,12 @@
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
 from app.modules.rbac.constants import RbacCacheKeys
-from app.modules.rbac.exceptions import RoleNotFound, SystemRoleImmutable, UnknownPermissionId
+from app.modules.rbac.exceptions import (
+    DuplicateRoleName,
+    RoleNotFound,
+    SystemRoleImmutable,
+    UnknownPermissionId,
+)
 from app.modules.rbac.rules import RbacRules
 from app.modules.rbac.schemas import RoleRead
 from app.modules.rbac.uow import AbstractRbacUnitOfWork
@@ -21,8 +26,13 @@ class UpdateRole(AbstractUseCase):
         role = await self._uow.roles.get_by_id(role_id)
         if role is None:
             raise RoleNotFound()
-        if name is not None and not RbacRules.can_rename_role(role):
-            raise SystemRoleImmutable()
+        if name is not None:
+            if not RbacRules.can_rename_role(role):
+                raise SystemRoleImmutable()
+            if name != role.name:
+                existing = await self._uow.roles.find_by_name(name)
+                if existing is not None and existing.id != role_id:
+                    raise DuplicateRoleName()
         if permission_ids is not None:
             if not RbacRules.can_modify_role_permissions(role):
                 raise SystemRoleImmutable()

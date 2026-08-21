@@ -139,3 +139,32 @@ class TestAssignUserRole:
 
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "rbac_cannot_modify_protected_admin"
+
+
+class TestAssignUserRoles:
+    async def test_assigns_multiple_roles_to_target_user(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        await _login_as(client, engine, permissions=[("user", "assign_role"), ("user", "read")])
+        role1_id = await _seed_role(engine, "reviewer", is_system=False, permission_ids=[])
+        role2_id = await _seed_role(engine, "editor", is_system=False, permission_ids=[])
+        target_user_id = await _seed_user(engine, email="multi@example.com", external_user_id="dx-multi")
+
+        response = await client.put(
+            f"/api/v1/rbac/users/{target_user_id}/roles",
+            json={"roleIds": [role1_id, role2_id]},
+        )
+
+        assert response.status_code == 200
+        async with engine.begin() as conn:
+            result = await conn.execute(
+                select(UserRole.role_id).where(UserRole.user_id == target_user_id)
+            )
+            assert set(result.scalars().all()) == {role1_id, role2_id}
+
+        # Test GET /users/{user_id}/roles
+        get_resp = await client.get(f"/api/v1/rbac/users/{target_user_id}/roles")
+        assert get_resp.status_code == 200
+        data = get_resp.json()["data"]
+        assert len(data) == 2
+        assert {r["name"] for r in data} == {"reviewer", "editor"}

@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+from pydantic import Field
+
 from app.core.models import FrozenModel
 from app.modules.common.constants import UserStatus
 
@@ -13,11 +15,12 @@ class UserRead(FrozenModel):
     email: str
     name: str
     status: UserStatus
-    external_user_id: str | None
-    employee_code: str | None
-    email_confirmed: bool
-    last_login_at: datetime | None
-    created_at: datetime
+    external_user_id: str | None = None
+    employee_code: str | None = None
+    email_confirmed: bool = False
+    last_login_at: datetime | None = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    role_names: list[str] = []
     role_name: str | None = None
 
 

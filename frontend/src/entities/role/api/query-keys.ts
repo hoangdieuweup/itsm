@@ -1,5 +1,5 @@
 /**
- * Hierarchical query key factory for the roles/rbac module.
+ * Hierarchical query key factory for the role entity.
  */
 export const rolesKeys = {
   all: ["roles"] as const,

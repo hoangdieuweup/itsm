@@ -9,9 +9,10 @@ import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { Can } from "@/entities/permission";
 import { USER_STATUS, type User } from "@/entities/user";
-import { isProtectedAdminRole } from "@/shared/constants/roles";
+import { isProtectedAdminRole, SYSTEM_ROLE_NAMES } from "@/shared/constants/roles";
 import { useUsers } from "../api/use-users";
 import { useUpdateUserStatus } from "../hooks/use-update-user-status";
+import { UserRoleAssignmentDialog } from "./user-role-assignment-dialog";
 
 export function UsersPageContent() {
   const t = useTranslations("users");
@@ -20,6 +21,7 @@ export function UsersPageContent() {
   const { data: page } = useUsers(50, 0);
   const updateStatus = useUpdateUserStatus();
   const [userToToggle, setUserToToggle] = useState<User | null>(null);
+  const [userToAssignRoles, setUserToAssignRoles] = useState<User | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleToggleStatus = (user: User) => {
@@ -153,15 +155,23 @@ export function UsersPageContent() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
-                            isProtectedAdminRole(user.roleName)
-                              ? "border border-amber-500/30 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-950/60 dark:text-amber-300"
-                              : "border border-border/80 bg-muted/60 text-foreground"
-                          }`}
-                        >
-                          {user.roleName || "member"}
-                        </span>
+                        <div className="flex max-w-[280px] flex-wrap items-center gap-1.5">
+                          {(user.roleNames && user.roleNames.length > 0
+                            ? user.roleNames
+                            : [user.roleName || SYSTEM_ROLE_NAMES.MEMBER]
+                          ).map((name) => (
+                            <span
+                              key={name}
+                              className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold uppercase tracking-wider ${
+                                isProtectedAdminRole(name)
+                                  ? "border border-amber-500/30 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-950/60 dark:text-amber-300"
+                                  : "border border-border/80 bg-muted/60 text-foreground"
+                              }`}
+                            >
+                              {name}
+                            </span>
+                          ))}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         {user.employeeCode ? (
@@ -198,12 +208,22 @@ export function UsersPageContent() {
                           : "—"}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Can I="update_status" a="user">
-                          {({ isAllowed }) => (
+                        <div className="flex items-center justify-end gap-2">
+                          <Can I="assign_role" a="user">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setUserToAssignRoles(user)}
+                              className="font-medium shadow-2xs"
+                            >
+                              {t("actions.assignRoles")}
+                            </Button>
+                          </Can>
+                          <Can I="update_status" a="user">
                             <Button
                               size="sm"
                               variant={isBlocked ? "outline" : "destructive"}
-                              disabled={!isAllowed || isUpdating}
+                              disabled={isUpdating}
                               onClick={() => handleToggleStatus(user)}
                               className="font-medium shadow-2xs"
                             >
@@ -213,8 +233,8 @@ export function UsersPageContent() {
                                   ? t("actions.unblock")
                                   : t("actions.block")}
                             </Button>
-                          )}
-                        </Can>
+                          </Can>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -224,6 +244,13 @@ export function UsersPageContent() {
           </table>
         </div>
       </div>
+
+      {/* User Role Assignment Dialog */}
+      <UserRoleAssignmentDialog
+        isOpen={Boolean(userToAssignRoles)}
+        onClose={() => setUserToAssignRoles(null)}
+        user={userToAssignRoles}
+      />
 
       {/* User Status Toggle Confirmation Dialog */}
       <ConfirmDialog

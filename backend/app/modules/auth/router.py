@@ -117,8 +117,20 @@ async def logout(
 async def me(
     user: UserRead = Depends(require_auth), rbac: RbacApi = Depends(get_rbac_api)
 ) -> ApiResponse[MeResponse]:
-    """Return the signed in user's profile plus their role and permissions —
+    """Return the signed in user's profile plus their roles and permissions —
     what the frontend's PermissionProvider seeds from."""
     summary = await rbac.role_summary_for_user(user.id)
-    body = MeResponse(user=user, role_name=summary.role_name, permissions=summary.permissions)
+    user_with_roles = user.model_copy(
+        update={
+            "role_names": summary.roles,
+            "role_name": summary.role_name or (summary.roles[0] if summary.roles else "member"),
+        }
+    )
+    body = MeResponse(
+        user=user_with_roles,
+        role_names=summary.roles,
+        roles=summary.roles,
+        role_name=summary.role_name,
+        permissions=summary.permissions,
+    )
     return ApiResponse[MeResponse](success=True, data=body)

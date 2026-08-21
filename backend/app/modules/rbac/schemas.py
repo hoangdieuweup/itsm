@@ -42,13 +42,21 @@ class RoleUpdate(FrozenModel):
 
 
 class RoleSummary(FrozenModel):
-    """What auth/me composes into the session: role name + flat permission strings."""
+    """What auth/me composes into the session: role names + flat permission strings."""
 
-    role_name: str
-    permissions: list[str]
+    roles: list[str] = []
+    permissions: list[str] = []
+    role_name: str | None = None
 
 
 class RoleAssignment(FrozenModel):
-    """Request body for PATCH /rbac/users/{id}/role."""
+    """Request body for PUT /rbac/users/{id}/roles and backwards-compatible assignments."""
 
-    role_id: int
+    role_ids: list[int] = []
+    role_id: int | None = None
+
+
+class UserRolesAssignment(FrozenModel):
+    """Request body for PUT /rbac/users/{id}/roles."""
+
+    role_ids: list[int]

@@ -28,46 +28,6 @@ export async function fetchPermissions(): Promise<PermissionsList> {
 }
 
 /**
- * Creates a new custom role via POST /rbac/roles.
- */
-export async function createRole(
-  name: string,
-  permissionIds: number[],
-): Promise<Role> {
-  const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.RBAC.ROLES, {
-    method: "POST",
-    data: { name, permissionIds },
-  });
-  return roleSchema.parse(raw);
-}
-
-/**
- * Updates a role via PATCH /rbac/roles/{roleId}.
- */
-export async function updateRole(
-  roleId: number,
-  data: { name?: string; permissionIds?: number[] },
-): Promise<Role> {
-  const raw = await apiFetch<unknown>(
-    API_CONFIG.ENDPOINTS.RBAC.ROLE_DETAIL(roleId),
-    {
-      method: "PATCH",
-      data,
-    },
-  );
-  return roleSchema.parse(raw);
-}
-
-/**
- * Deletes a custom role via DELETE /rbac/roles/{roleId}.
- */
-export async function deleteRole(roleId: number): Promise<void> {
-  await apiFetch<null>(API_CONFIG.ENDPOINTS.RBAC.ROLE_DETAIL(roleId), {
-    method: "DELETE",
-  });
-}
-
-/**
  * Assigns multiple roles to a user via PUT /rbac/users/{userId}/roles.
  */
 export async function assignUserRoles(

@@ -16,9 +16,11 @@ from app.integrations.cache.client import CacheClient
 from app.integrations.cache.config import cache_settings
 from app.integrations.cache.dependencies import get_cache
 from app.main import app
+from app.modules.auth.config import auth_settings
 from app.modules.rbac.models import Role
 
 settings.FRONTEND_BASE_URL = "http://localhost:3000"
+auth_settings.COOKIE_SECURE = False
 
 
 @pytest.fixture(scope="session")

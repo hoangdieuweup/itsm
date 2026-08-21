@@ -5,8 +5,10 @@ from app.modules.users.public import UserRead
 
 
 class MeResponse(FrozenModel):
-    """/me's response: the user's profile plus their resolved role/permissions."""
+    """/me's response: the user's profile plus their resolved roles/permissions."""
 
     user: UserRead
-    role_name: str
-    permissions: list[str]
+    role_names: list[str] = []
+    roles: list[str] = []
+    role_name: str | None = None
+    permissions: list[str] = []

@@ -1,5 +1,6 @@
 """Single access path to the rbac tables (roles, permissions, role_permissions, user_roles)."""
 
+import asyncio
 from abc import ABC, abstractmethod
 
 from sqlalchemy import delete, func, select
@@ -193,29 +194,36 @@ class PermissionRepository(AbstractPermissionRepository):
 
 
 class AbstractUserRoleRepository(ABC):
-    """Contract for the single-role-per-user grant. Not an AbstractRepository[T]: this
-    store is one row per user with no listing use case, the same shape as
-    app.integrations.dx_core.repository.AbstractDxTokenRepository — see that file's
-    docstring for why forcing get_by_id/list_page here would add nothing."""
+    """Contract for user role grants supporting multiple roles per user."""
 
     @abstractmethod
-    async def get_role_for_user(self, user_id: int) -> RoleRead | None:
-        """Return the role currently granted to a user, or None if never assigned."""
+    async def get_roles_for_user(self, user_id: int) -> list[RoleRead]:
+        """Return all roles currently granted to a user, or empty list if none."""
         raise NotImplementedError
 
     @abstractmethod
-    async def get_roles_for_users(self, user_ids: list[int]) -> dict[int, str]:
-        """Return a mapping of user_id -> role_name for a batch of users."""
+    async def get_role_for_user(self, user_id: int) -> RoleRead | None:
+        """Return the primary role currently granted to a user, or None if none."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_roles_for_users(self, user_ids: list[int]) -> dict[int, list[str]]:
+        """Return a mapping of user_id -> list[role_name] for a batch of users."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def assign_roles(self, user_id: int, role_ids: set[int] | list[int]) -> None:
+        """Replace a user's role grants with the given set of role_ids atomically."""
         raise NotImplementedError
 
     @abstractmethod
     async def assign(self, user_id: int, role_id: int) -> None:
-        """Upsert a user's single role grant."""
+        """Assign a single role to user (backwards compatible helper)."""
         raise NotImplementedError
 
     @abstractmethod
     async def user_has_permission(self, user_id: int, resource: str, action: str) -> bool:
-        """Return whether user_id's granted role includes resource.action."""
+        """Return whether any of user_id's granted roles includes resource.action."""
         raise NotImplementedError
 
 
@@ -228,8 +236,8 @@ class UserRoleRepository(AbstractUserRoleRepository):
         self._roles = RoleRepository(session, cache)
 
     @database
-    async def get_roles_for_users(self, user_ids: list[int]) -> dict[int, str]:
-        """Return a mapping of user_id -> role_name for a batch of users."""
+    async def get_roles_for_users(self, user_ids: list[int]) -> dict[int, list[str]]:
+        """Return a mapping of user_id -> list[role_name] for a batch of users."""
         if not user_ids:
             return {}
         result = await self._session.execute(
@@ -237,48 +245,61 @@ class UserRoleRepository(AbstractUserRoleRepository):
             .join(Role, Role.id == UserRole.role_id)
             .where(UserRole.user_id.in_(user_ids))
         )
-        return {user_id: role_name for user_id, role_name in result.all()}
+        mapping: dict[int, list[str]] = {uid: [] for uid in user_ids}
+        for uid, rname in result.all():
+            mapping[uid].append(rname)
+        return mapping
+
+    @database
+    async def get_roles_for_user(self, user_id: int) -> list[RoleRead]:
+        """Return all roles granted to user_id, each resolved through the cached RoleRepository."""
+        role_ids = await self._load_role_ids_for_user(user_id)
+        if not role_ids:
+            return []
+        roles = await asyncio.gather(*(self._roles.get_by_id(rid) for rid in role_ids))
+        return [r for r in roles if r is not None]
 
     @database
     async def get_role_for_user(self, user_id: int) -> RoleRead | None:
-        """Return the role currently granted to a user, or None if never assigned.
-        Reads user_id's assigned role_id from database, then delegates to cached RoleRepository
-        so updating a role's permissions immediately reflects for all assigned users."""
-        role_id = await self._load_role_id_for_user(user_id)
-        if role_id is None:
-            return None
-        return await self._roles.get_by_id(role_id)
+        """Return the primary (first) role granted to user_id, or None if none."""
+        roles = await self.get_roles_for_user(user_id)
+        return roles[0] if roles else None
 
     @helper
-    async def _load_role_id_for_user(self, user_id: int) -> int | None:
-        """Direct database read backing get_role_for_user."""
-        row = await self._session.scalar(
+    async def _load_role_ids_for_user(self, user_id: int) -> list[int]:
+        """Direct database read of all role_ids assigned to user_id."""
+        rows = await self._session.scalars(
             select(UserRole.role_id).where(UserRole.user_id == user_id)
         )
-        return row
+        return list(rows)
 
     @database
-    async def assign(self, user_id: int, role_id: int) -> None:
-        """Upsert a user's single role grant."""
-        row = await self._session.get(UserRole, user_id)
-        if row is None:
-            self._session.add(UserRole(user_id=user_id, role_id=role_id))
-        else:
-            row.role_id = role_id
+    async def assign_roles(self, user_id: int, role_ids: set[int] | list[int]) -> None:
+        """Replace a user's role grants with the given set of role_ids atomically."""
+        target_ids = set(role_ids)
+        current_ids = set(await self._load_role_ids_for_user(user_id))
+
+        to_remove = current_ids - target_ids
+        to_add = target_ids - current_ids
+
+        if to_remove:
+            await self._session.execute(
+                delete(UserRole).where(UserRole.user_id == user_id, UserRole.role_id.in_(to_remove))
+            )
+        for rid in to_add:
+            self._session.add(UserRole(user_id=user_id, role_id=rid))
         await self._session.flush()
 
     @database
-    async def user_has_permission(self, user_id: int, resource: str, action: str) -> bool:
-        """Return whether user_id's granted role includes resource.action.
+    async def assign(self, user_id: int, role_id: int) -> None:
+        """Assign a single role to user (backwards compatible helper)."""
+        await self.assign_roles(user_id, {role_id})
 
-        Reuses get_role_for_user's cache instead of its own JOIN — a cache
-        hit answers this from the already-cached role+permissions with no
-        query at all. This is the authorization gate every protected
-        request goes through (require_permission), so a revoked permission
-        stays effective for an already-cached user until that entry's TTL
-        expires, same as any other read through this cache.
-        """
-        role = await self.get_role_for_user(user_id)
-        if role is None:
-            return False
-        return any(p.resource == resource and p.action == action for p in role.permissions)
+    @database
+    async def user_has_permission(self, user_id: int, resource: str, action: str) -> bool:
+        """Return whether any of user_id's granted roles includes resource.action."""
+        roles = await self.get_roles_for_user(user_id)
+        for role in roles:
+            if any(p.resource == resource and p.action == action for p in role.permissions):
+                return True
+        return False

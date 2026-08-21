@@ -21,12 +21,21 @@
     "blockDialogTitle": "Block Account",
     "unblockDialogTitle": "Unblock Account",
     "blockConfirm": "Are you sure you want to block this user account? They will not be able to log in.",
-    "unblockConfirm": "Are you sure you want to unblock this user account? They will regain access to the system."
+    "unblockConfirm": "Are you sure you want to unblock this user account? They will regain access to the system.",
+    "assignRoles": "Assign Roles",
+    "assignRolesDialogTitle": "Assign User Roles",
+    "assignRolesDescription": "Select the roles applied to user {name} ({email}).",
+    "saveRoles": "Save Roles",
+    "savingRoles": "Saving...",
+    "adminRoleProtected": "The break-glass admin account must retain the Administrator role."
   },
   "errors": {
     "users_user_not_found": "User not found.",
     "users_cannot_block_last_admin": "This is the last user with the admin role — reassign it before blocking them.",
-    "users_cannot_modify_protected_admin": "This account is permanently protected and cannot be blocked."
+    "users_cannot_modify_protected_admin": "This account is permanently protected and cannot be blocked.",
+    "rbac_cannot_remove_last_admin": "Cannot remove the admin role from the last administrator.",
+    "rbac_cannot_modify_protected_admin": "This administrator account is permanently protected and its roles cannot be modified.",
+    "rbac_target_user_not_found": "Target user not found."
   },
   "empty": "No users found."
 }
