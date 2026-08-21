@@ -10,6 +10,7 @@ right fit.
 
 from abc import ABC, abstractmethod
 from datetime import datetime
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,17 +26,17 @@ class AbstractDxTokenRepository(ABC):
     """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
 
     @abstractmethod
-    async def get_by_user_id(self, user_id: int) -> DxToken | None:
+    async def get_by_user_id(self, user_id: UUID) -> DxToken | None:
         """Return the encrypted DX token row for a user, or None if never linked."""
         raise NotImplementedError
 
     @abstractmethod
-    async def save(self, user_id: int, token: DxTokenSet, *, expires_at: datetime) -> None:
+    async def save(self, user_id: UUID, token: DxTokenSet, *, expires_at: datetime) -> None:
         """Upsert a user's DX token set, encrypting both tokens at rest."""
         raise NotImplementedError
 
     @abstractmethod
-    async def clear(self, user_id: int) -> None:
+    async def clear(self, user_id: UUID) -> None:
         """Delete a user's DX token row (logout, or a rejected refresh)."""
         raise NotImplementedError
 
@@ -52,12 +53,12 @@ class DxTokenRepository(AbstractDxTokenRepository):
         self._session = session
 
     @database
-    async def get_by_user_id(self, user_id: int) -> DxToken | None:
+    async def get_by_user_id(self, user_id: UUID) -> DxToken | None:
         """Return the encrypted DX token row for a user, or None if never linked."""
         return await self._session.scalar(select(DxToken).where(DxToken.user_id == user_id))
 
     @database
-    async def save(self, user_id: int, token: DxTokenSet, *, expires_at: datetime) -> None:
+    async def save(self, user_id: UUID, token: DxTokenSet, *, expires_at: datetime) -> None:
         """Upsert a user's DX token set, encrypting both tokens at rest.
 
         DX rotates the refresh token on every exchange, so both tokens are
@@ -74,7 +75,7 @@ class DxTokenRepository(AbstractDxTokenRepository):
         await self._session.flush()
 
     @database
-    async def clear(self, user_id: int) -> None:
+    async def clear(self, user_id: UUID) -> None:
         """Delete a user's DX token row (logout, or a rejected refresh)."""
         row = await self.get_by_user_id(user_id)
         if row is not None:

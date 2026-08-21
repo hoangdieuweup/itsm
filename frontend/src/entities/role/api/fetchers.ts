@@ -31,8 +31,8 @@ export async function fetchPermissions(): Promise<PermissionsList> {
  * Assigns multiple roles to a user via PUT /rbac/users/{userId}/roles.
  */
 export async function assignUserRoles(
-  userId: number,
-  roleIds: number[],
+  userId: string,
+  roleIds: string[],
 ): Promise<void> {
   await apiFetch<unknown>(API_CONFIG.ENDPOINTS.RBAC.USER_ROLES(userId), {
     method: "PUT",
@@ -43,7 +43,7 @@ export async function assignUserRoles(
 /**
  * Fetches assigned roles for a user via GET /rbac/users/{userId}/roles.
  */
-export async function fetchUserRoles(userId: number): Promise<Role[]> {
+export async function fetchUserRoles(userId: string): Promise<Role[]> {
   const raw = await apiFetch<unknown>(
     API_CONFIG.ENDPOINTS.RBAC.USER_ROLES(userId),
   );

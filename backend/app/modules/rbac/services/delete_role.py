@@ -1,4 +1,4 @@
-"""Use case: delete a custom role."""
+from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
@@ -16,7 +16,7 @@ class DeleteRole(AbstractUseCase):
         self._uow = uow
 
     @use_case
-    async def execute(self, role_id: int) -> None:
+    async def execute(self, role_id: UUID) -> None:
         role = await self._uow.roles.get_by_id(role_id)
         if role is None:
             raise RoleNotFound()

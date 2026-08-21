@@ -1,4 +1,4 @@
-"""Unit tests for app.modules.rbac.rules — pure decisions, no I/O, no fixtures."""
+from uuid import uuid4
 
 import pytest
 
@@ -7,7 +7,7 @@ from app.modules.rbac.schemas import RoleRead
 
 
 def _role(*, is_system: bool) -> RoleRead:
-    return RoleRead(id=1, name="admin" if is_system else "custom", is_system=is_system, permissions=[])
+    return RoleRead(id=uuid4(), name="admin" if is_system else "custom", is_system=is_system, permissions=[])
 
 
 @pytest.mark.parametrize(("is_system", "expected"), [(True, False), (False, True)])
@@ -29,7 +29,7 @@ def test_can_rename_role(is_system: bool, expected: bool) -> None:
     ],
 )
 def test_can_modify_role_permissions(role_name: str, expected: bool) -> None:
-    role = RoleRead(id=1, name=role_name, is_system=role_name in ("admin", "member"), permissions=[])
+    role = RoleRead(id=uuid4(), name=role_name, is_system=role_name in ("admin", "member"), permissions=[])
     assert RbacRules.can_modify_role_permissions(role) is expected
 
 

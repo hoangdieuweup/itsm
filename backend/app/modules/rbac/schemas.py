@@ -1,5 +1,7 @@
 """Schemas for the rbac module."""
 
+from uuid import UUID
+
 from app.core.models import FrozenModel
 
 
@@ -10,7 +12,7 @@ class PermissionRead(FrozenModel):
     own docstring in models.py.
     """
 
-    id: int
+    id: UUID
     resource: str
     action: str
     description_key: str
@@ -19,7 +21,7 @@ class PermissionRead(FrozenModel):
 class RoleRead(FrozenModel):
     """A role together with the permissions currently granted to it."""
 
-    id: int
+    id: UUID
     name: str
     is_system: bool
     permissions: list[PermissionRead]
@@ -29,7 +31,7 @@ class RoleCreate(FrozenModel):
     """Request body for POST /rbac/roles."""
 
     name: str
-    permission_ids: list[int] = []
+    permission_ids: list[UUID] = []
 
 
 class RoleUpdate(FrozenModel):
@@ -38,7 +40,7 @@ class RoleUpdate(FrozenModel):
     role's permissions stay editable while its name stays locked (see rules.py)."""
 
     name: str | None = None
-    permission_ids: list[int] | None = None
+    permission_ids: list[UUID] | None = None
 
 
 class RoleSummary(FrozenModel):
@@ -52,11 +54,11 @@ class RoleSummary(FrozenModel):
 class RoleAssignment(FrozenModel):
     """Request body for PUT /rbac/users/{id}/roles and backwards-compatible assignments."""
 
-    role_ids: list[int] = []
-    role_id: int | None = None
+    role_ids: list[UUID] = []
+    role_id: UUID | None = None
 
 
 class UserRolesAssignment(FrozenModel):
     """Request body for PUT /rbac/users/{id}/roles."""
 
-    role_ids: list[int]
+    role_ids: list[UUID]

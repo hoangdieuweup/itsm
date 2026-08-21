@@ -3,6 +3,7 @@
 from collections.abc import Awaitable, Callable
 from enum import StrEnum
 from typing import Any
+from uuid import UUID
 
 
 class RbacPermissionCatalog:
@@ -61,8 +62,8 @@ class RbacLimits:
 class RbacTypes:
     """Type aliases owned by the rbac module."""
 
-    UserLookup = Callable[[int], Awaitable[Any | None]]
-    ProtectionCheck = Callable[[int], Awaitable[bool]]
+    UserLookup = Callable[[UUID], Awaitable[Any | None]]
+    ProtectionCheck = Callable[[UUID], Awaitable[bool]]
 
 
 class ErrorCode(StrEnum):

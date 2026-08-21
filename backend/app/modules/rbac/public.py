@@ -3,6 +3,7 @@ may import from rbac — enforced by scripts/check_module_boundaries.py.
 """
 
 from fastapi import Depends
+from uuid import UUID
 
 from app.core.base.markers import facade
 from app.modules.auth.public import AuthApi, get_auth_api
@@ -38,12 +39,12 @@ class RbacApi:
         self._uow = uow
 
     @facade
-    async def assign_default_role(self, user_id: int) -> None:
+    async def assign_default_role(self, user_id: UUID) -> None:
         """Grant the seeded default role. See services/assign_default_role.py."""
         await AssignDefaultRole(self._uow).execute(user_id)
 
     @facade
-    async def role_summary_for_user(self, user_id: int) -> RoleSummary:
+    async def role_summary_for_user(self, user_id: UUID) -> RoleSummary:
         """Return role names + union of 'resource.action' permission strings, for
         auth/me to compose into the session the frontend's PermissionProvider seeds from."""
         roles = await self._uow.user_roles.get_roles_for_user(user_id)
@@ -58,12 +59,12 @@ class RbacApi:
         )
 
     @facade
-    async def get_role_names_for_users(self, user_ids: list[int]) -> dict[int, list[str]]:
+    async def get_role_names_for_users(self, user_ids: list[UUID]) -> dict[UUID, list[str]]:
         """Return a mapping of user_id -> list[role_name] for a batch of users."""
         return await self._uow.user_roles.get_roles_for_users(user_ids)
 
     @facade
-    async def is_last_admin(self, user_id: int) -> bool:
+    async def is_last_admin(self, user_id: UUID) -> bool:
         """True if user_id holds the admin role and is the only one who does —
         used by users' UpdateUserStatus to block blocking the last admin."""
         roles = await self._uow.user_roles.get_roles_for_user(user_id)

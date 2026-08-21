@@ -3,6 +3,8 @@ fixture. Seeds roles/permissions directly through the ORM (bypassing the seed
 script's own idempotency logic, which isn't the thing under test here) and
 issues a real session cookie the same way auth's own router tests do."""
 
+from uuid import UUID, uuid4
+
 from httpx import AsyncClient
 from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -15,7 +17,7 @@ from app.modules.users.config import users_settings
 from app.modules.users.models import User
 
 
-async def _seed_permission(engine: AsyncEngine, resource: str, action: str) -> int:
+async def _seed_permission(engine: AsyncEngine, resource: str, action: str) -> UUID:
     async with engine.begin() as conn:
         result = await conn.execute(
             insert(Permission).values(resource=resource, action=action, description_key="x")
@@ -23,7 +25,7 @@ async def _seed_permission(engine: AsyncEngine, resource: str, action: str) -> i
         return result.inserted_primary_key[0]
 
 
-async def _seed_role(engine: AsyncEngine, name: str, *, is_system: bool, permission_ids: list[int]) -> int:
+async def _seed_role(engine: AsyncEngine, name: str, *, is_system: bool, permission_ids: list[UUID]) -> UUID:
     async with engine.begin() as conn:
         result = await conn.execute(insert(Role).values(name=name, is_system=is_system))
         role_id = result.inserted_primary_key[0]
@@ -32,7 +34,7 @@ async def _seed_role(engine: AsyncEngine, name: str, *, is_system: bool, permiss
         return role_id
 
 
-async def _seed_user(engine: AsyncEngine, *, email: str, external_user_id: str) -> int:
+async def _seed_user(engine: AsyncEngine, *, email: str, external_user_id: str) -> UUID:
     async with engine.begin() as conn:
         result = await conn.execute(
             insert(User).values(
@@ -47,7 +49,7 @@ async def _seed_user(engine: AsyncEngine, *, email: str, external_user_id: str) 
         return result.inserted_primary_key[0]
 
 
-async def _login_as(client: AsyncClient, engine: AsyncEngine, *, permissions: list[tuple[str, str]]) -> int:
+async def _login_as(client: AsyncClient, engine: AsyncEngine, *, permissions: list[tuple[str, str]]) -> UUID:
     """Seed a user with a role granting exactly `permissions`, and a valid session
     cookie for them, without going through the real DX OAuth flow."""
     permission_ids = [await _seed_permission(engine, r, a) for r, a in permissions]
@@ -108,7 +110,7 @@ class TestAssignUserRole:
         target_user_id = await _seed_user(engine, email="target@example.com", external_user_id="dx-target")
 
         response = await client.patch(
-            f"/api/v1/rbac/users/{target_user_id}/role", json={"roleId": target_role_id}
+            f"/api/v1/rbac/users/{target_user_id}/role", json={"roleId": str(target_role_id)}
         )
 
         assert response.status_code == 200
@@ -120,7 +122,7 @@ class TestAssignUserRole:
         await _login_as(client, engine, permissions=[("user", "assign_role")])
         role_id = await _seed_role(engine, "viewer2", is_system=False, permission_ids=[])
 
-        response = await client.patch("/api/v1/rbac/users/999999/role", json={"roleId": role_id})
+        response = await client.patch(f"/api/v1/rbac/users/{uuid4()}/role", json={"roleId": str(role_id)})
 
         assert response.status_code == 404
         assert response.json()["error"]["code"] == "rbac_target_user_not_found"
@@ -135,7 +137,7 @@ class TestAssignUserRole:
             engine, email="protected-rbac@example.com", external_user_id="dx-protected-rbac"
         )
 
-        response = await client.patch(f"/api/v1/rbac/users/{target_user_id}/role", json={"roleId": role_id})
+        response = await client.patch(f"/api/v1/rbac/users/{target_user_id}/role", json={"roleId": str(role_id)})
 
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "rbac_cannot_modify_protected_admin"
@@ -152,7 +154,7 @@ class TestAssignUserRoles:
 
         response = await client.put(
             f"/api/v1/rbac/users/{target_user_id}/roles",
-            json={"roleIds": [role1_id, role2_id]},
+            json={"roleIds": [str(role1_id), str(role2_id)]},
         )
 
         assert response.status_code == 200

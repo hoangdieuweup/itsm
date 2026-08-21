@@ -1,4 +1,4 @@
-"""Use case: block or unblock a user."""
+from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
@@ -24,7 +24,7 @@ class UpdateUserStatus(AbstractUseCase):
         self._rbac_api = rbac_api
 
     @use_case
-    async def execute(self, user_id: int, status: UserStatus) -> UserRead:
+    async def execute(self, user_id: UUID, status: UserStatus) -> UserRead:
         if status == UserStatus.BLOCKED:
             target = await self._uow.users.get_by_id(user_id)
             if target is not None and UsersRules.is_protected_admin_email(target.email):

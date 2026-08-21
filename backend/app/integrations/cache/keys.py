@@ -5,6 +5,8 @@ impossible, because nothing can enumerate what exists. Each domain module
 supplies its own entity name through its constants module.
 """
 
+from uuid import UUID
+
 from app.integrations.cache.constants import CacheDefaults
 
 
@@ -12,17 +14,17 @@ class CacheKeyBuilder:
     """The only place a cache key string is assembled."""
 
     @staticmethod
-    def entity_key(entity: str, entity_id: int, version: int) -> str:
+    def entity_key(entity: str, entity_id: UUID | int | str, version: int) -> str:
         """Build a versioned key for one entity instance."""
         return f"{entity}:{entity_id}:v{version}:s{CacheDefaults.PAYLOAD_SCHEMA_VERSION}"
 
     @staticmethod
-    def version_key(entity: str, entity_id: int) -> str:
+    def version_key(entity: str, entity_id: UUID | int | str) -> str:
         """Build the key holding the current generation of an entity."""
         return f"ver:{entity}:{entity_id}"
 
     @staticmethod
-    def lock_key(entity: str, entity_id: int) -> str:
+    def lock_key(entity: str, entity_id: UUID | int | str) -> str:
         """Build the key used to serialize loads across processes."""
         return f"lock:{entity}:{entity_id}"
 

@@ -1,5 +1,7 @@
 """Events published by the users module."""
 
+from uuid import UUID
+
 from app.core.events import DomainEvent
 from app.modules.users.constants import UsersEvents
 
@@ -7,7 +9,7 @@ from app.modules.users.constants import UsersEvents
 class UserCreated(DomainEvent):
     """Emitted after a new user has been synced from DX for the first time."""
 
-    user_id: int
+    user_id: UUID
     email: str
 
     @property

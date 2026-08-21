@@ -13,7 +13,7 @@ export function useCreateRole() {
       permissionIds,
     }: {
       name: string;
-      permissionIds: number[];
+      permissionIds: string[];
     }) => createRole(name, permissionIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: rolesKeys.all });

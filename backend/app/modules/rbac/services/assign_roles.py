@@ -1,4 +1,4 @@
-"""Use case: assign a set of roles to an existing user (admin action)."""
+from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
@@ -27,7 +27,7 @@ class AssignRoles(AbstractUseCase):
         self._is_protected = is_protected
 
     @use_case
-    async def execute(self, user_id: int, role_ids: list[int] | set[int]) -> None:
+    async def execute(self, user_id: UUID, role_ids: list[UUID] | set[UUID]) -> None:
         if await self._user_lookup(user_id) is None:
             raise TargetUserNotFound()
 

@@ -69,7 +69,7 @@ function UserRoleAssignmentInner({
           : [SYSTEM_ROLE_NAMES.MEMBER],
     );
 
-    const ids = new Set<number>();
+    const ids = new Set<string>();
     for (const r of availableRoles) {
       if (userRoleNamesSet.has(r.name)) {
         ids.add(r.id);
@@ -78,7 +78,7 @@ function UserRoleAssignmentInner({
     return ids;
   }, [availableRoles, user]);
 
-  const [selectedRoleIds, setSelectedRoleIds] = useState<Set<number>>(initialRoleIds);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<Set<string>>(initialRoleIds);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Check if target user has protected admin status

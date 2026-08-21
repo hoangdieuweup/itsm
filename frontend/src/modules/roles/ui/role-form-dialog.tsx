@@ -54,7 +54,7 @@ function RoleFormInner({
   const isAdminRole = isProtectedAdminRole(role);
 
   const [name, setName] = useState(() => role?.name ?? "");
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(role?.permissions.map((p) => p.id) ?? []),
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -69,7 +69,7 @@ function RoleFormInner({
     return groups;
   }, [permissionsCatalog]);
 
-  const togglePermission = (id: number) => {
+  const togglePermission = (id: string) => {
     if (isAdminRole) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -286,8 +286,8 @@ function PermissionResourceGroup({
 }: {
   resource: string;
   perms: PermissionItem[];
-  selectedIds: Set<number>;
-  onTogglePerm: (id: number) => void;
+  selectedIds: Set<string>;
+  onTogglePerm: (id: string) => void;
   onToggleGroup: (perms: PermissionItem[], shouldSelectAll: boolean) => void;
   selectAllLabel: string;
   deselectAllLabel: string;
@@ -340,7 +340,7 @@ function PermissionCheckboxItem({
 }: {
   perm: PermissionItem;
   isChecked: boolean;
-  onToggle: (id: number) => void;
+  onToggle: (id: string) => void;
   isDisabled: boolean;
   t: ReturnType<typeof useTranslations<"roles">>;
 }) {

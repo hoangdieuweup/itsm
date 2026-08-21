@@ -1,9 +1,5 @@
-"""Unit tests for the users module's use cases. No database — every
-collaborator is a fake implementing the module's own Abstract* contract.
-Router-level behavior is covered separately in tests/users/test_router.py.
-"""
-
 from datetime import UTC, datetime
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -18,10 +14,9 @@ from app.modules.users.uow import AbstractUsersUnitOfWork
 
 class FakeUserRepository(AbstractUserRepository):
     def __init__(self) -> None:
-        self._rows: dict[int, UserRead] = {}
-        self._next_id = 1
+        self._rows: dict[UUID, UserRead] = {}
 
-    async def get_by_id(self, entity_id: int) -> UserRead | None:
+    async def get_by_id(self, entity_id: UUID) -> UserRead | None:
         return self._rows.get(entity_id)
 
     async def list_page(self, limit: int, offset: int) -> tuple[list[UserRead], int]:
@@ -44,7 +39,7 @@ class FakeUserRepository(AbstractUserRepository):
         email_confirmed: bool,
     ) -> UserRead:
         user = UserRead(
-            id=self._next_id,
+            id=uuid4(),
             email=email,
             name=name,
             status=UserStatus.ACTIVE,
@@ -55,12 +50,11 @@ class FakeUserRepository(AbstractUserRepository):
             created_at=datetime.now(UTC),
         )
         self._rows[user.id] = user
-        self._next_id += 1
         return user
 
     async def update_profile(
         self,
-        user_id: int,
+        user_id: UUID,
         *,
         email: str,
         name: str,
@@ -81,12 +75,12 @@ class FakeUserRepository(AbstractUserRepository):
         self._rows[user_id] = updated
         return updated
 
-    async def set_last_login(self, user_id: int, at: datetime) -> None:
+    async def set_last_login(self, user_id: UUID, at: datetime) -> None:
         existing = self._rows.get(user_id)
         if existing is not None:
             self._rows[user_id] = existing.model_copy(update={"last_login_at": at})
 
-    async def set_status(self, user_id: int, status: UserStatus) -> UserRead:
+    async def set_status(self, user_id: UUID, status: UserStatus) -> UserRead:
         existing = self._rows[user_id]
         updated = existing.model_copy(update={"status": status})
         self._rows[user_id] = updated
@@ -100,12 +94,12 @@ class FakeUsersUnitOfWork(AbstractUsersUnitOfWork):
         self.users = FakeUserRepository()
         self.commits = 0
         self.rollbacks = 0
-        self.stale: list[tuple[str, int]] = []
+        self.stale: list[tuple[str, UUID | int | str]] = []
 
-    def mark_stale(self, entity: str, entity_id: int) -> None:
+    def mark_stale(self, entity: str, entity_id: UUID | int | str) -> None:
         self.stale.append((entity, entity_id))
 
-    async def invalidate_now(self, entity: str, entity_id: int) -> None:
+    async def invalidate_now(self, entity: str, entity_id: UUID | int | str) -> None:
         pass
 
     async def commit(self) -> None:
@@ -119,10 +113,10 @@ class FakeRbacApi:
     """Duck-typed stand-in for app.modules.rbac.public.RbacApi — UpdateUserStatus
     only calls is_last_admin, so that's the only method this fake needs."""
 
-    def __init__(self, *, last_admin_ids: frozenset[int] = frozenset()) -> None:
+    def __init__(self, *, last_admin_ids: frozenset[UUID] = frozenset()) -> None:
         self._last_admin_ids = last_admin_ids
 
-    async def is_last_admin(self, user_id: int) -> bool:
+    async def is_last_admin(self, user_id: UUID) -> bool:
         return user_id in self._last_admin_ids
 
 

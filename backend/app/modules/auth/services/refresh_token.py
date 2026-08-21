@@ -1,6 +1,5 @@
-"""Use case: refresh the app's own session JWTs using a valid refresh token."""
-
 from datetime import UTC, datetime
+from uuid import UUID
 
 import jwt
 
@@ -49,7 +48,7 @@ class RefreshToken(AbstractUseCase):
         if await self._cache.get_json(blacklist_key) is not None:
             raise NotAuthenticated()
 
-        user = await self._users_api.get_user_by_id(int(claims["sub"]))
+        user = await self._users_api.get_user_by_id(UUID(str(claims["sub"])))
         if user is None:
             raise NotAuthenticated()
         if not AuthRules.can_login(user.status):

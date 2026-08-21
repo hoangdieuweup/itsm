@@ -7,5 +7,5 @@ export const usersKeys = {
   lists: () => [...usersKeys.all, "list"] as const,
   list: (filters?: { limit?: number; offset?: number }) =>
     [...usersKeys.lists(), filters] as const,
-  detail: (id: number) => [...usersKeys.all, "detail", id] as const,
+  detail: (id: string) => [...usersKeys.all, "detail", id] as const,
 };

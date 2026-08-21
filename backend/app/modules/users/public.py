@@ -3,6 +3,7 @@ may import from users — enforced by scripts/check_module_boundaries.py.
 """
 
 from datetime import datetime
+from uuid import UUID
 
 from fastapi import Depends
 
@@ -31,14 +32,14 @@ class UsersApi:
         self._uow = uow
 
     @facade
-    async def get_user_by_id(self, user_id: int) -> UserRead | None:
+    async def get_user_by_id(self, user_id: UUID) -> UserRead | None:
         """Look up any user by id. For a single existence check from another
         module — never for bulk reads, which would mean that module wants its
         own list_page-shaped facade method instead."""
         return await self._uow.users.get_by_id(user_id)
 
     @facade
-    async def is_protected_admin(self, user_id: int) -> bool:
+    async def is_protected_admin(self, user_id: UUID) -> bool:
         """True when user_id is the seeded break-glass admin account —
         used by rbac's AssignRole to reject reassigning its role."""
         user = await self.get_user_by_id(user_id)
@@ -79,7 +80,7 @@ class UsersApi:
     @facade
     async def update_profile(
         self,
-        user_id: int,
+        user_id: UUID,
         *,
         email: str,
         name: str,
@@ -102,7 +103,7 @@ class UsersApi:
         )
 
     @facade
-    async def set_last_login(self, user_id: int, at: datetime) -> None:
+    async def set_last_login(self, user_id: UUID, at: datetime) -> None:
         """Record a completed login's timestamp — for auth's login flow only.
         Does not commit or invalidate: participates in the caller's own
         transaction. Covered by the same invalidate_user call as
@@ -110,7 +111,7 @@ class UsersApi:
         await self._uow.users.set_last_login(user_id, at)
 
     @facade
-    async def invalidate_user(self, user_id: int) -> None:
+    async def invalidate_user(self, user_id: UUID) -> None:
         """Bump this user's cache version immediately. For a cross-module
         orchestrator (auth's login flow) that wrote via create/update_profile/
         set_last_login above but commits its OWN unit of work, not this one

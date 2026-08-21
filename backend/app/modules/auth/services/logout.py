@@ -1,6 +1,5 @@
-"""Use case: revoke the DX link and blacklist this app's own session tokens."""
-
 from datetime import UTC, datetime
+from uuid import UUID
 
 import jwt
 
@@ -33,7 +32,7 @@ class LogoutUser(AbstractUseCase):
         self._cache = cache
 
     @use_case
-    async def execute(self, user_id: int, access_token: str | None, refresh_token: str | None) -> None:
+    async def execute(self, user_id: UUID, access_token: str | None, refresh_token: str | None) -> None:
         row = await self._dx_tokens.get_by_user_id(user_id)
         if row is not None:
             await self._dx_client.revoke(self._dx_tokens.decrypt_access_token(row))

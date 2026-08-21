@@ -12,6 +12,7 @@ admin UI (POST /rbac/roles) once an admin account exists to do so.
 
 import asyncio
 import logging
+import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -29,7 +30,7 @@ async def run() -> None:
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
     async with session_factory() as session:
-        permission_ids: list[int] = []
+        permission_ids: list[uuid.UUID] = []
         for resource, action, description_key in RbacPermissionCatalog.CATALOG:
             row = await session.scalar(
                 select(Permission).where(Permission.resource == resource, Permission.action == action)

@@ -14,6 +14,8 @@ rbac/public.py's docstrings, and
 docs/superpowers/specs/2026-08-21-users-module-split-design.md.
 """
 
+from uuid import UUID
+
 import jwt
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -79,7 +81,7 @@ async def get_current_user(
     if await cache.get_json(blacklist_key) is not None:
         raise NotAuthenticated()
 
-    user = await users_api.get_user_by_id(int(claims["sub"]))
+    user = await users_api.get_user_by_id(UUID(str(claims["sub"])))
     if user is None:
         raise NotAuthenticated()
     if not AuthRules.can_login(user.status):

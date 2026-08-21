@@ -23,7 +23,7 @@ export const userStatusSchema = z.enum([
  * `alias_generator = to_camel`).
  */
 export const userSchema = z.object({
-  id: z.number(),
+  id: z.uuid(),
   email: z.string().email(),
   name: z.string(),
   status: userStatusSchema,

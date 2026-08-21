@@ -6,6 +6,8 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import TypeVar, cast
 
+from uuid import UUID
+
 from pydantic import BaseModel, ValidationError
 from redis.asyncio import ConnectionPool, Redis
 from redis.exceptions import RedisError
@@ -50,7 +52,7 @@ class CacheClient:
     async def get_or_load(
         self,
         entity: str,
-        entity_id: int,
+        entity_id: UUID | int | str,
         model: type[T],
         loader: Callable[[], Awaitable[T | None]],
         ttl: int | None = None,
@@ -79,7 +81,7 @@ class CacheClient:
         return value
 
     @integration
-    async def bump_version(self, entity: str, entity_id: int) -> None:
+    async def bump_version(self, entity: str, entity_id: UUID | int | str) -> None:
         """Invalidate every cached key of this entity in constant time."""
         try:
             key = CacheKeyBuilder.version_key(entity, entity_id)
@@ -146,7 +148,7 @@ class CacheClient:
             logger.warning("lock release failed key=%s", key, exc_info=True)
 
     @helper
-    async def _version(self, entity: str, entity_id: int) -> int:
+    async def _version(self, entity: str, entity_id: UUID | int | str) -> int:
         """Return the current generation of an entity, defaulting to one. Supports get_or_load above."""
         raw = await self._redis.get(CacheKeyBuilder.version_key(entity, entity_id))
         return int(raw) if raw else 1

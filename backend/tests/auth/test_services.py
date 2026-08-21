@@ -6,11 +6,11 @@ separately in tests/auth/test_router.py.
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import cast
+from uuid import UUID, uuid4
 
 import jwt
 import pytest
-
-from typing import cast
 
 from app.core.events import DomainEvent
 from app.integrations.cache.keys import CacheKeyBuilder
@@ -48,14 +48,13 @@ class FakeUsersApi:
     """Duck-typed stand-in for app.modules.users.public.UsersApi."""
 
     def __init__(self) -> None:
-        self._rows: dict[int, UserRead] = {}
-        self._by_email: dict[str, int] = {}
-        self._by_external_id: dict[str, int] = {}
-        self._next_id = 1
-        self.last_login_calls: list[tuple[int, datetime]] = []
-        self.invalidated: list[int] = []
+        self._rows: dict[UUID, UserRead] = {}
+        self._by_email: dict[str, UUID] = {}
+        self._by_external_id: dict[str, UUID] = {}
+        self.last_login_calls: list[tuple[UUID, datetime]] = []
+        self.invalidated: list[UUID] = []
 
-    async def get_user_by_id(self, user_id: int) -> UserRead | None:
+    async def get_user_by_id(self, user_id: UUID) -> UserRead | None:
         return self._rows.get(user_id)
 
     async def find_by_email(self, email: str) -> UserRead | None:
@@ -76,7 +75,7 @@ class FakeUsersApi:
         email_confirmed: bool,
     ) -> UserRead:
         user = UserRead(
-            id=self._next_id,
+            id=uuid4(),
             email=email,
             name=name,
             status=UserStatus.ACTIVE,
@@ -89,12 +88,11 @@ class FakeUsersApi:
         self._rows[user.id] = user
         self._by_email[email] = user.id
         self._by_external_id[external_user_id] = user.id
-        self._next_id += 1
         return user
 
     async def update_profile(
         self,
-        user_id: int,
+        user_id: UUID,
         *,
         email: str,
         name: str,
@@ -117,13 +115,13 @@ class FakeUsersApi:
         self._by_external_id[external_user_id] = user_id
         return updated
 
-    async def set_last_login(self, user_id: int, at: datetime) -> None:
+    async def set_last_login(self, user_id: UUID, at: datetime) -> None:
         self.last_login_calls.append((user_id, at))
         existing = self._rows.get(user_id)
         if existing is not None:
             self._rows[user_id] = existing.model_copy(update={"last_login_at": at})
 
-    async def invalidate_user(self, user_id: int) -> None:
+    async def invalidate_user(self, user_id: UUID) -> None:
         self.invalidated.append(user_id)
 
     def seed_blocked(self, user: UserRead) -> None:
@@ -132,7 +130,6 @@ class FakeUsersApi:
         self._by_email[user.email] = user.id
         if user.external_user_id:
             self._by_external_id[user.external_user_id] = user.id
-        self._next_id = max(self._next_id, user.id + 1)
 
 
 class FakeRbacApi:
@@ -140,9 +137,9 @@ class FakeRbacApi:
     only calls assign_default_role, so that's the only method this fake needs."""
 
     def __init__(self) -> None:
-        self.calls: list[int] = []
+        self.calls: list[UUID] = []
 
-    async def assign_default_role(self, user_id: int) -> None:
+    async def assign_default_role(self, user_id: UUID) -> None:
         self.calls.append(user_id)
 
 
@@ -150,7 +147,7 @@ class FakeRbacApi:
 class FakeDxTokenRow:
     """Stand-in for app.integrations.dx_core.models.DxToken — plaintext, no encryption."""
 
-    user_id: int
+    user_id: UUID
     access_token: str
     refresh_token: str
     expires_at: datetime
@@ -161,14 +158,14 @@ class FakeDxTokenRepository(AbstractDxTokenRepository):
     encryption is DxTokenRepository's own concern, not this use case's."""
 
     def __init__(self) -> None:
-        self._rows: dict[int, FakeDxTokenRow] = {}
-        self.saved: list[tuple[int, str]] = []
-        self.cleared: list[int] = []
+        self._rows: dict[UUID, FakeDxTokenRow] = {}
+        self.saved: list[tuple[UUID, str]] = []
+        self.cleared: list[UUID] = []
 
-    async def get_by_user_id(self, user_id: int) -> FakeDxTokenRow | None:
+    async def get_by_user_id(self, user_id: UUID) -> FakeDxTokenRow | None:
         return self._rows.get(user_id)
 
-    async def save(self, user_id: int, token, *, expires_at: datetime) -> None:
+    async def save(self, user_id: UUID, token, *, expires_at: datetime) -> None:
         self._rows[user_id] = FakeDxTokenRow(
             user_id=user_id,
             access_token=token.access_token,
@@ -177,7 +174,7 @@ class FakeDxTokenRepository(AbstractDxTokenRepository):
         )
         self.saved.append((user_id, token.access_token))
 
-    async def clear(self, user_id: int) -> None:
+    async def clear(self, user_id: UUID) -> None:
         self._rows.pop(user_id, None)
         self.cleared.append(user_id)
 
@@ -290,8 +287,9 @@ class TestIssueTokens:
     """IssueTokens: mint this app's own session JWTs, independent of DX's own tokens."""
 
     async def test_issues_access_and_refresh_tokens_with_expected_claims(self) -> None:
+        uid = uuid4()
         user = UserRead(
-            id=42,
+            id=uid,
             email="bob@example.com",
             name="Bob",
             status=UserStatus.ACTIVE,
@@ -306,10 +304,10 @@ class TestIssueTokens:
 
         access_claims = jwt.decode(tokens.access_token, auth_settings.JWT_SECRET, algorithms=["HS256"])
         refresh_claims = jwt.decode(tokens.refresh_token, auth_settings.JWT_SECRET, algorithms=["HS256"])
-        assert access_claims["sub"] == "42"
+        assert access_claims["sub"] == str(uid)
         assert "role" not in access_claims
         assert access_claims["type"] == "access"
-        assert refresh_claims["sub"] == "42"
+        assert refresh_claims["sub"] == str(uid)
         assert refresh_claims["type"] == "refresh"
         assert access_claims["jti"] != refresh_claims["jti"]
         assert (access_claims["exp"] - access_claims["iat"]) == auth_settings.ACCESS_TOKEN_TTL_SECONDS
@@ -366,8 +364,9 @@ class TestAuthenticateWithDx:
     async def test_blocked_user_raises_before_storing_tokens_or_committing(self) -> None:
         uow = FakeAuthUnitOfWork()
         users_api = FakeUsersApi()
+        blocked_id = uuid4()
         blocked = UserRead(
-            id=7,
+            id=blocked_id,
             email="blocked@example.com",
             name="Blocked",
             status=UserStatus.BLOCKED,
@@ -402,12 +401,12 @@ class TestAuthenticateWithDx:
 class TestLogoutUser:
     """LogoutUser: best-effort DX revoke, always clear the DX link, blacklist app tokens."""
 
-    def _valid_token(self, *, ttl: int = 3600) -> str:
+    def _valid_token(self, *, sub: str = "1", ttl: int = 3600) -> str:
         return jwt.encode(
             {
-                "sub": "1",
+                "sub": sub,
                 "type": "access",
-                "jti": "jti-1",
+                "jti": f"jti-{uuid4()}",
                 "iat": int(datetime.now(UTC).timestamp()),
                 "exp": int(datetime.now(UTC).timestamp()) + ttl,
             },
@@ -417,16 +416,17 @@ class TestLogoutUser:
 
     async def test_revokes_dx_token_clears_link_and_blacklists_both_app_tokens(self, cache_client) -> None:
         dx_tokens = FakeDxTokenRepository()
-        await dx_tokens.save(1, FakeDxTokenSet(access_token="plain-dx-token"), expires_at=datetime.now(UTC))
+        user_id = uuid4()
+        await dx_tokens.save(user_id, FakeDxTokenSet(access_token="plain-dx-token"), expires_at=datetime.now(UTC))
         dx_client = FakeDxCoreClient()
         use_case = LogoutUser(dx_tokens, dx_client, cache_client)
-        access = self._valid_token()
-        refresh = self._valid_token()
+        access = self._valid_token(sub=str(user_id))
+        refresh = self._valid_token(sub=str(user_id))
 
-        await use_case.execute(1, access, refresh)
+        await use_case.execute(user_id, access, refresh)
 
         assert dx_client.revoked == ["plain-dx-token"]
-        assert dx_tokens.cleared == [1]
+        assert dx_tokens.cleared == [user_id]
         assert await cache_client.get_json(_blacklist_key(access)) == {"revoked": True}
         assert await cache_client.get_json(_blacklist_key(refresh)) == {"revoked": True}
 
@@ -434,17 +434,19 @@ class TestLogoutUser:
         dx_tokens = FakeDxTokenRepository()
         dx_client = FakeDxCoreClient()
         use_case = LogoutUser(dx_tokens, dx_client, cache_client)
+        user_id = uuid4()
 
-        await use_case.execute(1, None, None)
+        await use_case.execute(user_id, None, None)
 
         assert dx_client.revoked == []
-        assert dx_tokens.cleared == [1]
+        assert dx_tokens.cleared == [user_id]
 
     async def test_skips_blacklisting_an_unparsable_token(self, cache_client) -> None:
         dx_tokens = FakeDxTokenRepository()
         use_case = LogoutUser(dx_tokens, FakeDxCoreClient(), cache_client)
+        user_id = uuid4()
 
-        await use_case.execute(1, "not-a-jwt", None)  # must not raise
+        await use_case.execute(user_id, "not-a-jwt", None)  # must not raise
 
 
 class TestRefreshToken:
@@ -461,11 +463,12 @@ class TestRefreshToken:
 
     async def test_refreshes_tokens_with_valid_refresh_token_and_rotates(self, cache_client) -> None:
         users_api = FakeUsersApi()
-        users_api._rows[1] = UserRead(id=1, email="alice@example.com", name="Alice", status=UserStatus.ACTIVE)
+        user_id = uuid4()
+        users_api._rows[user_id] = UserRead(id=user_id, email="alice@example.com", name="Alice", status=UserStatus.ACTIVE)
         issue_tokens = IssueTokens()
         use_case = RefreshToken(cast(UsersApi, users_api), issue_tokens, cache_client)
 
-        old_refresh = self._create_token(sub="1", token_type=TokenType.REFRESH, jti="old-jti")
+        old_refresh = self._create_token(sub=str(user_id), token_type=TokenType.REFRESH, jti="old-jti")
         new_tokens = await use_case.execute(old_refresh)
 
         assert new_tokens.access_token is not None
@@ -487,16 +490,17 @@ class TestRefreshToken:
         users_api = FakeUsersApi()
         use_case = RefreshToken(cast(UsersApi, users_api), IssueTokens(), cache_client)
 
-        access_token = self._create_token(sub="1", token_type=TokenType.ACCESS)
+        access_token = self._create_token(sub=str(uuid4()), token_type=TokenType.ACCESS)
         with pytest.raises(NotAuthenticated):
             await use_case.execute(access_token)
 
     async def test_raises_not_authenticated_for_blacklisted_token(self, cache_client) -> None:
         users_api = FakeUsersApi()
-        users_api._rows[1] = UserRead(id=1, email="alice@example.com", name="Alice", status=UserStatus.ACTIVE)
+        user_id = uuid4()
+        users_api._rows[user_id] = UserRead(id=user_id, email="alice@example.com", name="Alice", status=UserStatus.ACTIVE)
         use_case = RefreshToken(cast(UsersApi, users_api), IssueTokens(), cache_client)
 
-        token = self._create_token(sub="1", jti="blacklisted-jti")
+        token = self._create_token(sub=str(user_id), jti="blacklisted-jti")
         blacklist_key = CacheKeyBuilder.session_key(AuthCacheNamespaces.TOKEN_BLACKLIST, "blacklisted-jti")
         await cache_client.set_json(blacklist_key, {"revoked": True}, ttl=3600)
 
@@ -505,10 +509,11 @@ class TestRefreshToken:
 
     async def test_raises_user_blocked_when_user_is_blocked(self, cache_client) -> None:
         users_api = FakeUsersApi()
-        users_api._rows[1] = UserRead(id=1, email="blocked@example.com", name="Blocked", status=UserStatus.BLOCKED)
+        user_id = uuid4()
+        users_api._rows[user_id] = UserRead(id=user_id, email="blocked@example.com", name="Blocked", status=UserStatus.BLOCKED)
         use_case = RefreshToken(cast(UsersApi, users_api), IssueTokens(), cache_client)
 
-        token = self._create_token(sub="1")
+        token = self._create_token(sub=str(user_id))
         with pytest.raises(UserBlocked):
             await use_case.execute(token)
 

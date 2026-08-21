@@ -2,6 +2,7 @@
 
 from abc import abstractmethod
 from datetime import datetime
+from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +16,7 @@ from app.modules.users.models import User
 from app.modules.users.schemas import UserRead
 
 
-class AbstractUserRepository(AbstractRepository[UserRead]):
+class AbstractUserRepository(AbstractRepository[UserRead, UUID]):
     """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
 
     @abstractmethod
@@ -44,7 +45,7 @@ class AbstractUserRepository(AbstractRepository[UserRead]):
     @abstractmethod
     async def update_profile(
         self,
-        user_id: int,
+        user_id: UUID,
         *,
         email: str,
         name: str,
@@ -58,12 +59,12 @@ class AbstractUserRepository(AbstractRepository[UserRead]):
         raise NotImplementedError
 
     @abstractmethod
-    async def set_last_login(self, user_id: int, at: datetime) -> None:
+    async def set_last_login(self, user_id: UUID, at: datetime) -> None:
         """Record the timestamp of a completed login."""
         raise NotImplementedError
 
     @abstractmethod
-    async def set_status(self, user_id: int, status: UserStatus) -> UserRead:
+    async def set_status(self, user_id: UUID, status: UserStatus) -> UserRead:
         """Block or unblock a user."""
         raise NotImplementedError
 
@@ -76,7 +77,7 @@ class UserRepository(AbstractUserRepository):
         self._cache = cache
 
     @database
-    async def get_by_id(self, entity_id: int) -> UserRead | None:
+    async def get_by_id(self, entity_id: UUID) -> UserRead | None:
         """Return one user, or None when it does not exist. Cache-aside: a
         miss loads from the database and populates the cache."""
         return await self._cache.get_or_load(
@@ -84,7 +85,7 @@ class UserRepository(AbstractUserRepository):
         )
 
     @helper
-    async def _load_by_id(self, entity_id: int) -> UserRead | None:
+    async def _load_by_id(self, entity_id: UUID) -> UserRead | None:
         """Direct database read backing get_by_id's cache-aside loader."""
         row = await self._session.scalar(select(User).where(User.id == entity_id))
         return UserRead.model_validate(row) if row else None
@@ -141,7 +142,7 @@ class UserRepository(AbstractUserRepository):
     @database
     async def update_profile(
         self,
-        user_id: int,
+        user_id: UUID,
         *,
         email: str,
         name: str,
@@ -163,7 +164,7 @@ class UserRepository(AbstractUserRepository):
         return UserRead.model_validate(row)
 
     @database
-    async def set_last_login(self, user_id: int, at: datetime) -> None:
+    async def set_last_login(self, user_id: UUID, at: datetime) -> None:
         """Record the timestamp of a completed login."""
         row = await self._session.get(User, user_id)
         if row is not None:
@@ -171,7 +172,7 @@ class UserRepository(AbstractUserRepository):
             await self._session.flush()
 
     @database
-    async def set_status(self, user_id: int, status: UserStatus) -> UserRead:
+    async def set_status(self, user_id: UUID, status: UserStatus) -> UserRead:
         """Block or unblock a user."""
         row = await self._session.get(User, user_id)
         if row is None:

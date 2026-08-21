@@ -13,9 +13,9 @@ export function useUpdateRole() {
       name,
       permissionIds,
     }: {
-      roleId: number;
+      roleId: string;
       name?: string;
-      permissionIds?: number[];
+      permissionIds?: string[];
     }) => updateRole(roleId, { name, permissionIds }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: rolesKeys.all });

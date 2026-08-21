@@ -3,6 +3,8 @@
 import logging
 from abc import abstractmethod
 
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database
@@ -19,12 +21,12 @@ class AbstractUsersUnitOfWork(AbstractUnitOfWork):
     users: AbstractUserRepository
 
     @abstractmethod
-    def mark_stale(self, entity: str, entity_id: int) -> None:
+    def mark_stale(self, entity: str, entity_id: UUID | int | str) -> None:
         """Queue a cache entity for invalidation once THIS uow's own commit() runs."""
         raise NotImplementedError
 
     @abstractmethod
-    async def invalidate_now(self, entity: str, entity_id: int) -> None:
+    async def invalidate_now(self, entity: str, entity_id: UUID | int | str) -> None:
         """Bump a cache entity's version immediately, bypassing the mark_stale
         queue. For a cross-module orchestrator (e.g. auth's login flow) that
         writes through this module's facade but commits its OWN unit of
@@ -41,14 +43,14 @@ class UsersUnitOfWork(AbstractUsersUnitOfWork):
     def __init__(self, session: AsyncSession, cache: CacheClient) -> None:
         self._session = session
         self._cache = cache
-        self._stale: list[tuple[str, int]] = []
+        self._stale: list[tuple[str, UUID | int | str]] = []
         self.users = UserRepository(session, cache)
 
-    def mark_stale(self, entity: str, entity_id: int) -> None:
+    def mark_stale(self, entity: str, entity_id: UUID | int | str) -> None:
         """Queue a cache entity for invalidation once this transaction commits."""
         self._stale.append((entity, entity_id))
 
-    async def invalidate_now(self, entity: str, entity_id: int) -> None:
+    async def invalidate_now(self, entity: str, entity_id: UUID | int | str) -> None:
         """Bump a cache entity's version immediately, bypassing the queue."""
         await self._cache.bump_version(entity, entity_id)
 

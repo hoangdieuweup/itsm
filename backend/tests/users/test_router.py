@@ -1,5 +1,4 @@
-"""Integration tests for app.modules.users.router. Real Postgres via the
-`client` fixture."""
+from uuid import UUID
 
 from httpx import AsyncClient
 from sqlalchemy import insert, select, update
@@ -15,7 +14,7 @@ from app.modules.users.models import User
 
 async def _login_with_permissions(
     client: AsyncClient, engine: AsyncEngine, *, permissions: list[tuple[str, str]]
-) -> int:
+) -> UUID:
     """Log in a real user (via a direct session cookie, same trick auth's
     own router tests use) and grant a role carrying exactly `permissions`."""
     async with engine.begin() as conn:
