@@ -10,6 +10,7 @@ class MongoConfig(BaseSettings):
 
     URL: str = "mongodb://localhost:27017"
     DATABASE_NAME: str = "itsm"
+    SERVER_SELECTION_TIMEOUT_MS: int = 2000
 
 
 mongo_settings = MongoConfig()
