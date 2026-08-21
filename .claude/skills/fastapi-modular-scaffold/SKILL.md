@@ -130,7 +130,7 @@ The line between `rules.py` and `utils/` is worth holding: rules encode business
 
 ## Non-negotiable rules
 
-**1. Modules reach each other only through `public.py`.** Never `models.py`, never `repository.py`. Enforced in CI by `lint-imports`, because reviewers get tired and linters don't.
+**1. Modules reach each other only through `public.py`.** Never `models.py`, never `repository.py`. Enforced in CI by `lint-imports` and `scripts/check_module_boundaries.py`, because reviewers get tired and linters don't.
 
 **2. Cross-module imports name the module.**
 
@@ -210,5 +210,6 @@ A structure that doesn't import is worse than no structure:
 ```bash
 uv run ruff check app && uv run ruff format --check app
 uv run lint-imports
+python scripts/check_module_boundaries.py --strict
 uv run python -c "from app.main import app; print(len(app.openapi()['paths']), 'paths')"
 ```
