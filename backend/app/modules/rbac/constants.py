@@ -6,29 +6,41 @@ from typing import Any
 
 
 class RbacPermissionCatalog:
-    """The fixed (resource, action, description) catalog — seeded from code,
-    never admin-created. See rbac/seeds and references/rbac.md's anti-pattern
-    list: permissions are what the application *can* do, not free text."""
+    """The fixed (resource, action, description_key) catalog — seeded from
+    code, never admin-created. See rbac/seeds and references/rbac.md's
+    anti-pattern list: permissions are what the application *can* do, not
+    free text.
+
+    description_key is an i18n key (e.g. "permissions.role.create"), not
+    display text — the frontend owns the actual translated string under its
+    own "rbac" message namespace, the same way error codes are keys the
+    frontend maps to copy, never raw text from the backend. See
+    Permission's docstring in models.py.
+    """
 
     CATALOG: list[tuple[str, str, str]] = [
-        ("role", "create", "Create a new role"),
-        ("role", "read", "View roles and their permissions"),
-        ("role", "update", "Rename a role or change its permission set"),
-        ("role", "delete", "Delete a custom role"),
-        ("permission", "read", "View the permission catalog"),
-        ("user", "read", "View the user list"),
-        ("user", "update_status", "Block or unblock a user"),
-        ("user", "assign_role", "Assign a role to a user"),
+        ("role", "create", "permissions.role.create"),
+        ("role", "read", "permissions.role.read"),
+        ("role", "update", "permissions.role.update"),
+        ("role", "delete", "permissions.role.delete"),
+        ("permission", "read", "permissions.permission.read"),
+        ("user", "read", "permissions.user.read"),
+        ("user", "update_status", "permissions.user.update_status"),
+        ("user", "assign_role", "permissions.user.assign_role"),
     ]
 
 
 class RbacDefaults:
-    """Seeded role names. See seeds/seed_rbac.py."""
+    """Seeded role names. See seeds/seed_rbac.py.
 
-    OWNER_ROLE_NAME = "owner"
+    No OWNER_ROLE_NAME: this system has no "owner" role — admin is the
+    highest seeded role, and the bus-factor protection (RbacRules.
+    blocks_last_admin_removal) guards admin, not a role nothing creates.
+    """
+
     ADMIN_ROLE_NAME = "admin"
     MEMBER_ROLE_NAME = "member"
-    SYSTEM_ROLE_NAMES = (OWNER_ROLE_NAME, ADMIN_ROLE_NAME, MEMBER_ROLE_NAME)
+    SYSTEM_ROLE_NAMES = (ADMIN_ROLE_NAME, MEMBER_ROLE_NAME)
     DEFAULT_ROLE_NAME = MEMBER_ROLE_NAME
 
 
@@ -51,7 +63,7 @@ class ErrorCode(StrEnum):
     DUPLICATE_ROLE_NAME = "rbac_duplicate_role_name"
     SYSTEM_ROLE_IMMUTABLE = "rbac_system_role_immutable"
     ROLE_IN_USE = "rbac_role_in_use"
-    CANNOT_REMOVE_LAST_OWNER = "rbac_cannot_remove_last_owner"
+    CANNOT_REMOVE_LAST_ADMIN = "rbac_cannot_remove_last_admin"
     TARGET_USER_NOT_FOUND = "rbac_target_user_not_found"
     PERMISSION_DENIED = "rbac_permission_denied"
     UNKNOWN_PERMISSION_ID = "rbac_unknown_permission_id"

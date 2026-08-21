@@ -46,14 +46,6 @@ from app.modules.rbac.public import RbacApi, get_rbac_api, require_permission
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-# The next two dependency-provider functions would normally live in
-# dependencies.py alongside every other one, but they need RbacApi from
-# rbac.public — and rbac.public needs auth.public, which needs
-# auth.dependencies for get_current_user/get_uow. Keeping dependencies.py
-# free of any rbac import breaks that cycle: router.py is never imported by
-# anything (only main.py imports a router), so by the time either function
-# below reaches into rbac.public, auth.dependencies has already finished
-# loading in full. See rbac/public.py's docstring for the other half.
 async def get_authenticate_with_dx(
     uow: AbstractAuthUnitOfWork = Depends(get_uow),
     dx_tokens: AbstractDxTokenRepository = Depends(get_dx_token_repository),
@@ -170,6 +162,6 @@ async def update_user_status(
     use_case: UpdateUserStatus = Depends(get_update_user_status),
     _user: UserRead = Depends(require_permission("user", "update_status")),
 ) -> ApiResponse[UserRead]:
-    """Block or unblock a user. Blocking the last owner is rejected — see rbac's bus-factor rule."""
+    """Block or unblock a user. Blocking the last admin is rejected — see rbac's bus-factor rule."""
     updated = await use_case.execute(user_id, body.status)
     return ApiResponse[UserRead](success=True, data=updated)

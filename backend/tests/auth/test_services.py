@@ -17,7 +17,7 @@ from app.integrations.dx_core.repository import AbstractDxTokenRepository
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCacheNamespaces, UserStatus
 from app.modules.auth.events import UserCreated, UserLoggedIn
-from app.modules.auth.exceptions import CannotBlockLastOwner, UserBlocked
+from app.modules.auth.exceptions import CannotBlockLastAdmin, UserBlocked
 from app.modules.auth.repository import AbstractUserRepository
 from app.modules.auth.schemas import UserRead
 from app.modules.auth.services.authenticate import AuthenticateWithDx
@@ -132,18 +132,18 @@ class FakeAuthUnitOfWork(AbstractAuthUnitOfWork):
 class FakeRbacApi:
     """Duck-typed stand-in for app.modules.rbac.public.RbacApi — same pattern as
     FakeDxCoreClient below: AuthenticateWithDx only calls assign_default_role,
-    UpdateUserStatus only calls is_last_owner, so those are the only two
+    UpdateUserStatus only calls is_last_admin, so those are the only two
     methods this fake needs."""
 
-    def __init__(self, *, last_owner_ids: frozenset[int] = frozenset()) -> None:
+    def __init__(self, *, last_admin_ids: frozenset[int] = frozenset()) -> None:
         self.calls: list[int] = []
-        self._last_owner_ids = last_owner_ids
+        self._last_admin_ids = last_admin_ids
 
     async def assign_default_role(self, user_id: int) -> None:
         self.calls.append(user_id)
 
-    async def is_last_owner(self, user_id: int) -> bool:
-        return user_id in self._last_owner_ids
+    async def is_last_admin(self, user_id: int) -> bool:
+        return user_id in self._last_admin_ids
 
 
 @dataclass
@@ -438,7 +438,7 @@ class TestLogoutUser:
 
 class TestUpdateUserStatus:
     """UpdateUserStatus: block/unblock a user, rejecting a block that would
-    leave zero users holding the owner role."""
+    leave zero users holding the admin role."""
 
     async def test_blocks_an_active_user(self) -> None:
         uow = FakeAuthUnitOfWork()
@@ -465,24 +465,24 @@ class TestUpdateUserStatus:
             employee_code=None,
             email_confirmed=True,
         )
-        rbac_api = FakeRbacApi(last_owner_ids=frozenset({user.id}))  # would block if this were a BLOCK
+        rbac_api = FakeRbacApi(last_admin_ids=frozenset({user.id}))  # would block if this were a BLOCK
 
         updated = await UpdateUserStatus(uow, rbac_api).execute(user.id, UserStatus.ACTIVE)
 
         assert updated.status is UserStatus.ACTIVE
 
-    async def test_rejects_blocking_the_last_owner(self) -> None:
+    async def test_rejects_blocking_the_last_admin(self) -> None:
         uow = FakeAuthUnitOfWork()
         user = await uow.users.create(
-            email="owner@example.com",
-            name="Owner",
-            external_user_id="dx-owner",
+            email="admin@example.com",
+            name="Admin",
+            external_user_id="dx-admin",
             employee_code=None,
             email_confirmed=True,
         )
-        rbac_api = FakeRbacApi(last_owner_ids=frozenset({user.id}))
+        rbac_api = FakeRbacApi(last_admin_ids=frozenset({user.id}))
 
-        with pytest.raises(CannotBlockLastOwner):
+        with pytest.raises(CannotBlockLastAdmin):
             await UpdateUserStatus(uow, rbac_api).execute(user.id, UserStatus.BLOCKED)
 
         assert uow.commits == 0

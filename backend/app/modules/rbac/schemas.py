@@ -4,12 +4,16 @@ from app.core.models import FrozenModel
 
 
 class PermissionRead(FrozenModel):
-    """Representation safe to round trip through the cache."""
+    """Representation safe to round trip through the cache.
+
+    description_key is an i18n key, not display text — see Permission's
+    own docstring in models.py.
+    """
 
     id: int
     resource: str
     action: str
-    description: str
+    description_key: str
 
 
 class RoleRead(FrozenModel):

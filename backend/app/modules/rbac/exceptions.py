@@ -19,7 +19,7 @@ class DuplicateRoleName(ConflictError):
 
 
 class SystemRoleImmutable(ForbiddenError):
-    """Raised when renaming or deleting one of the seeded owner/admin/member roles."""
+    """Raised when renaming or deleting one of the seeded admin/member roles."""
 
     code = ErrorCode.SYSTEM_ROLE_IMMUTABLE
     message = "This role's name cannot be changed and it cannot be deleted"
@@ -32,11 +32,11 @@ class RoleInUse(ConflictError):
     message = "This role still has users assigned to it"
 
 
-class CannotRemoveLastOwner(ValidationFailedError):
-    """Raised when an action would leave zero users holding the owner role."""
+class CannotRemoveLastAdmin(ValidationFailedError):
+    """Raised when an action would leave zero users holding the admin role."""
 
-    code = ErrorCode.CANNOT_REMOVE_LAST_OWNER
-    message = "This is the last user with the owner role — assign it to someone else first"
+    code = ErrorCode.CANNOT_REMOVE_LAST_ADMIN
+    message = "This is the last user with the admin role — assign it to someone else first"
 
 
 class TargetUserNotFound(NotFoundError):

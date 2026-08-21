@@ -38,8 +38,8 @@ class NotAuthenticated(ForbiddenError):
     message = "Authentication required"
 
 
-class CannotBlockLastOwner(ForbiddenError):
-    """Raised when blocking this user would leave zero users holding the owner role."""
+class CannotBlockLastAdmin(ForbiddenError):
+    """Raised when blocking this user would leave zero users holding the admin role."""
 
-    code = ErrorCode.CANNOT_BLOCK_LAST_OWNER
-    message = "This is the last user with the owner role — reassign it before blocking them"
+    code = ErrorCode.CANNOT_BLOCK_LAST_ADMIN
+    message = "This is the last user with the admin role — reassign it before blocking them"
