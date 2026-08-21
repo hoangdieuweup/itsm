@@ -4,18 +4,6 @@ from app.core.events import DomainEvent
 from app.modules.auth.constants import AuthEvents
 
 
-class UserCreated(DomainEvent):
-    """Emitted after a new user has been synced from DX for the first time."""
-
-    user_id: int
-    email: str
-
-    @property
-    def routing_key(self) -> str:
-        """Return the key used when publishing this event."""
-        return f"{AuthEvents.EXCHANGE}.user_created"
-
-
 class UserLoggedIn(DomainEvent):
     """Emitted after a user completes the SSO login flow."""
 

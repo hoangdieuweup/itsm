@@ -10,8 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.core.security import JwtCodec
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCookies
-from app.modules.auth.models import User
 from app.modules.rbac.models import Permission, Role, RolePermission, UserRole
+from app.modules.users.config import users_settings
+from app.modules.users.models import User
 
 
 async def _seed_permission(engine: AsyncEngine, resource: str, action: str) -> int:
@@ -127,7 +128,7 @@ class TestAssignUserRole:
     async def test_rejects_reassigning_the_protected_admin(
         self, client: AsyncClient, engine: AsyncEngine, monkeypatch
     ) -> None:
-        monkeypatch.setattr(auth_settings, "ADMIN_EMAIL", "protected-rbac@example.com")
+        monkeypatch.setattr(users_settings, "ADMIN_EMAIL", "protected-rbac@example.com")
         await _login_as(client, engine, permissions=[("user", "assign_role")])
         role_id = await _seed_role(engine, "viewer3", is_system=False, permission_ids=[])
         target_user_id = await _seed_user(

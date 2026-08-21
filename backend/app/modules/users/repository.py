@@ -1,4 +1,4 @@
-"""Single access path to the auth tables (users)."""
+"""Single access path to the users table."""
 
 from abc import abstractmethod
 from datetime import datetime
@@ -9,18 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
 from app.integrations.cache.client import CacheClient
-from app.modules.auth.constants import AuthCacheKeys, UserStatus
-from app.modules.auth.models import User
-from app.modules.auth.schemas import UserRead
+from app.modules.users.constants import UsersCacheKeys, UserStatus
+from app.modules.users.models import User
+from app.modules.users.schemas import UserRead
 
 
 class AbstractUserRepository(AbstractRepository[UserRead]):
-    """Contract a use case depends on instead of the concrete SQLAlchemy class below.
-
-    get_by_id and list_page come from AbstractRepository; this adds the
-    lookups and upsert-from-DX-profile writes the SSO sync use case
-    (app.modules.auth.services.sync_external_user) needs.
-    """
+    """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
 
     @abstractmethod
     async def find_by_email(self, email: str) -> UserRead | None:
@@ -84,7 +79,7 @@ class UserRepository(AbstractUserRepository):
         """Return one user, or None when it does not exist. Cache-aside: a
         miss loads from the database and populates the cache."""
         return await self._cache.get_or_load(
-            AuthCacheKeys.ENTITY, entity_id, UserRead, lambda: self._load_by_id(entity_id)
+            UsersCacheKeys.ENTITY, entity_id, UserRead, lambda: self._load_by_id(entity_id)
         )
 
     @helper

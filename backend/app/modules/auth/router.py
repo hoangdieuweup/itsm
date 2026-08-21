@@ -12,9 +12,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 
 from app.config import settings
-from app.core.events import EventBus, get_event_bus
 from app.core.models import ApiResponse
-from app.core.pagination import Page, PaginationParams, pagination_params
 from app.integrations.cache.client import CacheClient
 from app.integrations.cache.dependencies import get_cache
 from app.integrations.cache.keys import CacheKeyBuilder
@@ -22,49 +20,17 @@ from app.integrations.dx_core.client import DxCoreClient
 from app.integrations.dx_core.constants import DxCacheNamespaces, DxDefaults
 from app.integrations.dx_core.dependencies import get_dx_core_client
 from app.integrations.dx_core.exceptions import DxCoreUnavailable, TokenExchangeFailed
-from app.integrations.dx_core.repository import AbstractDxTokenRepository
 from app.modules.auth.constants import AuthCookies
-from app.modules.auth.dependencies import (
-    get_dx_token_repository,
-    get_issue_tokens,
-    get_logout_user,
-    get_sync_external_user,
-    get_uow,
-    require_auth,
-)
+from app.modules.auth.dependencies import get_logout_user, require_auth
 from app.modules.auth.exceptions import UserBlocked
-from app.modules.auth.schemas import MeResponse, UserRead, UserStatusUpdate
+from app.modules.auth.schemas import MeResponse
 from app.modules.auth.services.authenticate import AuthenticateWithDx
-from app.modules.auth.services.issue_tokens import IssueTokens
 from app.modules.auth.services.logout import LogoutUser
-from app.modules.auth.services.sync_external_user import SyncExternalUser
-from app.modules.auth.services.update_user_status import UpdateUserStatus
-from app.modules.auth.uow import AbstractAuthUnitOfWork
-from app.modules.auth.utils import AuthSessionResponses
-from app.modules.rbac.public import RbacApi, get_rbac_api, require_permission
+from app.modules.auth.utils import AuthSessionResponses, get_authenticate_with_dx
+from app.modules.rbac.public import RbacApi, get_rbac_api
+from app.modules.users.public import UserRead
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-async def get_authenticate_with_dx(
-    uow: AbstractAuthUnitOfWork = Depends(get_uow),
-    dx_tokens: AbstractDxTokenRepository = Depends(get_dx_token_repository),
-    dx_client: DxCoreClient = Depends(get_dx_core_client),
-    sync_user: SyncExternalUser = Depends(get_sync_external_user),
-    issue_tokens: IssueTokens = Depends(get_issue_tokens),
-    events: EventBus = Depends(get_event_bus),
-    rbac_api: RbacApi = Depends(get_rbac_api),
-) -> AuthenticateWithDx:
-    """Provide the DX OAuth2 callback use case."""
-    return AuthenticateWithDx(uow, dx_tokens, dx_client, sync_user, issue_tokens, events, rbac_api)
-
-
-async def get_update_user_status(
-    uow: AbstractAuthUnitOfWork = Depends(get_uow),
-    rbac_api: RbacApi = Depends(get_rbac_api),
-) -> UpdateUserStatus:
-    """Provide the block/unblock use case."""
-    return UpdateUserStatus(uow, rbac_api)
 
 
 @router.get("/oauth/dx/start")
@@ -141,27 +107,3 @@ async def me(
     summary = await rbac.role_summary_for_user(user.id)
     body = MeResponse(user=user, role_name=summary.role_name, permissions=summary.permissions)
     return ApiResponse[MeResponse](success=True, data=body)
-
-
-@router.get("/users")
-async def list_users(
-    pagination: PaginationParams = Depends(pagination_params),
-    uow: AbstractAuthUnitOfWork = Depends(get_uow),
-    _user: UserRead = Depends(require_permission("user", "read")),
-) -> ApiResponse[Page[UserRead]]:
-    """List users for the admin user-management page."""
-    items, total = await uow.users.list_page(pagination.limit, pagination.offset)
-    page = Page[UserRead](items=items, total=total, limit=pagination.limit, offset=pagination.offset)
-    return ApiResponse[Page[UserRead]](success=True, data=page)
-
-
-@router.patch("/users/{user_id}/status")
-async def update_user_status(
-    user_id: int,
-    body: UserStatusUpdate,
-    use_case: UpdateUserStatus = Depends(get_update_user_status),
-    _user: UserRead = Depends(require_permission("user", "update_status")),
-) -> ApiResponse[UserRead]:
-    """Block or unblock a user. Blocking the last admin is rejected — see rbac's bus-factor rule."""
-    updated = await use_case.execute(user_id, body.status)
-    return ApiResponse[UserRead](success=True, data=updated)

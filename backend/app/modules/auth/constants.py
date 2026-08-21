@@ -7,22 +7,7 @@ Other modules import these with an explicit alias:
 from enum import StrEnum
 from typing import Literal
 
-
-class UserStatus(StrEnum):
-    """Lifecycle state of a user account."""
-
-    ACTIVE = "active"
-    PENDING = "pending"
-    BLOCKED = "blocked"
-
-
-class AuthLimits:
-    """Numeric limits owned by the auth module."""
-
-    MAX_NAME_LENGTH = 255
-    MAX_EMAIL_LENGTH = 320
-    MAX_EMPLOYEE_CODE_LENGTH = 64
-    DEFAULT_PAGE_SIZE = 50
+from app.modules.users.public import UserStatus
 
 
 class AuthEvents:
@@ -40,13 +25,6 @@ class AuthCookies:
     SameSite = Literal["lax", "none", "strict"]
 
 
-class AuthCacheKeys:
-    """Cache identity owned by the auth module. See references/caching.md."""
-
-    ENTITY = "user"
-    TTL_SECONDS = 300
-
-
 class AuthCacheNamespaces:
     """Redis key namespaces owned by the auth module.
 
@@ -60,12 +38,9 @@ class AuthCacheNamespaces:
 class ErrorCode(StrEnum):
     """Stable error codes returned to clients by this module."""
 
-    USER_NOT_FOUND = "auth_user_not_found"
-    USER_BLOCKED = "auth_user_blocked"
     INVALID_CREDENTIALS = "auth_invalid_credentials"
     NOT_AUTHENTICATED = "auth_not_authenticated"
-    CANNOT_BLOCK_LAST_ADMIN = "auth_cannot_block_last_admin"
-    CANNOT_MODIFY_PROTECTED_ADMIN = "auth_cannot_modify_protected_admin"
+    USER_BLOCKED = "auth_user_blocked"
 
 
 class LoginPolicy:

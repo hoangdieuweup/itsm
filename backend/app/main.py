@@ -16,6 +16,7 @@ from app.core.models import ApiResponse, ErrorPayload
 from app.lifespan import lifespan
 from app.modules.auth.router import router as auth_router
 from app.modules.rbac.router import router as rbac_router
+from app.modules.users.router import router as users_router
 
 setup_logging()
 log = structlog.get_logger(__name__)
@@ -83,3 +84,4 @@ async def health() -> dict:
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(rbac_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")

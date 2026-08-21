@@ -1,19 +1,12 @@
 """Errors owned by the auth module.
 
 These live here rather than in a global module because each one encodes a
-fact about auth: what counts as missing, what counts as blocked. The
+fact about auth: what counts as blocked, what counts as not-signed-in. The
 mechanism they build on lives in app.exceptions.
 """
 
-from app.core.exceptions import ForbiddenError, NotFoundError, ValidationFailedError
+from app.core.exceptions import ForbiddenError, ValidationFailedError
 from app.modules.auth.constants import ErrorCode
-
-
-class UserNotFound(NotFoundError):
-    """Raised when no user matches the requested identifier."""
-
-    code = ErrorCode.USER_NOT_FOUND
-    message = "User not found"
 
 
 class UserBlocked(ForbiddenError):
@@ -36,17 +29,3 @@ class NotAuthenticated(ForbiddenError):
     code = ErrorCode.NOT_AUTHENTICATED
     status_code = 401
     message = "Authentication required"
-
-
-class CannotBlockLastAdmin(ForbiddenError):
-    """Raised when blocking this user would leave zero users holding the admin role."""
-
-    code = ErrorCode.CANNOT_BLOCK_LAST_ADMIN
-    message = "This is the last user with the admin role — reassign it before blocking them"
-
-
-class CannotModifyProtectedAdmin(ForbiddenError):
-    """Raised when attempting to block the seeded break-glass admin account."""
-
-    code = ErrorCode.CANNOT_MODIFY_PROTECTED_ADMIN
-    message = "This account is permanently protected and cannot be blocked"
