@@ -45,6 +45,21 @@ forbidden_modules =
     app.modules.users.utils
 allow_indirect_imports = True
 
+[importlinter:contract:projects-facade]
+name = Other modules reach projects only through public.py
+type = forbidden
+source_modules =
+    app.modules.auth
+    app.modules.rbac
+    app.modules.users
+    app.modules.common
+forbidden_modules =
+    app.modules.projects.repository
+    app.modules.projects.models
+    app.modules.projects.uow
+    app.modules.projects.services
+allow_indirect_imports = True
+
 [importlinter:contract:common-is-a-leaf-module]
 name = common is a promotion target, not a hub — it never imports another domain module
 type = forbidden
