@@ -18,6 +18,7 @@ dependencies = [
     "httpx>=0.28",
     "cryptography>=43.0",
     "pyjwt>=2.9",
+    "motor>=3.7.1",
 ]
 
 [dependency-groups]
@@ -27,7 +28,7 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
     "import-linter>=2.1",
-    "testcontainers[postgres]>=4.8",
+    "testcontainers[mongodb,postgres]>=4.8",
     "debugpy>=1.8.21",
 ]
 

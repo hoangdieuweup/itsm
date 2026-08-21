@@ -66,8 +66,15 @@ services:
       - "9001:9001"
     volumes:
       - miniodata:/data
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
 
 volumes:
   pgdata:
   rabbitdata:
   miniodata:
+  mongodata:

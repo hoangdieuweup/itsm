@@ -50,3 +50,16 @@ class ErrorCode(StrEnum):
     ENVIRONMENT_NOT_FOUND = "projects_environment_not_found"
     ENVIRONMENT_TYPE_ALREADY_EXISTS = "projects_environment_type_already_exists"
     PROJECT_LINK_NOT_FOUND = "projects_project_link_not_found"
+
+
+class ProjectAuditActions(StrEnum):
+    """Action identifiers this module writes via audit.log_event. Centralized
+    so the same string is never typo'd or drifted across call sites — audit
+    itself is domain-agnostic and only ever sees whatever string is passed."""
+
+    PROJECT_CREATED = "PROJECT_CREATED"
+    PROJECT_UPDATED = "PROJECT_UPDATED"
+    PROJECT_DELETED = "PROJECT_DELETED"
+    ENVIRONMENT_CREATED = "ENVIRONMENT_CREATED"
+    ENVIRONMENT_UPDATED = "ENVIRONMENT_UPDATED"
+    ENVIRONMENT_DELETED = "ENVIRONMENT_DELETED"

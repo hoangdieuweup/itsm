@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.integrations.cache.client import CacheClient
 from app.integrations.cache.dependencies import get_cache
+from app.modules.audit.public import AuditApi, get_audit_api
 from app.modules.projects.services.create_environment import CreateEnvironment
 from app.modules.projects.services.create_project import CreateProject
 from app.modules.projects.services.create_project_link import CreateProjectLink
@@ -27,34 +28,46 @@ async def get_uow(
     return ProjectsUnitOfWork(session, cache)
 
 
-async def get_create_project(uow: AbstractProjectsUnitOfWork = Depends(get_uow)) -> CreateProject:
+async def get_create_project(
+    uow: AbstractProjectsUnitOfWork = Depends(get_uow), audit_api: AuditApi = Depends(get_audit_api)
+) -> CreateProject:
     """Provide the create-project use case."""
-    return CreateProject(uow)
+    return CreateProject(uow, audit_api)
 
 
-async def get_update_project(uow: AbstractProjectsUnitOfWork = Depends(get_uow)) -> UpdateProject:
+async def get_update_project(
+    uow: AbstractProjectsUnitOfWork = Depends(get_uow), audit_api: AuditApi = Depends(get_audit_api)
+) -> UpdateProject:
     """Provide the update-project use case."""
-    return UpdateProject(uow)
+    return UpdateProject(uow, audit_api)
 
 
-async def get_delete_project(uow: AbstractProjectsUnitOfWork = Depends(get_uow)) -> DeleteProject:
+async def get_delete_project(
+    uow: AbstractProjectsUnitOfWork = Depends(get_uow), audit_api: AuditApi = Depends(get_audit_api)
+) -> DeleteProject:
     """Provide the delete-project use case."""
-    return DeleteProject(uow)
+    return DeleteProject(uow, audit_api)
 
 
-async def get_create_environment(uow: AbstractProjectsUnitOfWork = Depends(get_uow)) -> CreateEnvironment:
+async def get_create_environment(
+    uow: AbstractProjectsUnitOfWork = Depends(get_uow), audit_api: AuditApi = Depends(get_audit_api)
+) -> CreateEnvironment:
     """Provide the create-environment use case."""
-    return CreateEnvironment(uow)
+    return CreateEnvironment(uow, audit_api)
 
 
-async def get_update_environment(uow: AbstractProjectsUnitOfWork = Depends(get_uow)) -> UpdateEnvironment:
+async def get_update_environment(
+    uow: AbstractProjectsUnitOfWork = Depends(get_uow), audit_api: AuditApi = Depends(get_audit_api)
+) -> UpdateEnvironment:
     """Provide the update-environment use case."""
-    return UpdateEnvironment(uow)
+    return UpdateEnvironment(uow, audit_api)
 
 
-async def get_delete_environment(uow: AbstractProjectsUnitOfWork = Depends(get_uow)) -> DeleteEnvironment:
+async def get_delete_environment(
+    uow: AbstractProjectsUnitOfWork = Depends(get_uow), audit_api: AuditApi = Depends(get_audit_api)
+) -> DeleteEnvironment:
     """Provide the delete-environment use case."""
-    return DeleteEnvironment(uow)
+    return DeleteEnvironment(uow, audit_api)
 
 
 async def get_create_project_link(uow: AbstractProjectsUnitOfWork = Depends(get_uow)) -> CreateProjectLink:

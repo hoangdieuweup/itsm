@@ -1,0 +1,7 @@
+{
+  "title": "Audit Log",
+  "description": "System activity across projects and environments.",
+  "filters": { "projectId": "Project ID", "type": "Type", "allTypes": "All types" },
+  "table": { "timestamp": "Time", "action": "Action", "actor": "Actor", "message": "Message" },
+  "empty": { "title": "No log entries yet" }
+}

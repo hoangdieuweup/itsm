@@ -36,6 +36,7 @@ class RbacPermissionCatalog:
         ("environment", "read", "permissions.environment.read"),
         ("environment", "update", "permissions.environment.update"),
         ("environment", "delete", "permissions.environment.delete"),
+        ("audit_log", "read", "permissions.audit_log.read"),
     ]
 
 

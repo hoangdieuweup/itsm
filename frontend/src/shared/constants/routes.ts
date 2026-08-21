@@ -4,4 +4,5 @@ export const ROUTES = {
   adminUsers: "/admin/users",
   adminRoles: "/admin/roles",
   adminProjects: "/admin/projects",
+  adminAuditLog: "/admin/audit-log",
 } as const;
