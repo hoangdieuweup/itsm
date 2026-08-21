@@ -254,13 +254,16 @@ class UserRoleRepository(AbstractUserRoleRepository):
 
     @database
     async def user_has_permission(self, user_id: int, resource: str, action: str) -> bool:
-        """Return whether user_id's granted role includes resource.action."""
-        stmt = (
-            select(Permission.id)
-            .join(RolePermission, RolePermission.permission_id == Permission.id)
-            .join(Role, Role.id == RolePermission.role_id)
-            .join(UserRole, UserRole.role_id == Role.id)
-            .where(UserRole.user_id == user_id, Permission.resource == resource, Permission.action == action)
-        )
-        result = await self._session.execute(stmt)
-        return result.first() is not None
+        """Return whether user_id's granted role includes resource.action.
+
+        Reuses get_role_for_user's cache instead of its own JOIN — a cache
+        hit answers this from the already-cached role+permissions with no
+        query at all. This is the authorization gate every protected
+        request goes through (require_permission), so a revoked permission
+        stays effective for an already-cached user until that entry's TTL
+        expires, same as any other read through this cache.
+        """
+        role = await self.get_role_for_user(user_id)
+        if role is None:
+            return False
+        return any(p.resource == resource and p.action == action for p in role.permissions)

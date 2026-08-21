@@ -63,7 +63,20 @@ async def client(engine) -> AsyncIterator[AsyncClient]:
     next test starts from a clean slate. ASGITransport also skips the app's
     lifespan, so any other dependency that normally reads a pool off
     app.state (cache, when enabled) is overridden here too.
+
+    CACHE__URL points at the same real Redis a local dev server would use
+    (Postgres is an ephemeral per-run testcontainer, but Redis is not), so
+    a version-based cache entry keyed by an id like `user_role:5` can
+    outlive the Postgres container that id came from — a *later* run's
+    fresh container reassigns id 5 to an unrelated row, and would read
+    the previous run's stale cached value for it. Flushed before every
+    test, not just on teardown, so a run that starts here is never
+    contaminated by an earlier run/test that didn't get to clean up.
     """
+    redis = Redis.from_url(str(cache_settings.URL))
+    await redis.flushdb()
+    await redis.aclose()
+
     session_factory = async_sessionmaker(bind=engine, expire_on_commit=False)
 
     async def override_get_session() -> AsyncIterator[AsyncSession]:
