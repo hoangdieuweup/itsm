@@ -18,8 +18,10 @@
     "block": "Block",
     "unblock": "Unblock",
     "blocking": "Updating...",
-    "blockConfirm": "Are you sure you want to block this user?",
-    "unblockConfirm": "Are you sure you want to unblock this user?"
+    "blockDialogTitle": "Block Account",
+    "unblockDialogTitle": "Unblock Account",
+    "blockConfirm": "Are you sure you want to block this user account? They will not be able to log in.",
+    "unblockConfirm": "Are you sure you want to unblock this user account? They will regain access to the system."
   },
   "errors": {
     "users_user_not_found": "User not found.",

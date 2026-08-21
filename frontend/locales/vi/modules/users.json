@@ -18,8 +18,10 @@
     "block": "Khóa",
     "unblock": "Mở khóa",
     "blocking": "Đang cập nhật...",
-    "blockConfirm": "Bạn có chắc chắn muốn khóa người dùng này không?",
-    "unblockConfirm": "Bạn có chắc chắn muốn mở khóa người dùng này không?"
+    "blockDialogTitle": "Khóa tài khoản",
+    "unblockDialogTitle": "Mở khóa tài khoản",
+    "blockConfirm": "Bạn có chắc chắn muốn khóa tài khoản này không? Người dùng sẽ không thể đăng nhập vào hệ thống.",
+    "unblockConfirm": "Bạn có chắc chắn muốn mở khóa tài khoản này không? Người dùng sẽ có thể đăng nhập lại."
   },
   "errors": {
     "users_user_not_found": "Không tìm thấy người dùng.",

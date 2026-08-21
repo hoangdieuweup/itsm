@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Plus, Shield, ShieldCheck, Edit2, Trash2, AlertCircle, Key, Eye } from "lucide-react";
 import { Button } from "@/shared/ui/button";
+import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useRoles } from "../api/use-roles";
@@ -13,12 +14,14 @@ import { isProtectedAdminRole, type Role } from "../model/schema";
 
 export function RolesPageContent() {
   const t = useTranslations("roles");
+  const tCommon = useTranslations("confirmDialog");
   const getErrorMessage = useApiErrorMessage("roles");
   const { data: page } = useRoles(50, 0);
   const deleteRole = useDeleteRole();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleCreate = () => {
@@ -32,10 +35,18 @@ export function RolesPageContent() {
   };
 
   const handleDelete = (role: Role) => {
-    if (!window.confirm(t("actions.deleteConfirm"))) return;
+    setRoleToDelete(role);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!roleToDelete) return;
     setErrorMessage(null);
-    deleteRole.mutate(role.id, {
+    deleteRole.mutate(roleToDelete.id, {
+      onSuccess: () => {
+        setRoleToDelete(null);
+      },
       onError: (err) => {
+        setRoleToDelete(null);
         setErrorMessage(getErrorMessage(err));
       },
     });
@@ -218,6 +229,30 @@ export function RolesPageContent() {
         isOpen={dialogOpen}
         onClose={() => setDialogOpen(false)}
         role={selectedRole}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(roleToDelete)}
+        onClose={() => setRoleToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        title={t("actions.deleteDialogTitle")}
+        description={
+          roleToDelete ? (
+            <span>
+              {t("actions.deleteConfirm")}{" "}
+              <strong className="font-semibold text-foreground">
+                ({roleToDelete.name})
+              </strong>
+            </span>
+          ) : (
+            ""
+          )
+        }
+        confirmText={t("actions.delete")}
+        cancelText={tCommon("cancel")}
+        variant="destructive"
+        isLoading={deleteRole.isPending}
       />
     </div>
   );

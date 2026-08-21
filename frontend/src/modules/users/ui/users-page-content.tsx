@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { AlertCircle, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Button } from "@/shared/ui/button";
+import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { Can } from "@/entities/permission";
 import { USER_STATUS, type User } from "@/entities/user";
@@ -14,22 +15,33 @@ import { useUpdateUserStatus } from "../hooks/use-update-user-status";
 
 export function UsersPageContent() {
   const t = useTranslations("users");
+  const tCommon = useTranslations("confirmDialog");
   const getErrorMessage = useApiErrorMessage("users");
   const { data: page } = useUsers(50, 0);
   const updateStatus = useUpdateUserStatus();
+  const [userToToggle, setUserToToggle] = useState<User | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleToggleStatus = (user: User) => {
+    setUserToToggle(user);
+  };
+
+  const handleConfirmToggle = () => {
+    if (!userToToggle) return;
     setErrorMessage(null);
     const nextStatus =
-      user.status === USER_STATUS.BLOCKED
+      userToToggle.status === USER_STATUS.BLOCKED
         ? USER_STATUS.ACTIVE
         : USER_STATUS.BLOCKED;
 
     updateStatus.mutate(
-      { userId: user.id, status: nextStatus },
+      { userId: userToToggle.id, status: nextStatus },
       {
+        onSuccess: () => {
+          setUserToToggle(null);
+        },
         onError: (err) => {
+          setUserToToggle(null);
           setErrorMessage(getErrorMessage(err));
         },
       },
@@ -212,6 +224,42 @@ export function UsersPageContent() {
           </table>
         </div>
       </div>
+
+      {/* User Status Toggle Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(userToToggle)}
+        onClose={() => setUserToToggle(null)}
+        onConfirm={handleConfirmToggle}
+        title={
+          userToToggle?.status === USER_STATUS.BLOCKED
+            ? t("actions.unblockDialogTitle")
+            : t("actions.blockDialogTitle")
+        }
+        description={
+          userToToggle ? (
+            <span>
+              {userToToggle.status === USER_STATUS.BLOCKED
+                ? t("actions.unblockConfirm")
+                : t("actions.blockConfirm")}{" "}
+              <strong className="font-semibold text-foreground">
+                ({userToToggle.email})
+              </strong>
+            </span>
+          ) : (
+            ""
+          )
+        }
+        confirmText={
+          userToToggle?.status === USER_STATUS.BLOCKED
+            ? t("actions.unblock")
+            : t("actions.block")
+        }
+        cancelText={tCommon("cancel")}
+        variant={
+          userToToggle?.status === USER_STATUS.BLOCKED ? "default" : "destructive"
+        }
+        isLoading={updateStatus.isPending}
+      />
     </div>
   );
 }
