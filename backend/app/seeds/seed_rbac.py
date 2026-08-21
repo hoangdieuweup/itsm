@@ -2,11 +2,12 @@
 
 Run via `python -m app.seeds.seed_rbac`. Safe to run on every deploy — new
 permissions added to RbacPermissionCatalog.CATALOG appear on the next run
-without touching existing role/permission rows. Deliberately does NOT seed
-the "owner" role — that's created only by seed_owner.py, when
-AUTH__OWNER_EMAIL is configured, not unconditionally on every deploy. If a
+without touching existing role/permission rows. There is no "owner" role —
+admin is the highest role this seeds. A break-glass admin *account* (not a
+role) can optionally be seeded separately by seed_admin.py, when
+AUTH__ADMIN_EMAIL is configured, not unconditionally on every deploy. If a
 project needs additional roles beyond admin/member, create them through the
-admin UI (POST /rbac/roles) once an owner/admin account exists to do so.
+admin UI (POST /rbac/roles) once an admin account exists to do so.
 """
 
 import asyncio
