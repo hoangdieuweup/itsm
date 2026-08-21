@@ -188,26 +188,50 @@ class FakeProjectsUnitOfWork(AbstractProjectsUnitOfWork):
         self.rollbacks += 1
 
 
+class FakeAuditApi:
+    """Duck-typed stand-in for app.modules.audit.public.AuditApi — records every
+    call instead of writing to Mongo, so tests can assert an event was logged."""
+
+    def __init__(self) -> None:
+        self.events: list[dict] = []
+
+    async def log_event(self, **kwargs) -> None:
+        self.events.append(kwargs)
+
+    async def list_logs(self, **kwargs) -> tuple[list, int]:
+        return [], 0
+
+
+ACTOR_ID = uuid4()
+ACTOR_EMAIL = "actor@example.com"
+
+
 class TestCreateProject:
     async def test_creates_project_with_configured_default_links(self, monkeypatch) -> None:
         monkeypatch.setattr(projects_settings, "DEFAULT_JIRA_URL", "https://jira.weup.vn")
         monkeypatch.setattr(projects_settings, "DEFAULT_GIT_URL", "https://git.weup.vn")
         uow = FakeProjectsUnitOfWork()
+        audit_api = FakeAuditApi()
 
-        project = await CreateProject(uow).execute("Website A", "Marketing site")
+        project = await CreateProject(uow, audit_api).execute(
+            "Website A", "Marketing site", actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
 
         assert project.name == "Website A"
         links = await uow.project_links.list_for_project(project.id)
         assert {link.type for link in links} == {ProjectLinkType.JIRA, ProjectLinkType.GIT}
         assert all(link.is_default for link in links)
         assert uow.commits == 1
+        assert audit_api.events[0]["action"] == "PROJECT_CREATED"
 
     async def test_creates_project_with_no_default_links_when_unconfigured(self, monkeypatch) -> None:
         monkeypatch.setattr(projects_settings, "DEFAULT_JIRA_URL", "")
         monkeypatch.setattr(projects_settings, "DEFAULT_GIT_URL", "")
         uow = FakeProjectsUnitOfWork()
 
-        project = await CreateProject(uow).execute("Website B", None)
+        project = await CreateProject(uow, FakeAuditApi()).execute(
+            "Website B", None, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
 
         links = await uow.project_links.list_for_project(project.id)
         assert links == []
@@ -218,7 +242,9 @@ class TestUpdateProject:
         uow = FakeProjectsUnitOfWork()
         project = await uow.projects.create(name="Old", description=None, created_by=None)
 
-        updated = await UpdateProject(uow).execute(project.id, name="New", description=None)
+        updated = await UpdateProject(uow, FakeAuditApi()).execute(
+            project.id, name="New", description=None, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
 
         assert updated.name == "New"
         assert uow.commits == 1
@@ -227,7 +253,9 @@ class TestUpdateProject:
         uow = FakeProjectsUnitOfWork()
 
         with pytest.raises(ProjectNotFound):
-            await UpdateProject(uow).execute(uuid4(), name="X", description=None)
+            await UpdateProject(uow, FakeAuditApi()).execute(
+                uuid4(), name="X", description=None, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
 
         assert uow.commits == 0
 
@@ -237,7 +265,9 @@ class TestDeleteProject:
         uow = FakeProjectsUnitOfWork()
         project = await uow.projects.create(name="Gone", description=None, created_by=None)
 
-        await DeleteProject(uow).execute(project.id)
+        await DeleteProject(uow, FakeAuditApi()).execute(
+            project.id, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
 
         assert await uow.projects.get_by_id(project.id) is None
         assert uow.commits == 1
@@ -246,7 +276,9 @@ class TestDeleteProject:
         uow = FakeProjectsUnitOfWork()
 
         with pytest.raises(ProjectNotFound):
-            await DeleteProject(uow).execute(uuid4())
+            await DeleteProject(uow, FakeAuditApi()).execute(
+                uuid4(), actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
 
         assert uow.commits == 0
 
@@ -256,8 +288,13 @@ class TestCreateEnvironment:
         uow = FakeProjectsUnitOfWork()
         project = await uow.projects.create(name="Website A", description=None, created_by=None)
 
-        env = await CreateEnvironment(uow).execute(
-            project.id, EnvironmentType.DEV, "dev", "https://dev.website-a.example"
+        env = await CreateEnvironment(uow, FakeAuditApi()).execute(
+            project.id,
+            EnvironmentType.DEV,
+            "dev",
+            "https://dev.website-a.example",
+            actor_id=ACTOR_ID,
+            actor_email=ACTOR_EMAIL,
         )
 
         assert env.type is EnvironmentType.DEV
@@ -267,7 +304,9 @@ class TestCreateEnvironment:
         uow = FakeProjectsUnitOfWork()
 
         with pytest.raises(ProjectNotFound):
-            await CreateEnvironment(uow).execute(uuid4(), EnvironmentType.DEV, "dev", None)
+            await CreateEnvironment(uow, FakeAuditApi()).execute(
+                uuid4(), EnvironmentType.DEV, "dev", None, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
 
     async def test_rejects_duplicate_type_for_same_project(self) -> None:
         uow = FakeProjectsUnitOfWork()
@@ -277,7 +316,9 @@ class TestCreateEnvironment:
         )
 
         with pytest.raises(EnvironmentTypeAlreadyExists):
-            await CreateEnvironment(uow).execute(project.id, EnvironmentType.DEV, "dev-2", None)
+            await CreateEnvironment(uow, FakeAuditApi()).execute(
+                project.id, EnvironmentType.DEV, "dev-2", None, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
 
 
 class TestUpdateEnvironment:
@@ -288,8 +329,12 @@ class TestUpdateEnvironment:
             project_id=project.id, type=EnvironmentType.DEV, name="dev", base_url=None
         )
 
-        updated = await UpdateEnvironment(uow).execute(
-            env.id, name="development", base_url="https://d.example"
+        updated = await UpdateEnvironment(uow, FakeAuditApi()).execute(
+            env.id,
+            name="development",
+            base_url="https://d.example",
+            actor_id=ACTOR_ID,
+            actor_email=ACTOR_EMAIL,
         )
 
         assert updated.name == "development"
@@ -299,7 +344,9 @@ class TestUpdateEnvironment:
         uow = FakeProjectsUnitOfWork()
 
         with pytest.raises(EnvironmentNotFound):
-            await UpdateEnvironment(uow).execute(uuid4(), name="x", base_url=None)
+            await UpdateEnvironment(uow, FakeAuditApi()).execute(
+                uuid4(), name="x", base_url=None, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
 
 
 class TestDeleteEnvironment:
@@ -310,7 +357,9 @@ class TestDeleteEnvironment:
             project_id=project.id, type=EnvironmentType.DEV, name="dev", base_url=None
         )
 
-        await DeleteEnvironment(uow).execute(env.id)
+        await DeleteEnvironment(uow, FakeAuditApi()).execute(
+            env.id, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
 
         assert await uow.environments.get_by_id(env.id) is None
 
@@ -318,7 +367,9 @@ class TestDeleteEnvironment:
         uow = FakeProjectsUnitOfWork()
 
         with pytest.raises(EnvironmentNotFound):
-            await DeleteEnvironment(uow).execute(uuid4())
+            await DeleteEnvironment(uow, FakeAuditApi()).execute(
+                uuid4(), actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
 
 
 class TestCreateProjectLink:

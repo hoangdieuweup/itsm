@@ -53,10 +53,10 @@ router = APIRouter(tags=["projects"])
 async def create_project(
     body: ProjectCreate,
     use_case: CreateProject = Depends(get_create_project),
-    _user: UserRead = Depends(require_permission("project", "create")),
+    user: UserRead = Depends(require_permission("project", "create")),
 ) -> ApiResponse[ProjectRead]:
     """Create a new project — auto-attaches the configured default Jira/Git links."""
-    project = await use_case.execute(body.name, body.description)
+    project = await use_case.execute(body.name, body.description, actor_id=user.id, actor_email=user.email)
     return ApiResponse[ProjectRead](success=True, data=project)
 
 
@@ -90,10 +90,12 @@ async def update_project(
     project_id: UUID,
     body: ProjectUpdate,
     use_case: UpdateProject = Depends(get_update_project),
-    _user: UserRead = Depends(require_permission("project", "update")),
+    user: UserRead = Depends(require_permission("project", "update")),
 ) -> ApiResponse[ProjectRead]:
     """Rename and/or redescribe a project."""
-    project = await use_case.execute(project_id, name=body.name, description=body.description)
+    project = await use_case.execute(
+        project_id, name=body.name, description=body.description, actor_id=user.id, actor_email=user.email
+    )
     return ApiResponse[ProjectRead](success=True, data=project)
 
 
@@ -101,10 +103,10 @@ async def update_project(
 async def delete_project(
     project_id: UUID,
     use_case: DeleteProject = Depends(get_delete_project),
-    _user: UserRead = Depends(require_permission("project", "delete")),
+    user: UserRead = Depends(require_permission("project", "delete")),
 ) -> ApiResponse[None]:
     """Delete a project. Its environments and links cascade at the DB level."""
-    await use_case.execute(project_id)
+    await use_case.execute(project_id, actor_id=user.id, actor_email=user.email)
     return ApiResponse[None](success=True)
 
 
@@ -124,10 +126,12 @@ async def create_environment(
     project_id: UUID,
     body: EnvironmentCreate,
     use_case: CreateEnvironment = Depends(get_create_environment),
-    _user: UserRead = Depends(require_permission("environment", "create")),
+    user: UserRead = Depends(require_permission("environment", "create")),
 ) -> ApiResponse[EnvironmentRead]:
     """Create an environment. Rejected if the project already has one of this type."""
-    env = await use_case.execute(project_id, body.type, body.name, body.base_url)
+    env = await use_case.execute(
+        project_id, body.type, body.name, body.base_url, actor_id=user.id, actor_email=user.email
+    )
     return ApiResponse[EnvironmentRead](success=True, data=env)
 
 
@@ -136,10 +140,12 @@ async def update_environment(
     environment_id: UUID,
     body: EnvironmentUpdate,
     use_case: UpdateEnvironment = Depends(get_update_environment),
-    _user: UserRead = Depends(require_permission("environment", "update")),
+    user: UserRead = Depends(require_permission("environment", "update")),
 ) -> ApiResponse[EnvironmentRead]:
     """Rename and/or re-point an environment."""
-    env = await use_case.execute(environment_id, name=body.name, base_url=body.base_url)
+    env = await use_case.execute(
+        environment_id, name=body.name, base_url=body.base_url, actor_id=user.id, actor_email=user.email
+    )
     return ApiResponse[EnvironmentRead](success=True, data=env)
 
 
@@ -147,10 +153,10 @@ async def update_environment(
 async def delete_environment(
     environment_id: UUID,
     use_case: DeleteEnvironment = Depends(get_delete_environment),
-    _user: UserRead = Depends(require_permission("environment", "delete")),
+    user: UserRead = Depends(require_permission("environment", "delete")),
 ) -> ApiResponse[None]:
     """Delete an environment."""
-    await use_case.execute(environment_id)
+    await use_case.execute(environment_id, actor_id=user.id, actor_email=user.email)
     return ApiResponse[None](success=True)
 
 
