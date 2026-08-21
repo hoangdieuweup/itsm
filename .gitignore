@@ -11,3 +11,4 @@ PLAN.md
 .ruff_cache/
 .import_linter_cache/
 .mypy_cache/
+.vscode/
