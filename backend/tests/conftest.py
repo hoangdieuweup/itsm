@@ -17,6 +17,7 @@ from app.core.database import Base, get_session
 from app.integrations.cache.client import CacheClient
 from app.integrations.cache.config import cache_settings
 from app.integrations.cache.dependencies import get_cache
+from app.integrations.mongo.dependencies import get_mongo_database
 from app.main import app
 from app.modules.auth.config import auth_settings
 from app.modules.rbac.models import Role
@@ -75,7 +76,7 @@ async def cache_client() -> AsyncIterator[CacheClient]:
 
 
 @pytest.fixture
-async def client(engine) -> AsyncIterator[AsyncClient]:
+async def client(engine, mongo_db: AsyncIOMotorDatabase) -> AsyncIterator[AsyncClient]:
     """Provide an HTTP client backed by the test database.
 
     ASGITransport runs the app in its own anyio task so it can stream the
@@ -116,6 +117,13 @@ async def client(engine) -> AsyncIterator[AsyncClient]:
 
     async def override_get_cache() -> CacheClient:
         return CacheClient(Redis.from_url(str(cache_settings.URL)), cache_settings.DEFAULT_TTL)
+
+    app.dependency_overrides[get_cache] = override_get_cache
+
+    async def override_get_mongo_database() -> AsyncIOMotorDatabase:
+        return mongo_db
+
+    app.dependency_overrides[get_mongo_database] = override_get_mongo_database
 
     app.dependency_overrides[get_cache] = override_get_cache
 
