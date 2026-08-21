@@ -47,8 +47,9 @@
 
 ## Plugins vs. Skills (Do Not Confuse)
 
-- **Skills** = repo-local instructions under `.agents/skills/` and `.claude/skills/` (`nextjs-modular-architecture`, `fastapi-modular-scaffold`, `full-stack-dev-workflow`, `reviewing-code-against-skills`). Version-controlled with this repo.
+- **Skills** = repo-local instructions under `.agents/skills/` (`nextjs-modular-architecture`, `fastapi-modular-scaffold`, `full-stack-dev-workflow`, `reviewing-code-against-skills`). Version-controlled with this repo.
 - **Plugins** = globally-installed agent capabilities (`ui-ux-pro-max`, `superpowers`) that live outside this repo (`~/.claude/plugins/` or global config) and must be **invoked**, not just read:
+
 
 | Plugin | Invoke at | Purpose |
 |--------|-----------|---------|
@@ -126,10 +127,11 @@ Applies whenever the task came from a shared queue (e.g. an `agent-task` GitHub 
 
 | Scope | Required Skills (repo) |
 |-------|-------------------------|
-| Next.js / frontend | `.agents/skills/nextjs-modular-architecture/` or `.claude/skills/nextjs-modular-architecture/` |
-| FastAPI / backend | `.agents/skills/fastapi-modular-scaffold/` or `.claude/skills/fastapi-modular-scaffold/` |
+| Next.js / frontend | `.agents/skills/nextjs-modular-architecture/` |
+| FastAPI / backend | `.agents/skills/fastapi-modular-scaffold/` |
 | Full-stack | All repo skills above |
-| Every task | `.agents/skills/reviewing-code-against-skills/` or `.claude/skills/reviewing-code-against-skills/` |
+| Every task | `.agents/skills/reviewing-code-against-skills/` |
+
 
 Also invoke the **`superpowers` plugin** here (Phase 0 → Phase 2 scope) while framing the request and constraints.
 
@@ -292,7 +294,7 @@ If ANY item fails:
 
 ## Skills Reference
 
-All skills are located in `.agents/skills/` and `.claude/skills/`:
+All skills are located in `.agents/skills/`:
 
 - `nextjs-modular-architecture/` — Module boundary, folder structure, App Router patterns, entities vs modules, SSR prefetch guards, typed constants
 - `fastapi-modular-scaffold/` — Router → Service → Schema, dependency injection, class-scoped constants
@@ -335,11 +337,12 @@ This project is indexed by GitNexus as **itsm** (2156 symbols, 4324 relationship
 
 | Task | Read this skill file |
 |------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+| Understand architecture / "How does X work?" | `.agents/skills/gitnexus/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.agents/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.agents/skills/gitnexus/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.agents/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.agents/skills/gitnexus/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.agents/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
