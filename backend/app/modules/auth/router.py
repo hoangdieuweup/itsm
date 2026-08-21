@@ -21,11 +21,12 @@ from app.integrations.dx_core.constants import DxCacheNamespaces, DxDefaults
 from app.integrations.dx_core.dependencies import get_dx_core_client
 from app.integrations.dx_core.exceptions import DxCoreUnavailable, TokenExchangeFailed
 from app.modules.auth.constants import AuthCookies
-from app.modules.auth.dependencies import get_logout_user, require_auth
+from app.modules.auth.dependencies import get_logout_user, get_refresh_token, require_auth
 from app.modules.auth.exceptions import UserBlocked
 from app.modules.auth.schemas import MeResponse
 from app.modules.auth.services.authenticate import AuthenticateWithDx
 from app.modules.auth.services.logout import LogoutUser
+from app.modules.auth.services.refresh_token import RefreshToken
 from app.modules.auth.utils import AuthSessionResponses, get_authenticate_with_dx
 from app.modules.rbac.public import RbacApi, get_rbac_api
 from app.modules.users.public import UserRead
@@ -79,6 +80,20 @@ async def dx_oauth_callback(
     response = RedirectResponse(settings.FRONTEND_BASE_URL, status_code=status.HTTP_302_FOUND)
     AuthSessionResponses.set_session_cookies(response, result.tokens)
     return response
+
+
+@router.post("/refresh")
+async def refresh(
+    request: Request,
+    response: Response,
+    refresh_token_use_case: RefreshToken = Depends(get_refresh_token),
+) -> ApiResponse[None]:
+    """Exchange a valid refresh token cookie for a new session token pair."""
+    new_tokens = await refresh_token_use_case.execute(
+        request.cookies.get(AuthCookies.REFRESH_TOKEN)
+    )
+    AuthSessionResponses.set_session_cookies(response, new_tokens)
+    return ApiResponse[None](success=True)
 
 
 @router.post("/logout")

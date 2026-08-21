@@ -27,11 +27,12 @@ from app.integrations.dx_core.client import DxCoreClient
 from app.integrations.dx_core.dependencies import get_dx_core_client
 from app.integrations.dx_core.repository import AbstractDxTokenRepository, DxTokenRepository
 from app.modules.auth.config import auth_settings
-from app.modules.auth.constants import AuthCacheNamespaces, AuthCookies
+from app.modules.auth.constants import AuthCacheNamespaces, AuthCookies, TokenType
 from app.modules.auth.exceptions import NotAuthenticated, UserBlocked
 from app.modules.auth.rules import AuthRules
 from app.modules.auth.services.issue_tokens import IssueTokens
 from app.modules.auth.services.logout import LogoutUser
+from app.modules.auth.services.refresh_token import RefreshToken
 from app.modules.auth.services.sync_external_user import SyncExternalUser
 from app.modules.auth.uow import AuthUnitOfWork
 from app.modules.users.public import UserRead, UsersApi, get_users_api
@@ -71,7 +72,7 @@ async def get_current_user(
         claims = JwtCodec.decode(raw, secret=auth_settings.JWT_SECRET)
     except jwt.PyJWTError as exc:
         raise NotAuthenticated() from exc
-    if claims.get("type") != "access":
+    if claims.get("type") != TokenType.ACCESS:
         raise NotAuthenticated()
 
     blacklist_key = CacheKeyBuilder.session_key(AuthCacheNamespaces.TOKEN_BLACKLIST, claims["jti"])
@@ -99,6 +100,15 @@ async def get_sync_external_user(users_api: UsersApi = Depends(get_users_api)) -
 async def get_issue_tokens() -> IssueTokens:
     """Provide the app session token issuance use case."""
     return IssueTokens()
+
+
+async def get_refresh_token(
+    users_api: UsersApi = Depends(get_users_api),
+    issue_tokens: IssueTokens = Depends(get_issue_tokens),
+    cache: CacheClient = Depends(get_cache),
+) -> RefreshToken:
+    """Provide the token refresh use case."""
+    return RefreshToken(users_api, issue_tokens, cache)
 
 
 async def get_logout_user(

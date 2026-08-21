@@ -7,6 +7,7 @@ from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
 from app.core.security import JwtCodec
 from app.modules.auth.config import auth_settings
+from app.modules.auth.constants import TokenType
 from app.modules.auth.schemas import UserRead
 
 
@@ -29,12 +30,12 @@ class IssueTokens(AbstractUseCase):
     @use_case
     async def execute(self, user: UserRead) -> AppTokenSet:
         access = JwtCodec.encode(
-            {"sub": str(user.id), "type": "access", "jti": uuid.uuid4().hex},
+            {"sub": str(user.id), "type": TokenType.ACCESS, "jti": uuid.uuid4().hex},
             secret=auth_settings.JWT_SECRET,
             ttl_seconds=auth_settings.ACCESS_TOKEN_TTL_SECONDS,
         )
         refresh = JwtCodec.encode(
-            {"sub": str(user.id), "type": "refresh", "jti": uuid.uuid4().hex},
+            {"sub": str(user.id), "type": TokenType.REFRESH, "jti": uuid.uuid4().hex},
             secret=auth_settings.JWT_SECRET,
             ttl_seconds=auth_settings.REFRESH_TOKEN_TTL_SECONDS,
         )

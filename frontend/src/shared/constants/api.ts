@@ -8,6 +8,7 @@ export const API_CONFIG = {
     AUTH: {
       SSO_START: `${RAW_API_URL ? `${RAW_API_URL}${API_V1_PREFIX}` : API_V1_PREFIX}/auth/oauth/dx/start`,
       ME: "/auth/me",
+      REFRESH: "/auth/refresh",
       LOGOUT: "/auth/logout",
     },
     USERS: {

@@ -45,6 +45,94 @@ export const apiClient = axios.create({
   withCredentials: true,
 });
 
+interface PendingRequest {
+  resolve: (value?: unknown) => void;
+  reject: (reason?: unknown) => void;
+}
+
+let isRefreshing = false;
+let pendingQueue: PendingRequest[] = [];
+
+function flushPendingQueue(error: Error | null): void {
+  pendingQueue.forEach((item) => {
+    if (error) {
+      item.reject(error);
+    } else {
+      item.resolve();
+    }
+  });
+  pendingQueue = [];
+}
+
+function isAuthBypassUrl(url?: string): boolean {
+  if (!url) return false;
+  return (
+    url.includes("/auth/refresh") ||
+    url.includes("/auth/oauth") ||
+    url.includes("/auth/logout")
+  );
+}
+
+function shouldAttemptTokenRefresh(
+  error: AxiosError<ApiEnvelope<unknown>>,
+  config?: AxiosRequestConfig & { _retry?: boolean },
+): boolean {
+  if (typeof window === "undefined" || !config || config._retry) {
+    return false;
+  }
+  if (isAuthBypassUrl(config.url)) {
+    return false;
+  }
+  const is401 = error.response?.status === 401;
+  const isAuthCode = error.response?.data?.error?.code === "auth_not_authenticated";
+  return is401 || isAuthCode;
+}
+
+async function handleSilentRefresh(
+  originalConfig: AxiosRequestConfig & { _retry?: boolean },
+): Promise<unknown> {
+  if (isRefreshing) {
+    return new Promise((resolve, reject) => {
+      pendingQueue.push({ resolve, reject });
+    }).then(() => apiClient.request(originalConfig));
+  }
+
+  originalConfig._retry = true;
+  isRefreshing = true;
+
+  try {
+    await apiClient.post(API_CONFIG.ENDPOINTS.AUTH.REFRESH);
+    flushPendingQueue(null);
+    return await apiClient.request(originalConfig);
+  } catch (refreshErr) {
+    const err =
+      refreshErr instanceof Error ? refreshErr : new Error("Token refresh failed");
+    flushPendingQueue(err);
+    throw refreshErr;
+  } finally {
+    isRefreshing = false;
+  }
+}
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError<ApiEnvelope<unknown>>) => {
+    const originalConfig = error.config as
+      | (AxiosRequestConfig & { _retry?: boolean })
+      | undefined;
+
+    if (originalConfig && shouldAttemptTokenRefresh(error, originalConfig)) {
+      try {
+        return await handleSilentRefresh(originalConfig);
+      } catch (refreshError) {
+        return Promise.reject(refreshError);
+      }
+    }
+
+    return Promise.reject(error);
+  },
+);
+
 /**
  * Helper to forward cookies when executing on the server (Server Components / SSR).
  */
