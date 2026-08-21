@@ -1,4 +1,4 @@
-"""Use case: assign a role to an existing user (admin action)."""
+from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
@@ -19,5 +19,5 @@ class AssignRole(AbstractUseCase):
         self._delegate = AssignRoles(uow, user_lookup, is_protected)
 
     @use_case
-    async def execute(self, user_id: int, role_id: int) -> None:
+    async def execute(self, user_id: UUID, role_id: UUID) -> None:
         await self._delegate.execute(user_id, [role_id])

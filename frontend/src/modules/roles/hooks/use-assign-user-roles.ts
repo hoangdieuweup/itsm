@@ -12,8 +12,8 @@ export function useAssignUserRoles() {
       userId,
       roleIds,
     }: {
-      userId: number;
-      roleIds: number[];
+      userId: string;
+      roleIds: string[];
     }) => assignUserRoles(userId, roleIds),
     onSuccess: (_, { userId }) => {
       queryClient.invalidateQueries({ queryKey: rolesKeys.userRoles(userId) });

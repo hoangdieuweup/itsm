@@ -1,4 +1,4 @@
-"""Use case: grant the seeded default role to a newly synced user."""
+from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
@@ -14,7 +14,7 @@ class AssignDefaultRole(AbstractUseCase):
         self._uow = uow
 
     @use_case
-    async def execute(self, user_id: int) -> None:
+    async def execute(self, user_id: UUID) -> None:
         role = await self._uow.roles.find_by_name(RbacDefaults.DEFAULT_ROLE_NAME)
         if role is None:
             raise RuntimeError(

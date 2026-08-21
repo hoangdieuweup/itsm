@@ -3,6 +3,8 @@
 import logging
 from abc import abstractmethod
 
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database
@@ -28,7 +30,7 @@ class AbstractRbacUnitOfWork(AbstractUnitOfWork):
     user_roles: AbstractUserRoleRepository
 
     @abstractmethod
-    def mark_stale(self, entity: str, entity_id: int) -> None:
+    def mark_stale(self, entity: str, entity_id: UUID | int | str) -> None:
         """Queue a cache entity for invalidation once this transaction commits."""
         raise NotImplementedError
 
@@ -39,12 +41,12 @@ class RbacUnitOfWork(AbstractRbacUnitOfWork):
     def __init__(self, session: AsyncSession, cache: CacheClient) -> None:
         self._session = session
         self._cache = cache
-        self._stale: list[tuple[str, int]] = []
+        self._stale: list[tuple[str, UUID | int | str]] = []
         self.roles = RoleRepository(session, cache)
         self.permissions = PermissionRepository(session)  # no cache needed — small, fixed catalog
         self.user_roles = UserRoleRepository(session, cache)
 
-    def mark_stale(self, entity: str, entity_id: int) -> None:
+    def mark_stale(self, entity: str, entity_id: UUID | int | str) -> None:
         """Queue a cache entity for invalidation once this transaction commits."""
         self._stale.append((entity, entity_id))
 

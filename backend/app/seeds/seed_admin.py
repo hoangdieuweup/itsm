@@ -58,13 +58,12 @@ async def run() -> None:
         if admin_role is None:
             raise RuntimeError("admin role missing — run `python -m app.seeds.seed_rbac` first")
 
-        grant = await session.get(UserRole, user.id)
+        grant = await session.scalar(
+            select(UserRole).where(UserRole.user_id == user.id, UserRole.role_id == admin_role.id)
+        )
         if grant is None:
             session.add(UserRole(user_id=user.id, role_id=admin_role.id))
             logger.info("granted admin role to %s", users_settings.ADMIN_EMAIL)
-        elif grant.role_id != admin_role.id:
-            grant.role_id = admin_role.id
-            logger.info("reasserted admin role for %s", users_settings.ADMIN_EMAIL)
 
         await session.commit()
 

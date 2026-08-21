@@ -17,7 +17,7 @@ export function useUpdateUserStatus() {
       userId,
       status,
     }: {
-      userId: number;
+      userId: string;
       status: UserStatus;
     }) => updateUserStatus(userId, status),
     onSuccess: () => {

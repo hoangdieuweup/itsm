@@ -32,7 +32,7 @@ export async function fetchPermissions(): Promise<PermissionsList> {
  */
 export async function createRole(
   name: string,
-  permissionIds: number[],
+  permissionIds: string[],
 ): Promise<Role> {
   const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.RBAC.ROLES, {
     method: "POST",
@@ -45,8 +45,8 @@ export async function createRole(
  * Updates a role via PATCH /rbac/roles/{roleId}.
  */
 export async function updateRole(
-  roleId: number,
-  data: { name?: string; permissionIds?: number[] },
+  roleId: string,
+  data: { name?: string; permissionIds?: string[] },
 ): Promise<Role> {
   const raw = await apiFetch<unknown>(
     API_CONFIG.ENDPOINTS.RBAC.ROLE_DETAIL(roleId),
@@ -61,7 +61,7 @@ export async function updateRole(
 /**
  * Deletes a custom role via DELETE /rbac/roles/{roleId}.
  */
-export async function deleteRole(roleId: number): Promise<void> {
+export async function deleteRole(roleId: string): Promise<void> {
   await apiFetch<null>(API_CONFIG.ENDPOINTS.RBAC.ROLE_DETAIL(roleId), {
     method: "DELETE",
   });
@@ -71,8 +71,8 @@ export async function deleteRole(roleId: number): Promise<void> {
  * Assigns multiple roles to a user via PUT /rbac/users/{userId}/roles.
  */
 export async function assignUserRoles(
-  userId: number,
-  roleIds: number[],
+  userId: string,
+  roleIds: string[],
 ): Promise<void> {
   await apiFetch<unknown>(API_CONFIG.ENDPOINTS.RBAC.USER_ROLES(userId), {
     method: "PUT",
@@ -83,7 +83,7 @@ export async function assignUserRoles(
 /**
  * Fetches assigned roles for a user via GET /rbac/users/{userId}/roles.
  */
-export async function fetchUserRoles(userId: number): Promise<Role[]> {
+export async function fetchUserRoles(userId: string): Promise<Role[]> {
   const raw = await apiFetch<unknown>(
     API_CONFIG.ENDPOINTS.RBAC.USER_ROLES(userId),
   );

@@ -1,4 +1,4 @@
-"""Use case: rename a role and/or replace its permission set."""
+from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
@@ -22,7 +22,7 @@ class UpdateRole(AbstractUseCase):
         self._uow = uow
 
     @use_case
-    async def execute(self, role_id: int, *, name: str | None, permission_ids: list[int] | None) -> RoleRead:
+    async def execute(self, role_id: UUID, *, name: str | None, permission_ids: list[UUID] | None) -> RoleRead:
         role = await self._uow.roles.get_by_id(role_id)
         if role is None:
             raise RoleNotFound()

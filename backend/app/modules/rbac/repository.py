@@ -2,6 +2,7 @@
 
 import asyncio
 from abc import ABC, abstractmethod
+from uuid import UUID
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +16,7 @@ from app.modules.rbac.models import Permission, Role, RolePermission, UserRole
 from app.modules.rbac.schemas import PermissionRead, RoleRead
 
 
-class AbstractRoleRepository(AbstractRepository[RoleRead]):
+class AbstractRoleRepository(AbstractRepository[RoleRead, UUID]):
     """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
 
     @abstractmethod
@@ -24,22 +25,22 @@ class AbstractRoleRepository(AbstractRepository[RoleRead]):
         raise NotImplementedError
 
     @abstractmethod
-    async def create(self, *, name: str, is_system: bool, permission_ids: list[int]) -> RoleRead:
+    async def create(self, *, name: str, is_system: bool, permission_ids: list[UUID]) -> RoleRead:
         """Create a role with an initial permission set."""
         raise NotImplementedError
 
     @abstractmethod
-    async def update(self, role_id: int, *, name: str | None, permission_ids: list[int] | None) -> RoleRead:
+    async def update(self, role_id: UUID, *, name: str | None, permission_ids: list[UUID] | None) -> RoleRead:
         """Rename and/or replace a role's permission set. None means unchanged."""
         raise NotImplementedError
 
     @abstractmethod
-    async def delete(self, role_id: int) -> None:
+    async def delete(self, role_id: UUID) -> None:
         """Delete a role. Caller is responsible for the is_system/in-use checks."""
         raise NotImplementedError
 
     @abstractmethod
-    async def count_users_with_role(self, role_id: int) -> int:
+    async def count_users_with_role(self, role_id: UUID) -> int:
         """Count how many users currently hold this role."""
         raise NotImplementedError
 
@@ -52,13 +53,13 @@ class RoleRepository(AbstractRoleRepository):
         self._cache = cache
 
     @helper
-    async def _get(self, role_id: int) -> Role | None:
+    async def _get(self, role_id: UUID) -> Role | None:
         return await self._session.scalar(
             select(Role).options(selectinload(Role.permissions)).where(Role.id == role_id)
         )
 
     @database
-    async def get_by_id(self, entity_id: int) -> RoleRead | None:
+    async def get_by_id(self, entity_id: UUID) -> RoleRead | None:
         """Return one role with its permissions, or None when it does not
         exist. Cache-aside: a miss loads from the database and populates
         the cache."""
@@ -67,7 +68,7 @@ class RoleRepository(AbstractRoleRepository):
         )
 
     @helper
-    async def _load_by_id(self, entity_id: int) -> RoleRead | None:
+    async def _load_by_id(self, entity_id: UUID) -> RoleRead | None:
         """Direct database read backing get_by_id's cache-aside loader."""
         row = await self._get(entity_id)
         return RoleRead.model_validate(row) if row else None
@@ -91,7 +92,7 @@ class RoleRepository(AbstractRoleRepository):
         return items, total or 0
 
     @database
-    async def create(self, *, name: str, is_system: bool, permission_ids: list[int]) -> RoleRead:
+    async def create(self, *, name: str, is_system: bool, permission_ids: list[UUID]) -> RoleRead:
         """Create a role with an initial permission set."""
         row = Role(name=name, is_system=is_system)
         self._session.add(row)
@@ -104,7 +105,7 @@ class RoleRepository(AbstractRoleRepository):
         return result
 
     @database
-    async def update(self, role_id: int, *, name: str | None, permission_ids: list[int] | None) -> RoleRead:
+    async def update(self, role_id: UUID, *, name: str | None, permission_ids: list[UUID] | None) -> RoleRead:
         """Rename and/or replace a role's permission set. None means unchanged."""
         row = await self._session.get(Role, role_id)
         if row is None:
@@ -124,7 +125,7 @@ class RoleRepository(AbstractRoleRepository):
         return result
 
     @database
-    async def delete(self, role_id: int) -> None:
+    async def delete(self, role_id: UUID) -> None:
         """Delete a role. Caller is responsible for the is_system/in-use checks."""
         row = await self._session.get(Role, role_id)
         if row is not None:
@@ -132,7 +133,7 @@ class RoleRepository(AbstractRoleRepository):
             await self._session.flush()
 
     @database
-    async def count_users_with_role(self, role_id: int) -> int:
+    async def count_users_with_role(self, role_id: UUID) -> int:
         """Count how many users currently hold this role."""
         total = await self._session.scalar(
             select(func.count()).select_from(UserRole).where(UserRole.role_id == role_id)
@@ -140,7 +141,7 @@ class RoleRepository(AbstractRoleRepository):
         return total or 0
 
 
-class AbstractPermissionRepository(AbstractRepository[PermissionRead]):
+class AbstractPermissionRepository(AbstractRepository[PermissionRead, UUID]):
     """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
 
     @abstractmethod
@@ -149,7 +150,7 @@ class AbstractPermissionRepository(AbstractRepository[PermissionRead]):
         raise NotImplementedError
 
     @abstractmethod
-    async def find_by_ids(self, ids: list[int]) -> list[PermissionRead]:
+    async def find_by_ids(self, ids: list[UUID]) -> list[PermissionRead]:
         """Return the permissions matching the given ids (fewer than requested if some don't exist)."""
         raise NotImplementedError
 
@@ -161,7 +162,7 @@ class PermissionRepository(AbstractPermissionRepository):
         self._session = session
 
     @database
-    async def get_by_id(self, entity_id: int) -> PermissionRead | None:
+    async def get_by_id(self, entity_id: UUID) -> PermissionRead | None:
         """Return one permission, or None when it does not exist."""
         row = await self._session.get(Permission, entity_id)
         return PermissionRead.model_validate(row) if row else None
@@ -185,7 +186,7 @@ class PermissionRepository(AbstractPermissionRepository):
         return [PermissionRead.model_validate(row) for row in rows]
 
     @database
-    async def find_by_ids(self, ids: list[int]) -> list[PermissionRead]:
+    async def find_by_ids(self, ids: list[UUID]) -> list[PermissionRead]:
         """Return the permissions matching the given ids (fewer than requested if some don't exist)."""
         if not ids:
             return []
@@ -197,32 +198,32 @@ class AbstractUserRoleRepository(ABC):
     """Contract for user role grants supporting multiple roles per user."""
 
     @abstractmethod
-    async def get_roles_for_user(self, user_id: int) -> list[RoleRead]:
+    async def get_roles_for_user(self, user_id: UUID) -> list[RoleRead]:
         """Return all roles currently granted to a user, or empty list if none."""
         raise NotImplementedError
 
     @abstractmethod
-    async def get_role_for_user(self, user_id: int) -> RoleRead | None:
+    async def get_role_for_user(self, user_id: UUID) -> RoleRead | None:
         """Return the primary role currently granted to a user, or None if none."""
         raise NotImplementedError
 
     @abstractmethod
-    async def get_roles_for_users(self, user_ids: list[int]) -> dict[int, list[str]]:
+    async def get_roles_for_users(self, user_ids: list[UUID]) -> dict[UUID, list[str]]:
         """Return a mapping of user_id -> list[role_name] for a batch of users."""
         raise NotImplementedError
 
     @abstractmethod
-    async def assign_roles(self, user_id: int, role_ids: set[int] | list[int]) -> None:
+    async def assign_roles(self, user_id: UUID, role_ids: set[UUID] | list[UUID]) -> None:
         """Replace a user's role grants with the given set of role_ids atomically."""
         raise NotImplementedError
 
     @abstractmethod
-    async def assign(self, user_id: int, role_id: int) -> None:
+    async def assign(self, user_id: UUID, role_id: UUID) -> None:
         """Assign a single role to user (backwards compatible helper)."""
         raise NotImplementedError
 
     @abstractmethod
-    async def user_has_permission(self, user_id: int, resource: str, action: str) -> bool:
+    async def user_has_permission(self, user_id: UUID, resource: str, action: str) -> bool:
         """Return whether any of user_id's granted roles includes resource.action."""
         raise NotImplementedError
 
@@ -236,7 +237,7 @@ class UserRoleRepository(AbstractUserRoleRepository):
         self._roles = RoleRepository(session, cache)
 
     @database
-    async def get_roles_for_users(self, user_ids: list[int]) -> dict[int, list[str]]:
+    async def get_roles_for_users(self, user_ids: list[UUID]) -> dict[UUID, list[str]]:
         """Return a mapping of user_id -> list[role_name] for a batch of users."""
         if not user_ids:
             return {}
@@ -245,13 +246,13 @@ class UserRoleRepository(AbstractUserRoleRepository):
             .join(Role, Role.id == UserRole.role_id)
             .where(UserRole.user_id.in_(user_ids))
         )
-        mapping: dict[int, list[str]] = {uid: [] for uid in user_ids}
+        mapping: dict[UUID, list[str]] = {uid: [] for uid in user_ids}
         for uid, rname in result.all():
             mapping[uid].append(rname)
         return mapping
 
     @database
-    async def get_roles_for_user(self, user_id: int) -> list[RoleRead]:
+    async def get_roles_for_user(self, user_id: UUID) -> list[RoleRead]:
         """Return all roles granted to user_id, each resolved through the cached RoleRepository."""
         role_ids = await self._load_role_ids_for_user(user_id)
         if not role_ids:
@@ -260,13 +261,13 @@ class UserRoleRepository(AbstractUserRoleRepository):
         return [r for r in roles if r is not None]
 
     @database
-    async def get_role_for_user(self, user_id: int) -> RoleRead | None:
+    async def get_role_for_user(self, user_id: UUID) -> RoleRead | None:
         """Return the primary (first) role granted to user_id, or None if none."""
         roles = await self.get_roles_for_user(user_id)
         return roles[0] if roles else None
 
     @helper
-    async def _load_role_ids_for_user(self, user_id: int) -> list[int]:
+    async def _load_role_ids_for_user(self, user_id: UUID) -> list[UUID]:
         """Direct database read of all role_ids assigned to user_id."""
         rows = await self._session.scalars(
             select(UserRole.role_id).where(UserRole.user_id == user_id)
@@ -274,7 +275,7 @@ class UserRoleRepository(AbstractUserRoleRepository):
         return list(rows)
 
     @database
-    async def assign_roles(self, user_id: int, role_ids: set[int] | list[int]) -> None:
+    async def assign_roles(self, user_id: UUID, role_ids: set[UUID] | list[UUID]) -> None:
         """Replace a user's role grants with the given set of role_ids atomically."""
         target_ids = set(role_ids)
         current_ids = set(await self._load_role_ids_for_user(user_id))
@@ -291,12 +292,12 @@ class UserRoleRepository(AbstractUserRoleRepository):
         await self._session.flush()
 
     @database
-    async def assign(self, user_id: int, role_id: int) -> None:
+    async def assign(self, user_id: UUID, role_id: UUID) -> None:
         """Assign a single role to user (backwards compatible helper)."""
         await self.assign_roles(user_id, {role_id})
 
     @database
-    async def user_has_permission(self, user_id: int, resource: str, action: str) -> bool:
+    async def user_has_permission(self, user_id: UUID, resource: str, action: str) -> bool:
         """Return whether any of user_id's granted roles includes resource.action."""
         roles = await self.get_roles_for_user(user_id)
         for role in roles:

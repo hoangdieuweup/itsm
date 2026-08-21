@@ -1,4 +1,4 @@
-"""Use case: create a new custom role with an initial permission set."""
+from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
@@ -15,7 +15,7 @@ class CreateRole(AbstractUseCase):
         self._uow = uow
 
     @use_case
-    async def execute(self, name: str, permission_ids: list[int]) -> RoleRead:
+    async def execute(self, name: str, permission_ids: list[UUID]) -> RoleRead:
         if await self._uow.roles.find_by_name(name) is not None:
             raise DuplicateRoleName()
         found = await self._uow.permissions.find_by_ids(permission_ids)

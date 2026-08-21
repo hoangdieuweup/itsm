@@ -13,14 +13,14 @@ export const API_CONFIG = {
     },
     USERS: {
       ROOT: "/users",
-      STATUS: (id: number) => `/users/${id}/status`,
+      STATUS: (id: string) => `/users/${id}/status`,
     },
     RBAC: {
       ROLES: "/rbac/roles",
-      ROLE_DETAIL: (id: number) => `/rbac/roles/${id}`,
+      ROLE_DETAIL: (id: string) => `/rbac/roles/${id}`,
       PERMISSIONS: "/rbac/permissions",
-      USER_ROLE: (userId: number) => `/rbac/users/${userId}/role`,
-      USER_ROLES: (userId: number) => `/rbac/users/${userId}/roles`,
+      USER_ROLE: (userId: string) => `/rbac/users/${userId}/role`,
+      USER_ROLES: (userId: string) => `/rbac/users/${userId}/roles`,
     },
   },
 } as const;

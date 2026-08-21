@@ -2,6 +2,8 @@
 function below only translates HTTP -> use-case call and wraps the result in
 ApiResponse — no formatting/business logic lives here."""
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 
 from app.core.models import ApiResponse
@@ -59,7 +61,7 @@ async def list_roles(
 
 @router.get("/roles/{role_id}")
 async def get_role(
-    role_id: int,
+    role_id: UUID,
     uow: AbstractRbacUnitOfWork = Depends(get_rbac_uow),
     _user: UserRead = Depends(require_permission("role", "read")),
 ) -> ApiResponse[RoleRead]:
@@ -72,7 +74,7 @@ async def get_role(
 
 @router.patch("/roles/{role_id}")
 async def update_role(
-    role_id: int,
+    role_id: UUID,
     body: RoleUpdate,
     use_case: UpdateRole = Depends(get_update_role),
     _user: UserRead = Depends(require_permission("role", "update")),
@@ -84,7 +86,7 @@ async def update_role(
 
 @router.delete("/roles/{role_id}")
 async def delete_role(
-    role_id: int,
+    role_id: UUID,
     use_case: DeleteRole = Depends(get_delete_role),
     _user: UserRead = Depends(require_permission("role", "delete")),
 ) -> ApiResponse[None]:
@@ -105,7 +107,7 @@ async def list_permissions(
 
 @router.put("/users/{user_id}/roles")
 async def assign_user_roles(
-    user_id: int,
+    user_id: UUID,
     body: UserRolesAssignment,
     use_case: AssignRoles = Depends(get_assign_roles),
     _user: UserRead = Depends(require_permission("user", "assign_role")),
@@ -117,7 +119,7 @@ async def assign_user_roles(
 
 @router.get("/users/{user_id}/roles")
 async def get_user_roles(
-    user_id: int,
+    user_id: UUID,
     uow: AbstractRbacUnitOfWork = Depends(get_rbac_uow),
     _user: UserRead = Depends(require_permission("user", "read")),
 ) -> ApiResponse[list[RoleRead]]:
@@ -128,7 +130,7 @@ async def get_user_roles(
 
 @router.patch("/users/{user_id}/role")
 async def assign_user_role(
-    user_id: int,
+    user_id: UUID,
     body: RoleAssignment,
     use_case: AssignRole = Depends(get_assign_role),
     _user: UserRead = Depends(require_permission("user", "assign_role")),

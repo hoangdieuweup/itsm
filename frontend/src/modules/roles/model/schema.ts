@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const permissionSchema = z.object({
-  id: z.number(),
+  id: z.uuid(),
   resource: z.string(),
   action: z.string(),
   descriptionKey: z.string(),
@@ -16,7 +16,7 @@ export {
 } from "@/shared/constants/roles";
 
 export const roleSchema = z.object({
-  id: z.number(),
+  id: z.uuid(),
   name: z.string(),
   isSystem: z.boolean(),
   permissions: z.array(permissionSchema),
@@ -37,7 +37,7 @@ export const permissionsListSchema = z.array(permissionSchema);
 export type PermissionsList = z.infer<typeof permissionsListSchema>;
 
 export const userRolesAssignmentSchema = z.object({
-  roleIds: z.array(z.number()),
+  roleIds: z.array(z.uuid()),
 });
 
 export type UserRolesAssignment = z.infer<typeof userRolesAssignmentSchema>;

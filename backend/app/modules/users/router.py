@@ -3,6 +3,8 @@ function below only translates HTTP -> use-case call and wraps the result
 in ApiResponse — no formatting/business logic lives here.
 """
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 
 from app.core.models import ApiResponse
@@ -44,7 +46,7 @@ async def list_users(
 
 @router.patch("/{user_id}/status")
 async def update_user_status(
-    user_id: int,
+    user_id: UUID,
     body: UserStatusUpdate,
     use_case: UpdateUserStatus = Depends(get_update_user_status),
     rbac: RbacApi = Depends(get_rbac_api),

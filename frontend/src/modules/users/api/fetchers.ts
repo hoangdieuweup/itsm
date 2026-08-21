@@ -19,7 +19,7 @@ export async function fetchUsers(limit = 50, offset = 0): Promise<UsersPage> {
  * Returns the updated User object validated via `userSchema`.
  */
 export async function updateUserStatus(
-  userId: number,
+  userId: string,
   status: UserStatus,
 ): Promise<User> {
   const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.USERS.STATUS(userId), {

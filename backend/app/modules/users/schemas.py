@@ -1,6 +1,7 @@
 """Schemas for the users module."""
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import Field
 
@@ -11,7 +12,7 @@ from app.modules.common.constants import UserStatus
 class UserRead(FrozenModel):
     """Representation safe to round trip through the cache. Never includes DX tokens."""
 
-    id: int
+    id: UUID
     email: str
     name: str
     status: UserStatus
