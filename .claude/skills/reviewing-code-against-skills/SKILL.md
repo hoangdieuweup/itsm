@@ -35,7 +35,7 @@ Not for a plain style/bug pass with no project-specific architecture — use `co
 | Domain | Tools | Also read |
 |---|---|---|
 | **All changes (first)** | GitNexus `detect_changes(scope: "all")` + `check()` | Compare against Phase 2 impact assessment |
-| Python / FastAPI | `ruff check`, `ruff format --check`, `lint-imports`, `bandit -r app` | `references/backend-checks.md` |
+| Python / FastAPI | `ruff check`, `ruff format --check`, `lint-imports`, `python scripts/check_module_boundaries.py --strict`, `bandit -r app` | `references/backend-checks.md` |
 | Next.js / React | `eslint` (+ `eslint-plugin-boundaries` if configured), `tsc --noEmit` | `references/frontend-checks.md` |
 | Report shape | — | `references/report-format.md` |
 

@@ -14,6 +14,16 @@ def constants(name: str) -> str:
 
 Other modules import these with an explicit alias:
     from app.modules.{name} import constants as {name}_constants
+
+DO:
+  - Define enums, error codes, numeric limits, cache identity, type aliases here.
+  - Group every constant inside a class (e.g. {cls}Limits.MAX_NAME_LENGTH).
+  - Expose type aliases (Literal, TypeAlias, TypeVar) as class attributes.
+
+DO NOT:
+  - Put bare top-level constants outside a class.
+  - Define I/O, database calls, or framework imports here.
+  - Import from other domain modules — constants are leaf nodes.
 """
 
 from enum import StrEnum
@@ -71,7 +81,17 @@ def exceptions(name: str) -> str:
 
 These live here rather than in a global module because each one encodes a fact
 about {name}: what counts as missing, what counts as a conflict. The mechanism
-they build on lives in app.exceptions.
+they build on lives in app.core.exceptions.
+
+DO:
+  - Define concrete exception classes that extend base errors from app.core.exceptions.
+  - Attach a stable ErrorCode and a fallback message to each class.
+  - Import error codes from this module's own constants.py.
+
+DO NOT:
+  - Define generic/base exception classes here — those live in app.core.exceptions.
+  - Include business logic, I/O, or framework imports.
+  - Import from other domain modules.
 """
 
 from app.core.exceptions import ConflictError, NotFoundError, ValidationFailedError
@@ -116,6 +136,16 @@ def config(name: str) -> str:
 
 Splitting settings per module keeps the global config from turning into a
 dumping ground and lets a module be extracted with its configuration intact.
+
+DO:
+  - Define settings this module reads from env vars (prefix {upper}__).
+  - Use BaseSettings with SettingsConfigDict for typed env parsing.
+  - Reference default values from this module's own constants.py.
+
+DO NOT:
+  - Put global settings here (DATABASE_URL, CORS_ORIGINS → app/config.py).
+  - Use vendor names as prefix (e.g. REDIS__ → use CACHE__ instead).
+  - Import from other domain modules.
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -150,7 +180,20 @@ def schemas(name: str) -> str:
     """
     cls = _cls(name)
     return f'''
-"""Schemas for the {name} module."""
+"""Schemas for the {name} module.
+
+DO:
+  - Define Pydantic models for request/response payloads.
+  - Put field_validator / field_serializer on the schema that owns the field.
+  - Call into rules.py / utils/ from validators — never reimplement their logic.
+  - Inherit from CustomModel (mutable payloads) or FrozenModel (read responses).
+
+DO NOT:
+  - Define ORM models here — those live in models.py.
+  - Put business logic beyond validation — that belongs in services/.
+  - Return schemas that don't inherit CustomModel/FrozenModel (they miss camelCase alias).
+  - Import from other domain modules — use public.py types if cross-module data is needed.
+"""
 
 from datetime import datetime
 
@@ -209,7 +252,19 @@ def models(name: str) -> str:
     """Render the ORM models owned by this module."""
     cls = _cls(name)
     return f'''
-"""ORM models owned by the {name} module. No other module may query these tables."""
+"""ORM models owned by the {name} module.
+
+DO:
+  - Define SQLAlchemy ORM models (tables) this module owns.
+  - Use constants from this module's constants.py for column constraints.
+  - One table = one owning module, no exceptions.
+
+DO NOT:
+  - Query or JOIN tables owned by another module — go through their public.py.
+  - Return ORM model instances from endpoints — convert to Pydantic schemas.
+  - Import from other domain modules.
+  - Put business logic or validation here — those live in rules.py / schemas.py.
+"""
 
 from datetime import datetime
 
@@ -245,7 +300,18 @@ def rules(name: str) -> str:
 
 Everything here is a pure decision: no I/O, no framework, no database. That is
 what keeps these testable without fixtures, and it is the difference between
-this class and utils/, which holds non business helpers.
+this class and utils/, which holds non-business helpers.
+
+DO:
+  - Encode business decisions as pure functions (can_X, is_valid_X, should_X).
+  - Group methods inside a single class, decorated with @rule.
+  - Keep this file heavily unit-tested — no fixtures needed.
+
+DO NOT:
+  - Perform I/O (database, HTTP, cache) — those belong in repository/services.
+  - Import framework code (FastAPI, SQLAlchemy).
+  - Put formatting/normalization here — that belongs in utils/.
+  - Define bare functions outside a class.
 """
 
 from app.core.base.markers import rule
@@ -285,12 +351,23 @@ def utils_init(name: str) -> str:
     """
     cls = _cls(name)
     return f'''
-"""Non business helpers for the {name} module, grouped by concern.
+"""Non-business helpers for the {name} module, grouped by concern.
 
 Formatting, normalization and data shaping live here, one class per concern.
 Add utils/dates.py, utils/formatting.py the same way when the module needs
-another kind of helper. Anything that encodes a business decision belongs in
-rules.py instead, so the two can be reviewed and tested on different terms.
+another kind of helper.
+
+DO:
+  - Put formatting, normalization, and data-shaping helpers here.
+  - One file per concern (text.py, dates.py, formatting.py).
+  - Group methods inside a class, decorated with @helper.
+  - Re-export from __init__.py.
+
+DO NOT:
+  - Put business decisions here — those belong in rules.py.
+  - Use bare top-level functions outside a class.
+  - Create a flat utils.py — use the utils/ package instead.
+  - Import from other domain modules.
 """
 
 from app.modules.{name}.utils.text import {cls}TextUtils
@@ -303,7 +380,16 @@ def utils_text(name: str) -> str:
     """Render utils/text.py: text formatting and normalization."""
     cls = _cls(name)
     return f'''
-"""Text formatting helpers owned by the {name} module."""
+"""Text formatting helpers owned by the {name} module.
+
+DO:
+  - Define text normalization, slugification, display formatting.
+  - Group methods inside a class, decorated with @helper.
+
+DO NOT:
+  - Encode business decisions — those belong in rules.py.
+  - Perform I/O or import framework code.
+"""
 
 import re
 
@@ -360,7 +446,20 @@ def repository(name: str, with_cache: bool) -> str:
         marker_import = "from app.core.base.markers import database"
 
     return f'''
-"""Single access path to the {name} tables."""
+"""Single access path to the {name} tables.
+
+DO:
+  - Define Abstract{cls}Repository (contract) and {cls}Repository (SQLAlchemy impl).
+  - Every read/write to {name} tables goes through this file.
+  - Use flush() inside methods, never commit() — the UoW owns the transaction.
+  - Decorate methods with @database.
+
+DO NOT:
+  - Query or JOIN tables owned by another module.
+  - Commit the transaction here — that's the UoW's job.
+  - Put business logic here — only data access.
+  - Return ORM model instances — convert to Pydantic schemas.
+"""
 
 from abc import abstractmethod
 
@@ -492,7 +591,19 @@ def uow(name: str, with_cache: bool) -> str:
         marker_import = "from app.core.base.markers import database"
 
     return f'''
-"""Transaction boundary for the {name} module."""
+"""Transaction boundary for the {name} module.
+
+DO:
+  - Define Abstract{cls}UnitOfWork (contract) and {cls}UnitOfWork (concrete).
+  - Own the session.commit() / session.rollback() lifecycle.
+  - Invalidate cache entries AFTER commit, never before.
+  - Expose repositories as attributes (self.{name}).
+
+DO NOT:
+  - Put business logic here — only transaction coordination.
+  - Create the session — it's injected by dependencies.py.
+  - Import from other domain modules.
+"""
 
 import logging
 
@@ -534,7 +645,17 @@ def events(name: str) -> str:
     """Render the events published by this module."""
     cls = _cls(name)
     return f'''
-"""Events published by the {name} module."""
+"""Events published by the {name} module.
+
+DO:
+  - Define DomainEvent subclasses this module publishes.
+  - Use routing_key for message broker topic routing.
+  - Reference event identity from this module's constants.py.
+
+DO NOT:
+  - Handle/subscribe to events here — consumers live in services/ or a worker.
+  - Import from other domain modules.
+"""
 
 from app.core.events import DomainEvent
 from app.modules.{name}.constants import {cls}Events, {cls}Status
@@ -570,7 +691,18 @@ def service_read(name: str) -> str:
     """Render the read use case."""
     cls = _cls(name)
     return f'''
-"""Read use case of the {name} module."""
+"""Read use case of the {name} module.
+
+DO:
+  - One file = one use case class with one execute() method.
+  - Extend AbstractUseCase, decorate execute() with @use_case.
+  - Depend on Abstract* contracts, never concrete classes.
+
+DO NOT:
+  - Put multiple use cases in one file — split into separate files.
+  - Name the concrete repository/UoW — that's dependencies.py's job.
+  - Hold HTTP/framework concerns — those live in the router.
+"""
 
 from app.core.base.markers import use_case
 from app.core.pagination import Page, PaginationParams
@@ -634,7 +766,19 @@ def service_write(name: str, with_uow: bool) -> str:
         persist = "        created = await self._repo.create(name)\n"
 
     return f'''
-"""Write use case of the {name} module."""
+"""Write use case of the {name} module.
+
+DO:
+  - One file = one use case class with one execute() method.
+  - Extend AbstractUseCase, decorate execute() with @use_case.
+  - Depend on Abstract* contracts, never concrete classes.
+  - Publish domain events after successful persistence.
+
+DO NOT:
+  - Put multiple use cases in one file — split into separate files.
+  - Name the concrete repository/UoW — that's dependencies.py's job.
+  - Hold HTTP/framework concerns — those live in the router.
+"""
 
 from app.core.events import EventBus
 from app.core.base.markers import use_case
@@ -719,12 +863,18 @@ async def create_{name}_service(
 '''
 
     return f'''
-"""Dependency wiring for the {name} module.
+"""Dependency wiring for the {name} module — the composition root.
 
-The composition root: the only place that names a concrete class
-({cls}Repository / {cls}UnitOfWork) instead of its Abstract* contract.
-Everything below it — services, the public.py facade — depends on the
-abstraction. See references/layer-examples.md.
+DO:
+  - Wire concrete classes to their Abstract* contracts via Depends().
+  - This is the ONLY place that names a concrete class ({cls}Repository, {cls}UnitOfWork).
+  - Provide factory functions for services/use cases.
+
+DO NOT:
+  - Put business logic here — only wiring.
+  - Import from other domain modules (except through their public.py if needed).
+  - Define classes — only plain Depends() provider functions.
+  - Let services or public.py name concrete classes — they use Abstract*.
 """
 
 from fastapi import Depends
@@ -765,7 +915,20 @@ def router(name: str) -> str:
     """Render the HTTP surface of this module."""
     cls = _cls(name)
     return f'''
-"""HTTP entry points of the {name} module."""
+"""HTTP entry points of the {name} module.
+
+DO:
+  - Translate HTTP requests into use-case calls and return ApiResponse.
+  - Keep route handlers thin — call a dependency/service, return the result.
+  - Map domain exceptions to HTTP status codes via the central error handler.
+
+DO NOT:
+  - Put business logic here — that belongs in services/.
+  - Build URLs, format values, or make decisions — move to utils/ or rules.py.
+  - Define private helper functions in this file (e.g. _build_redirect_url).
+  - Return bare schemas without the ApiResponse envelope.
+  - Return ORM models — always use Pydantic schemas.
+"""
 
 from fastapi import APIRouter, Depends, status
 
@@ -810,11 +973,18 @@ def public(name: str) -> str:
     """Render the cross module contract."""
     cls = _cls(name)
     return f'''
-"""Contract exposed to other modules.
+"""Contract exposed to other modules — the ONLY import surface.
 
-Other modules import this file and nothing else from {name}. Reaching into
-repository.py or models.py couples them to storage details and makes this
-module impossible to extract later.
+DO:
+  - Expose a read-only facade class ({cls}Api) with @facade-decorated methods.
+  - Depend on Abstract* contracts, never concrete classes.
+  - Re-export schemas/types that other modules need.
+  - Other modules MUST import from this file and nothing else from {name}.
+
+DO NOT:
+  - Expose write operations — those stay internal to the module.
+  - Let other modules reach into repository.py, models.py, services/, etc.
+  - Import from other domain modules — public.py is a leaf for outbound deps.
 """
 
 from fastapi import Depends
