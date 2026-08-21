@@ -7,10 +7,15 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
-import { usePermissions } from "../api/use-roles";
+import {
+  usePermissions,
+  isProtectedAdminRole,
+  type Role,
+  type PermissionItem,
+} from "@/entities/role";
 import { useCreateRole } from "../hooks/use-create-role";
 import { useUpdateRole } from "../hooks/use-update-role";
-import { isProtectedAdminRole, type Role, type PermissionItem } from "../model/schema";
+
 
 interface RoleFormDialogProps {
   isOpen: boolean;

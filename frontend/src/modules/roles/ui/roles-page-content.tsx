@@ -7,10 +7,10 @@ import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
-import { useRoles } from "../api/use-roles";
+import { useRoles, isProtectedAdminRole, type Role } from "@/entities/role";
 import { useDeleteRole } from "../hooks/use-delete-role";
 import { RoleFormDialog } from "./role-form-dialog";
-import { isProtectedAdminRole, type Role } from "../model/schema";
+
 
 export function RolesPageContent() {
   const t = useTranslations("roles");

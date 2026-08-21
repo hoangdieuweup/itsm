@@ -2,7 +2,8 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteRole } from "../api/fetchers";
-import { rolesKeys } from "../api/query-keys";
+import { rolesKeys } from "@/entities/role";
+
 
 export function useDeleteRole() {
   const queryClient = useQueryClient();

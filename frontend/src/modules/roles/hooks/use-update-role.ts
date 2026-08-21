@@ -2,7 +2,8 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateRole } from "../api/fetchers";
-import { rolesKeys } from "../api/query-keys";
+import { rolesKeys } from "@/entities/role";
+
 
 export function useUpdateRole() {
   const queryClient = useQueryClient();

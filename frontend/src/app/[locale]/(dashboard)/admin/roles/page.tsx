@@ -3,11 +3,12 @@ import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { createQueryClient } from "@/shared/lib/query-client";
 import { RequirePermission, NoPermission } from "@/entities/permission";
 import {
-  RolesPageContent,
   fetchRoles,
   fetchPermissions,
   rolesKeys,
-} from "@/modules/roles";
+} from "@/entities/role";
+import { RolesPageContent } from "@/modules/roles";
+
 
 export default async function AdminRolesPage({
   params,
