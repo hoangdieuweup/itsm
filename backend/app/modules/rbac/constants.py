@@ -1,6 +1,8 @@
 """Constants and enums owned by the rbac module."""
 
+from collections.abc import Awaitable, Callable
 from enum import StrEnum
+from typing import Any
 
 
 class RbacPermissionCatalog:
@@ -34,6 +36,12 @@ class RbacLimits:
     """Numeric limits owned by the rbac module."""
 
     MAX_ROLE_NAME_LENGTH = 100
+
+
+class RbacTypes:
+    """Type aliases owned by the rbac module."""
+
+    UserLookup = Callable[[int], Awaitable[Any | None]]
 
 
 class ErrorCode(StrEnum):
