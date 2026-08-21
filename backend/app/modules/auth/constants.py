@@ -58,6 +58,7 @@ class ErrorCode(StrEnum):
     INVALID_CREDENTIALS = "auth_invalid_credentials"
     NOT_AUTHENTICATED = "auth_not_authenticated"
     CANNOT_BLOCK_LAST_ADMIN = "auth_cannot_block_last_admin"
+    CANNOT_MODIFY_PROTECTED_ADMIN = "auth_cannot_modify_protected_admin"
 
 
 class LoginPolicy:

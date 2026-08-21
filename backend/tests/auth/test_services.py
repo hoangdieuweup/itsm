@@ -17,7 +17,7 @@ from app.integrations.dx_core.repository import AbstractDxTokenRepository
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCacheNamespaces, UserStatus
 from app.modules.auth.events import UserCreated, UserLoggedIn
-from app.modules.auth.exceptions import CannotBlockLastAdmin, UserBlocked
+from app.modules.auth.exceptions import CannotBlockLastAdmin, CannotModifyProtectedAdmin, UserBlocked
 from app.modules.auth.repository import AbstractUserRepository
 from app.modules.auth.schemas import UserRead
 from app.modules.auth.services.authenticate import AuthenticateWithDx
@@ -483,6 +483,23 @@ class TestUpdateUserStatus:
         rbac_api = FakeRbacApi(last_admin_ids=frozenset({user.id}))
 
         with pytest.raises(CannotBlockLastAdmin):
+            await UpdateUserStatus(uow, rbac_api).execute(user.id, UserStatus.BLOCKED)
+
+        assert uow.commits == 0
+
+    async def test_rejects_blocking_the_protected_admin(self, monkeypatch) -> None:
+        monkeypatch.setattr(auth_settings, "ADMIN_EMAIL", "protected@example.com")
+        uow = FakeAuthUnitOfWork()
+        user = await uow.users.create(
+            email="protected@example.com",
+            name="Protected",
+            external_user_id="dx-protected",
+            employee_code=None,
+            email_confirmed=True,
+        )
+        rbac_api = FakeRbacApi()  # is_last_admin would return False — protection must win regardless
+
+        with pytest.raises(CannotModifyProtectedAdmin):
             await UpdateUserStatus(uow, rbac_api).execute(user.id, UserStatus.BLOCKED)
 
         assert uow.commits == 0

@@ -43,3 +43,10 @@ class CannotBlockLastAdmin(ForbiddenError):
 
     code = ErrorCode.CANNOT_BLOCK_LAST_ADMIN
     message = "This is the last user with the admin role — reassign it before blocking them"
+
+
+class CannotModifyProtectedAdmin(ForbiddenError):
+    """Raised when attempting to block the seeded break-glass admin account."""
+
+    code = ErrorCode.CANNOT_MODIFY_PROTECTED_ADMIN
+    message = "This account is permanently protected and cannot be blocked"

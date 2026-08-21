@@ -46,7 +46,7 @@ Not touched: `SyncExternalUser`, `AuthenticateWithDx`, migrations, `User` model,
 **Interfaces:**
 - Produces: `auth_settings.ADMIN_EMAIL: str | None`, `auth_settings.ADMIN_NAME: str`, `AuthRules.is_protected_admin_email(email: str) -> bool`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `backend/tests/auth/test_rules.py`:
 ```python
@@ -67,12 +67,12 @@ class TestIsProtectedAdminEmail:
         assert AuthRules.is_protected_admin_email("anyone@example.com") is False
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cd backend && uv run pytest tests/auth/test_rules.py::TestIsProtectedAdminEmail -v`
 Expected: FAIL — `AttributeError: type object 'AuthConfig' has no attribute 'ADMIN_EMAIL'` (or `AuthRules` has no `is_protected_admin_email`).
 
-- [ ] **Step 3: Add the settings**
+- [x] **Step 3: Add the settings**
 
 In `backend/app/modules/auth/config.py`, add two fields to `AuthConfig`:
 ```python
@@ -81,7 +81,7 @@ In `backend/app/modules/auth/config.py`, add two fields to `AuthConfig`:
 ```
 (placed after `COOKIE_SECURE: bool = True`, before the `cookie_domain` property)
 
-- [ ] **Step 4: Add the rule**
+- [x] **Step 4: Add the rule**
 
 In `backend/app/modules/auth/rules.py`, add to `AuthRules` (after `can_login`):
 ```python
@@ -95,7 +95,7 @@ In `backend/app/modules/auth/rules.py`, add to `AuthRules` (after `can_login`):
 ```
 Add the import at the top: `from app.modules.auth.config import auth_settings`.
 
-- [ ] **Step 5: Document the env vars**
+- [x] **Step 5: Document the env vars**
 
 Add to `backend/.env.example`, after `AUTH__COOKIE_SECURE=false`:
 ```
@@ -103,17 +103,17 @@ AUTH__ADMIN_EMAIL=
 AUTH__ADMIN_NAME=Admin
 ```
 
-- [ ] **Step 6: Run to verify it passes**
+- [x] **Step 6: Run to verify it passes**
 
 Run: `uv run pytest tests/auth/test_rules.py -v`
 Expected: PASS (all tests, including the 3 new ones — `monkeypatch` is a built-in pytest fixture, no new dependency).
 
-- [ ] **Step 7: `ruff check` + `ruff format --check`**
+- [x] **Step 7: `ruff check` + `ruff format --check`**
 
 Run: `uv run ruff check app/modules/auth/config.py app/modules/auth/rules.py tests/auth/test_rules.py && uv run ruff format --check app/modules/auth/config.py app/modules/auth/rules.py tests/auth/test_rules.py`
 Expected: `All checks passed!` / files already formatted
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add backend/app/modules/auth/config.py backend/app/modules/auth/rules.py backend/.env.example backend/tests/auth/test_rules.py
@@ -137,13 +137,13 @@ git commit -m "feat(auth): AUTH__ADMIN_EMAIL setting and is_protected_admin_emai
 
 No new test file for this task — `AuthApi.is_protected_admin` is exercised end-to-end by Task 3's/Task 4's tests, matching how `get_user_by_id` had no dedicated test either (composition-root/facade functions are covered by their consumers).
 
-- [ ] **Step 1: `auth/constants.py`** — add to `ErrorCode`:
+- [x] **Step 1: `auth/constants.py`** — add to `ErrorCode`:
 ```python
     CANNOT_MODIFY_PROTECTED_ADMIN = "auth_cannot_modify_protected_admin"
 ```
 (alongside the existing `CANNOT_BLOCK_LAST_ADMIN`)
 
-- [ ] **Step 2: `auth/exceptions.py`** — add:
+- [x] **Step 2: `auth/exceptions.py`** — add:
 ```python
 class CannotModifyProtectedAdmin(ForbiddenError):
     """Raised when attempting to block the seeded break-glass admin account."""
@@ -153,7 +153,7 @@ class CannotModifyProtectedAdmin(ForbiddenError):
 ```
 (alongside `CannotBlockLastAdmin`)
 
-- [ ] **Step 3: `auth/public.py`** — add the facade method:
+- [x] **Step 3: `auth/public.py`** — add the facade method:
 ```python
     @facade
     async def is_protected_admin(self, user_id: int) -> bool:
@@ -164,7 +164,7 @@ class CannotModifyProtectedAdmin(ForbiddenError):
 ```
 Add the import: `from app.modules.auth.rules import AuthRules`.
 
-- [ ] **Step 4: `rbac/constants.py`** — extend `RbacTypes` and `ErrorCode`:
+- [x] **Step 4: `rbac/constants.py`** — extend `RbacTypes` and `ErrorCode`:
 ```python
 class RbacTypes:
     """Type aliases owned by the rbac module."""
@@ -177,7 +177,7 @@ Add to `ErrorCode`:
     CANNOT_MODIFY_PROTECTED_ADMIN = "rbac_cannot_modify_protected_admin"
 ```
 
-- [ ] **Step 5: `rbac/exceptions.py`** — add:
+- [x] **Step 5: `rbac/exceptions.py`** — add:
 ```python
 class CannotModifyProtectedAdmin(ForbiddenError):
     """Raised when attempting to reassign the role of the seeded break-glass
@@ -187,17 +187,17 @@ class CannotModifyProtectedAdmin(ForbiddenError):
     message = "This account's role is permanently locked and cannot be changed"
 ```
 
-- [ ] **Step 6: Verify it imports cleanly**
+- [x] **Step 6: Verify it imports cleanly**
 
 Run: `cd backend && uv run python -c "from app.modules.auth.public import AuthApi; from app.modules.rbac.constants import RbacTypes; from app.modules.rbac.exceptions import CannotModifyProtectedAdmin as RbacCMPA; from app.modules.auth.exceptions import CannotModifyProtectedAdmin as AuthCMPA; print('ok')"`
 Expected: `ok`
 
-- [ ] **Step 7: `ruff check` + `ruff format --check` + boundary check**
+- [x] **Step 7: `ruff check` + `ruff format --check` + boundary check**
 
 Run: `uv run ruff check app/modules/auth app/modules/rbac && uv run ruff format --check app/modules/auth app/modules/rbac && python3 scripts/check_module_boundaries.py`
 Expected: all clean
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add backend/app/modules/auth/constants.py backend/app/modules/auth/exceptions.py backend/app/modules/auth/public.py backend/app/modules/rbac/constants.py backend/app/modules/rbac/exceptions.py
@@ -217,7 +217,7 @@ git commit -m "feat(auth,rbac): CannotModifyProtectedAdmin exceptions and AuthAp
 - Consumes: `AuthRules.is_protected_admin_email` (Task 1).
 - Produces: `UpdateUserStatus.execute` now raises `CannotModifyProtectedAdmin` before the existing `CannotBlockLastAdmin` check.
 
-- [ ] **Step 1: Write the failing unit test**
+- [x] **Step 1: Write the failing unit test**
 
 Add to `backend/tests/auth/test_services.py`'s `TestUpdateUserStatus` class:
 ```python
@@ -242,12 +242,12 @@ Add to `backend/tests/auth/test_services.py`'s `TestUpdateUserStatus` class:
 ```
 Add the import: `from app.modules.auth.exceptions import CannotBlockLastAdmin, CannotModifyProtectedAdmin, UserBlocked` (extends the existing import line, replacing the current `CannotBlockLastAdmin, UserBlocked` names).
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cd backend && uv run pytest tests/auth/test_services.py::TestUpdateUserStatus::test_rejects_blocking_the_protected_admin -v`
 Expected: FAIL — the exception isn't raised yet, `CannotModifyProtectedAdmin` isn't even importable from `update_user_status`'s module namespace in the test (import error first, then assertion failure once fixed).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Rewrite `backend/app/modules/auth/services/update_user_status.py`:
 ```python
@@ -288,12 +288,12 @@ class UpdateUserStatus(AbstractUseCase):
         return updated
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `uv run pytest tests/auth/test_services.py -v`
 Expected: PASS, all `TestUpdateUserStatus` tests including the new one.
 
-- [ ] **Step 5: Add the router-level integration test**
+- [x] **Step 5: Add the router-level integration test**
 
 Add to `backend/tests/auth/test_router.py`'s `TestUpdateUserStatus` class:
 ```python
@@ -323,17 +323,17 @@ Add to `backend/tests/auth/test_router.py`'s `TestUpdateUserStatus` class:
         assert response.json()["error"]["code"] == "auth_cannot_modify_protected_admin"
 ```
 
-- [ ] **Step 6: Run the full auth test suite**
+- [x] **Step 6: Run the full auth test suite**
 
 Run: `uv run pytest tests/auth -v`
 Expected: PASS, all files.
 
-- [ ] **Step 7: `ruff check` + `ruff format --check`**
+- [x] **Step 7: `ruff check` + `ruff format --check`**
 
 Run: `uv run ruff check app/modules/auth tests/auth && uv run ruff format --check app/modules/auth tests/auth`
 Expected: clean
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add backend/app/modules/auth/services/update_user_status.py backend/tests/auth/test_services.py backend/tests/auth/test_router.py
@@ -354,7 +354,7 @@ git commit -m "feat(auth): reject blocking the protected admin account"
 - Consumes: `AuthApi.is_protected_admin` (Task 2), `RbacTypes.ProtectionCheck` (Task 2).
 - Produces: `AssignRole.__init__` gains a required `is_protected: RbacTypes.ProtectionCheck` parameter.
 
-- [ ] **Step 1: Update the existing failing calls first**
+- [x] **Step 1: Update the existing failing calls first**
 
 In `backend/tests/rbac/test_services.py`'s `TestAssignRole`, every `AssignRole(uow, user_lookup)` call needs a third argument. Add a shared fake at module scope (near `_admin_role`):
 ```python
@@ -363,7 +363,7 @@ async def _not_protected(user_id: int) -> bool:
 ```
 Then update all 4 existing `TestAssignRole` methods' `AssignRole(uow, user_lookup)` calls to `AssignRole(uow, user_lookup, _not_protected)`.
 
-- [ ] **Step 2: Write the new failing test**
+- [x] **Step 2: Write the new failing test**
 
 Add to `TestAssignRole`:
 ```python
@@ -384,12 +384,12 @@ Add to `TestAssignRole`:
 ```
 Add the import: `from app.modules.rbac.exceptions import CannotModifyProtectedAdmin` (extend the existing multi-name import from `app.modules.rbac.exceptions`).
 
-- [ ] **Step 3: Run to verify it fails**
+- [x] **Step 3: Run to verify it fails**
 
 Run: `cd backend && uv run pytest tests/rbac/test_services.py -v`
 Expected: FAIL — `AssignRole.__init__() missing 1 required positional argument: 'is_protected'` on every `TestAssignRole` test (all 5, including the new one), since the Fakes are already updated to pass 3 args but the real class only accepts 2 yet.
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Rewrite `backend/app/modules/rbac/services/assign_role.py`:
 ```python
@@ -444,7 +444,7 @@ class AssignRole(AbstractUseCase):
         await self._uow.commit()
 ```
 
-- [ ] **Step 5: Wire the facade**
+- [x] **Step 5: Wire the facade**
 
 In `backend/app/modules/rbac/public.py`, update `get_assign_role`:
 ```python
@@ -457,12 +457,12 @@ async def get_assign_role(
     return AssignRole(uow, auth_api.get_user_by_id, auth_api.is_protected_admin)
 ```
 
-- [ ] **Step 6: Run to verify it passes**
+- [x] **Step 6: Run to verify it passes**
 
 Run: `uv run pytest tests/rbac/test_services.py -v`
 Expected: PASS, all `TestAssignRole` tests (5, including the new one) plus every other test in the file.
 
-- [ ] **Step 7: Add the router-level integration test**
+- [x] **Step 7: Add the router-level integration test**
 
 Add to `backend/tests/rbac/test_router.py`'s `TestAssignUserRole` class:
 ```python
@@ -484,17 +484,17 @@ Add to `backend/tests/rbac/test_router.py`'s `TestAssignUserRole` class:
         assert response.json()["error"]["code"] == "rbac_cannot_modify_protected_admin"
 ```
 
-- [ ] **Step 8: Run the full rbac test suite**
+- [x] **Step 8: Run the full rbac test suite**
 
 Run: `uv run pytest tests/rbac -v`
 Expected: PASS, all files.
 
-- [ ] **Step 9: `ruff check` + `ruff format --check` + boundary check**
+- [x] **Step 9: `ruff check` + `ruff format --check` + boundary check**
 
 Run: `uv run ruff check app/modules/rbac tests/rbac && uv run ruff format --check app/modules/rbac tests/rbac && python3 scripts/check_module_boundaries.py`
 Expected: all clean
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add backend/app/modules/rbac/services/assign_role.py backend/app/modules/rbac/public.py backend/tests/rbac/test_services.py backend/tests/rbac/test_router.py
@@ -514,7 +514,7 @@ git commit -m "feat(rbac): reject reassigning the protected admin's role"
 
 No unit test — matches `seed_rbac.py`'s own convention (schema/data-seeding scripts are verified by running them against the real DB, not by a pytest suite; the fastapi-modular-scaffold checklist's "no module without a test folder" rule targets `app/modules/`, not `app/seeds/`).
 
-- [ ] **Step 1: Write the seed script**
+- [x] **Step 1: Write the seed script**
 
 ```python
 """Idempotent seed: the break-glass admin account from AUTH__ADMIN_EMAIL.
@@ -589,32 +589,32 @@ if __name__ == "__main__":
     asyncio.run(run())
 ```
 
-- [ ] **Step 2: `ruff check` + `ruff format --check`**
+- [x] **Step 2: `ruff check` + `ruff format --check`**
 
 Run: `cd backend && uv run ruff check app/seeds/seed_admin.py && uv run ruff format --check app/seeds/seed_admin.py`
 Expected: clean
 
-- [ ] **Step 3: Run it against the real local DB with `AUTH__ADMIN_EMAIL` unset — verify the no-op path**
+- [x] **Step 3: Run it against the real local DB with `AUTH__ADMIN_EMAIL` unset — verify the no-op path**
 
 Run: `uv run python -m app.seeds.seed_admin`
 Expected: logs "AUTH__ADMIN_EMAIL not set — skipping admin seed", exits 0, no DB rows created (`SELECT COUNT(*) FROM users` unchanged).
 
-- [ ] **Step 4: Set `AUTH__ADMIN_EMAIL` and run it for real**
+- [x] **Step 4: Set `AUTH__ADMIN_EMAIL` and run it for real**
 
 Run: `AUTH__ADMIN_EMAIL=admin@example.com AUTH__ADMIN_NAME="Example Admin" uv run python -m app.seeds.seed_admin`
 Expected: logs "seeded break-glass admin user admin@example.com" and "granted admin role to admin@example.com". Verify: `psql ... -c "select u.email, u.external_user_id, r.name from users u join user_roles ur on ur.user_id=u.id join roles r on r.id=ur.role_id where u.email='admin@example.com'"` shows one row, `external_user_id` is NULL, role is `admin`.
 
-- [ ] **Step 5: Run it again — verify idempotency**
+- [x] **Step 5: Run it again — verify idempotency**
 
 Run: `AUTH__ADMIN_EMAIL=admin@example.com uv run python -m app.seeds.seed_admin`
 Expected: no "seeded"/"granted" log lines (both branches already satisfied), `SELECT COUNT(*) FROM users WHERE email='admin@example.com'` still returns 1.
 
-- [ ] **Step 6: Clean up the manual test row**
+- [x] **Step 6: Clean up the manual test row**
 
 Run: `psql ... -c "delete from user_roles where user_id in (select id from users where email='admin@example.com'); delete from users where email='admin@example.com';"`
 (Leaves the local DB in the same state Task 5 started with — this row was created purely to verify the script, not as a fixture for later tasks.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/app/seeds/seed_admin.py

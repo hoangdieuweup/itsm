@@ -123,3 +123,18 @@ class TestAssignUserRole:
 
         assert response.status_code == 404
         assert response.json()["error"]["code"] == "rbac_target_user_not_found"
+
+    async def test_rejects_reassigning_the_protected_admin(
+        self, client: AsyncClient, engine: AsyncEngine, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(auth_settings, "ADMIN_EMAIL", "protected-rbac@example.com")
+        await _login_as(client, engine, permissions=[("user", "assign_role")])
+        role_id = await _seed_role(engine, "viewer3", is_system=False, permission_ids=[])
+        target_user_id = await _seed_user(
+            engine, email="protected-rbac@example.com", external_user_id="dx-protected-rbac"
+        )
+
+        response = await client.patch(f"/api/v1/rbac/users/{target_user_id}/role", json={"roleId": role_id})
+
+        assert response.status_code == 403
+        assert response.json()["error"]["code"] == "rbac_cannot_modify_protected_admin"

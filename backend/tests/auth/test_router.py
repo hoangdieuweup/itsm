@@ -287,6 +287,29 @@ class TestUpdateUserStatus:
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "auth_cannot_block_last_admin"
 
+    async def test_rejects_blocking_the_protected_admin(
+        self, client: AsyncClient, engine: AsyncEngine, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(auth_settings, "ADMIN_EMAIL", "protected-router@example.com")
+        await _login_with_permissions(client, engine, permissions=[("user", "update_status")])
+        async with engine.begin() as conn:
+            target = await conn.execute(
+                insert(User).values(
+                    email="protected-router@example.com",
+                    name="Protected",
+                    status="active",
+                    external_user_id="dx-protected-router",
+                    employee_code=None,
+                    email_confirmed=True,
+                )
+            )
+            target_id = target.inserted_primary_key[0]
+
+        response = await client.patch(f"/api/v1/auth/users/{target_id}/status", json={"status": "blocked"})
+
+        assert response.status_code == 403
+        assert response.json()["error"]["code"] == "auth_cannot_modify_protected_admin"
+
 
 class TestLogout:
     async def test_logout_clears_cookies_and_blacklists_the_session(self, client: AsyncClient) -> None:

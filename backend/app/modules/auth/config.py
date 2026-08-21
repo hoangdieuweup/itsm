@@ -20,6 +20,8 @@ class AuthConfig(BaseSettings):
     ACCESS_TOKEN_TTL_SECONDS: int = 1800
     REFRESH_TOKEN_TTL_SECONDS: int = 2592000
     COOKIE_SECURE: bool = True
+    ADMIN_EMAIL: str | None = None
+    ADMIN_NAME: str = "Admin"
 
     @property
     def cookie_domain(self) -> str | None:

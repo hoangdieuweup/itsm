@@ -58,8 +58,9 @@ async def get_assign_role(
     uow: AbstractRbacUnitOfWork = Depends(get_uow),
     auth_api: AuthApi = Depends(get_auth_api),
 ) -> AssignRole:
-    """Provide the assign-role use case, wired to auth's user-existence check."""
-    return AssignRole(uow, auth_api.get_user_by_id)
+    """Provide the assign-role use case, wired to auth's user-existence and
+    protected-admin checks."""
+    return AssignRole(uow, auth_api.get_user_by_id, auth_api.is_protected_admin)
 
 
 def require_permission(resource: str, action: str):

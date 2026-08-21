@@ -3,25 +3,38 @@
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
 from app.modules.rbac.constants import RbacTypes
-from app.modules.rbac.exceptions import CannotRemoveLastAdmin, RoleNotFound, TargetUserNotFound
+from app.modules.rbac.exceptions import (
+    CannotModifyProtectedAdmin,
+    CannotRemoveLastAdmin,
+    RoleNotFound,
+    TargetUserNotFound,
+)
 from app.modules.rbac.rules import RbacRules
 from app.modules.rbac.uow import AbstractRbacUnitOfWork
 
 
 class AssignRole(AbstractUseCase):
-    """user_lookup is injected rather than importing auth directly, so this
-    service depends only on a narrow capability — dependencies.py wires it to
-    app.modules.auth.public.AuthApi.get_user_by_id (the one facade call to the
-    module that actually owns the users table)."""
+    """user_lookup and is_protected are both injected rather than importing
+    auth directly, so this service depends only on two narrow capabilities —
+    dependencies wired in rbac/public.py's get_assign_role to
+    app.modules.auth.public.AuthApi.get_user_by_id / .is_protected_admin."""
 
-    def __init__(self, uow: AbstractRbacUnitOfWork, user_lookup: RbacTypes.UserLookup) -> None:
+    def __init__(
+        self,
+        uow: AbstractRbacUnitOfWork,
+        user_lookup: RbacTypes.UserLookup,
+        is_protected: RbacTypes.ProtectionCheck,
+    ) -> None:
         self._uow = uow
         self._user_lookup = user_lookup
+        self._is_protected = is_protected
 
     @use_case
     async def execute(self, user_id: int, role_id: int) -> None:
         if await self._user_lookup(user_id) is None:
             raise TargetUserNotFound()
+        if await self._is_protected(user_id):
+            raise CannotModifyProtectedAdmin()
         role = await self._uow.roles.get_by_id(role_id)
         if role is None:
             raise RoleNotFound()
