@@ -20,6 +20,7 @@ export const API_CONFIG = {
       ROLE_DETAIL: (id: number) => `/rbac/roles/${id}`,
       PERMISSIONS: "/rbac/permissions",
       USER_ROLE: (userId: number) => `/rbac/users/${userId}/role`,
+      USER_ROLES: (userId: number) => `/rbac/users/${userId}/roles`,
     },
   },
 } as const;

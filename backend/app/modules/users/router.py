@@ -29,7 +29,15 @@ async def list_users(
     if items:
         user_ids = [u.id for u in items]
         role_map = await rbac.get_role_names_for_users(user_ids)
-        items = [u.model_copy(update={"role_name": role_map.get(u.id, "member")}) for u in items]
+        items = [
+            u.model_copy(
+                update={
+                    "role_names": role_map.get(u.id, ["member"]),
+                    "role_name": (role_map.get(u.id) or ["member"])[0],
+                }
+            )
+            for u in items
+        ]
     page = Page[UserRead](items=items, total=total, limit=pagination.limit, offset=pagination.offset)
     return ApiResponse[Page[UserRead]](success=True, data=page)
 
@@ -45,5 +53,10 @@ async def update_user_status(
     """Block or unblock a user. Blocking the last admin is rejected — see rbac's bus-factor rule."""
     updated = await use_case.execute(user_id, body.status)
     role_summary = await rbac.role_summary_for_user(user_id)
-    updated = updated.model_copy(update={"role_name": role_summary.role_name or "member"})
+    updated = updated.model_copy(
+        update={
+            "role_names": role_summary.roles,
+            "role_name": role_summary.role_name or (role_summary.roles[0] if role_summary.roles else "member"),
+        }
+    )
     return ApiResponse[UserRead](success=True, data=updated)

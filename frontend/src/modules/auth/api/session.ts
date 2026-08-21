@@ -22,11 +22,18 @@ export async function fetchAuthSession(): Promise<AuthSession> {
       status: "authenticated",
       user: me.user,
       roleName: me.roleName,
+      roleNames: me.roleNames,
       permissions: me.permissions,
     };
   } catch (error) {
     if (error instanceof ApiRequestError) {
-      return { status: "unauthenticated", user: null, roleName: "", permissions: [] };
+      return {
+        status: "unauthenticated",
+        user: null,
+        roleName: "",
+        roleNames: [],
+        permissions: [],
+      };
     }
     throw error;
   }

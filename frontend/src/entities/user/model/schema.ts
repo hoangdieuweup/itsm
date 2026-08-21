@@ -32,6 +32,7 @@ export const userSchema = z.object({
   emailConfirmed: z.boolean(),
   lastLoginAt: z.string().nullable(),
   createdAt: z.string(),
+  roleNames: z.array(z.string()).default([]),
   roleName: z.string().nullable().optional(),
 });
 

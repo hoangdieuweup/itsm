@@ -9,6 +9,7 @@ import { userSchema } from "@/entities/user";
 export const meResponseSchema = z.object({
   user: userSchema,
   roleName: z.string(),
+  roleNames: z.array(z.string()).default([]),
   permissions: z.array(z.string()),
 });
 
@@ -17,12 +18,14 @@ export const authSessionSchema = z.discriminatedUnion("status", [
     status: z.literal("authenticated"),
     user: userSchema,
     roleName: z.string(),
+    roleNames: z.array(z.string()).default([]),
     permissions: z.array(z.string()),
   }),
   z.object({
     status: z.literal("unauthenticated"),
     user: z.null(),
     roleName: z.literal(""),
+    roleNames: z.array(z.string()).default([]),
     permissions: z.array(z.string()).length(0),
   }),
 ]);

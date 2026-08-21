@@ -124,6 +124,7 @@ class TestOAuthCallback:
         assert response.status_code == 200
         assert body["success"] is True
         assert body["data"]["user"]["email"] == "dave@example.com"
+        assert body["data"]["roleNames"] == ["member"]
         assert body["data"]["roleName"] == "member"
         assert body["data"]["permissions"] == []
 

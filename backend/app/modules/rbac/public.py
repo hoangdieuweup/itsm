@@ -14,6 +14,7 @@ from app.modules.rbac.rules import RbacRules
 from app.modules.rbac.schemas import RoleSummary
 from app.modules.rbac.services.assign_default_role import AssignDefaultRole
 from app.modules.rbac.services.assign_role import AssignRole
+from app.modules.rbac.services.assign_roles import AssignRoles
 from app.modules.rbac.uow import AbstractRbacUnitOfWork
 from app.modules.users.public import UserRead, UsersApi, get_users_api
 
@@ -24,7 +25,9 @@ __all__ = [
     "RbacApi",
     "get_rbac_api",
     "get_assign_role",
+    "get_assign_roles",
     "require_permission",
+    "require_any_permission",
 ]
 
 
@@ -41,29 +44,34 @@ class RbacApi:
 
     @facade
     async def role_summary_for_user(self, user_id: int) -> RoleSummary:
-        """Return role name + flat 'resource.action' permission strings, for
+        """Return role names + union of 'resource.action' permission strings, for
         auth/me to compose into the session the frontend's PermissionProvider seeds from."""
-        role = await self._uow.user_roles.get_role_for_user(user_id)
-        if role is None:
-            return RoleSummary(role_name="", permissions=[])
+        roles = await self._uow.user_roles.get_roles_for_user(user_id)
+        if not roles:
+            return RoleSummary(roles=[], permissions=[], role_name="")
+        role_names = [r.name for r in roles]
+        perms = {f"{p.resource}.{p.action}" for r in roles for p in r.permissions}
         return RoleSummary(
-            role_name=role.name, permissions=[f"{p.resource}.{p.action}" for p in role.permissions]
+            roles=role_names,
+            permissions=sorted(perms),
+            role_name=role_names[0],
         )
 
     @facade
-    async def get_role_names_for_users(self, user_ids: list[int]) -> dict[int, str]:
-        """Return a mapping of user_id -> role_name for a batch of users."""
+    async def get_role_names_for_users(self, user_ids: list[int]) -> dict[int, list[str]]:
+        """Return a mapping of user_id -> list[role_name] for a batch of users."""
         return await self._uow.user_roles.get_roles_for_users(user_ids)
 
     @facade
     async def is_last_admin(self, user_id: int) -> bool:
         """True if user_id holds the admin role and is the only one who does —
         used by users' UpdateUserStatus to block blocking the last admin."""
-        role = await self._uow.user_roles.get_role_for_user(user_id)
-        if role is None or role.name != RbacDefaults.ADMIN_ROLE_NAME:
+        roles = await self._uow.user_roles.get_roles_for_user(user_id)
+        admin_role = next((r for r in roles if r.name == RbacDefaults.ADMIN_ROLE_NAME), None)
+        if admin_role is None:
             return False
-        admin_grants = await self._uow.roles.count_users_with_role(role.id)
-        return RbacRules.blocks_last_admin_removal(role.name, admin_grants)
+        admin_grants = await self._uow.roles.count_users_with_role(admin_role.id)
+        return RbacRules.blocks_last_admin_removal(admin_role.name, admin_grants)
 
 
 async def get_rbac_api(uow: AbstractRbacUnitOfWork = Depends(get_uow)) -> RbacApi:
@@ -78,6 +86,15 @@ async def get_assign_role(
     """Provide the assign-role use case, wired to users' existence and
     protected-admin checks."""
     return AssignRole(uow, users_api.get_user_by_id, users_api.is_protected_admin)
+
+
+async def get_assign_roles(
+    uow: AbstractRbacUnitOfWork = Depends(get_uow),
+    users_api: UsersApi = Depends(get_users_api),
+) -> AssignRoles:
+    """Provide the assign-roles use case, wired to users' existence and
+    protected-admin checks."""
+    return AssignRoles(uow, users_api.get_user_by_id, users_api.is_protected_admin)
 
 
 def require_permission(resource: str, action: str):
@@ -95,3 +112,22 @@ def require_permission(resource: str, action: str):
         return user
 
     return check
+
+
+def require_any_permission(*permissions: tuple[str, str]):
+    """Return a dependency that 403s unless the current user holds AT LEAST ONE
+    of the specified (resource, action) permissions."""
+
+    async def check(
+        auth_api: AuthApi = Depends(get_auth_api),
+        uow: AbstractRbacUnitOfWork = Depends(get_uow),
+    ) -> UserRead:
+        user = auth_api.current_user()
+        for resource, action in permissions:
+            if await uow.user_roles.user_has_permission(user.id, resource, action):
+                return user
+        first_res, first_act = permissions[0] if permissions else ("unknown", "unknown")
+        raise PermissionDenied(resource=first_res, action=first_act)
+
+    return check
+

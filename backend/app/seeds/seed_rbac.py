@@ -50,11 +50,18 @@ async def run() -> None:
                 role = Role(name=name, is_system=True)
                 session.add(role)
                 await session.flush()
-                if grants_everything:
-                    for permission_id in permission_ids:
+                logger.info("seeded role %s", name)
+
+            if grants_everything:
+                existing_perms = set(
+                    await session.scalars(
+                        select(RolePermission.permission_id).where(RolePermission.role_id == role.id)
+                    )
+                )
+                for permission_id in permission_ids:
+                    if permission_id not in existing_perms:
                         session.add(RolePermission(role_id=role.id, permission_id=permission_id))
                 await session.flush()
-                logger.info("seeded role %s", name)
         await session.commit()
 
     await engine.dispose()

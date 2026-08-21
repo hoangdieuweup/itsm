@@ -1,21 +1,20 @@
-export { RolesPageContent } from "./ui/roles-page-content";
-export { RoleFormDialog } from "./ui/role-form-dialog";
-export { useRoles, usePermissions } from "./api/use-roles";
-export { useAssignUserRoles } from "./hooks/use-assign-user-roles";
 export {
   fetchRoles,
   fetchPermissions,
-  createRole,
-  updateRole,
-  deleteRole,
   assignUserRoles,
   fetchUserRoles,
 } from "./api/fetchers";
 export { rolesKeys } from "./api/query-keys";
+export { useRoles, useRolesQuery, usePermissions } from "./hooks/use-roles";
+export { useAssignUserRoles } from "./hooks/use-assign-user-roles";
 export {
+  roleSchema,
+  rolesPageSchema,
+  permissionSchema,
+  permissionsListSchema,
+  userRolesAssignmentSchema,
   SYSTEM_ROLE_NAMES,
   isProtectedAdminRole,
-  userRolesAssignmentSchema,
 } from "./model/schema";
 export type {
   Role,

@@ -58,10 +58,9 @@ class RolePermission(Base):
 
 
 class UserRole(Base):
-    """A user's single role grant. user_id is the primary key: one active role
-    per user in this single-tenant design — see spec's Scope > Out."""
+    """A user's role grant. Composite PK (user_id, role_id) allows multiple roles per user."""
 
     __tablename__ = "user_roles"
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="RESTRICT"), index=True)
+    role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="RESTRICT"), primary_key=True, index=True)
