@@ -8,9 +8,11 @@ export default getRequestConfig(async ({ requestLocale }) => {
     ? requested
     : routing.defaultLocale;
 
-  const [common, auth] = await Promise.all([
+  const [common, auth, users, roles] = await Promise.all([
     import(`../../../../locales/${locale}/common.json`),
     import(`../../../../locales/${locale}/modules/auth.json`),
+    import(`../../../../locales/${locale}/modules/users.json`),
+    import(`../../../../locales/${locale}/modules/roles.json`),
   ]);
 
   return {
@@ -18,6 +20,8 @@ export default getRequestConfig(async ({ requestLocale }) => {
     messages: {
       common: common.default,
       auth: auth.default,
+      users: users.default,
+      roles: roles.default,
     },
   };
 });

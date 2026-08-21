@@ -1,65 +1,85 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { LogIn } from "lucide-react";
+import { LogIn, AlertCircle } from "lucide-react";
 
 import { Button } from "@/shared/ui/button";
-import { Card } from "@/shared/ui/card";
 import { m } from "@/shared/lib/motion";
+import { API_CONFIG } from "@/shared/constants/api";
 import { BrandPanel } from "./brand-panel";
 import { LanguageSwitch } from "./language-switch";
 
-/**
- * Split-screen SSO login card (visual layer only — see issue #18). The CTA
- * stays disabled and does not start an OAuth flow. Sub-issue #15 (Frontend:
- * SSO wiring) wires this button up to WeUpBook DX OAuth2 + PKCE once #14
- * (backend SSO service) is merged.
- */
 export function LoginForm() {
   const t = useTranslations("auth");
   const tc = useTranslations("common.meta");
+  const te = useTranslations("common.errors");
+  const searchParams = useSearchParams();
+
+  const errorCode = searchParams.get("error");
+
+  function handleSsoLogin() {
+    window.location.href = API_CONFIG.ENDPOINTS.AUTH.SSO_START;
+  }
 
   return (
-    <m.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
-      className="w-full max-w-4xl"
-    >
-      <Card className="flex-row gap-0 p-0 shadow-xl">
-        <BrandPanel />
+    <div className="flex min-h-[100dvh] w-full">
+      <BrandPanel />
 
-        <div className="flex w-full flex-col justify-center gap-6 p-8 sm:p-10 lg:w-[55%]">
-          <div className="flex items-start justify-between gap-4">
-            <span className="text-xs font-semibold text-orange-700">
-              {t("login.departmentLabel")}
-            </span>
+      {/* ── Right pane: login form ── */}
+      <div className="flex w-full flex-col items-center justify-center bg-gray-50/50 px-6 sm:px-12 lg:w-[52%]">
+        <m.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.15, ease: "easeOut" }}
+          className="w-full max-w-md"
+        >
+          {/* ── Language switch ── */}
+          <div className="mb-12 flex justify-end">
             <LanguageSwitch />
           </div>
 
-          <div className="space-y-2">
-            <h1 className="font-heading text-2xl font-bold text-foreground sm:text-3xl">
+          {/* ── Heading ── */}
+          <div className="mb-8 space-y-3">
+            <h1 className="font-heading text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
               {t("login.title")}
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-[15px] leading-relaxed text-gray-500">
               {t("login.subtitle")}
             </p>
           </div>
 
+          {/* ── SSO error banner ── */}
+          {errorCode && (
+            <div
+              role="alert"
+              className="mb-6 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+            >
+              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>
+                {te.has(errorCode as Parameters<typeof te>[0])
+                  ? te(errorCode as Parameters<typeof te>[0])
+                  : te("unknown")}
+              </span>
+            </div>
+          )}
+
+          {/* ── CTA button ── */}
           <Button
-            disabled
             size="lg"
-            className="h-11 w-full justify-center gap-2 rounded-xl bg-linear-to-r from-orange-700 to-red-800 text-base font-semibold text-white shadow-md hover:from-orange-800 hover:to-red-900 disabled:opacity-60"
+            onClick={handleSsoLogin}
+            className="h-12 w-full cursor-pointer justify-center gap-2.5 rounded-xl bg-[#2563EB] text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-all duration-200 hover:bg-[#1D4ED8] hover:shadow-xl hover:shadow-blue-600/30"
           >
             <LogIn className="size-4" aria-hidden />
             {t("login.continueButton")}
           </Button>
 
-          <p className="text-xs text-muted-foreground">
+          {/* ── Footer ── */}
+          <p className="mt-10 text-center text-xs text-gray-400">
             {tc("copyright", { year: new Date().getFullYear() })}
           </p>
-        </div>
-      </Card>
-    </m.div>
+        </m.div>
+      </div>
+    </div>
   );
 }

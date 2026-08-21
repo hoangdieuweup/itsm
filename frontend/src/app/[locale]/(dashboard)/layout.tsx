@@ -1,8 +1,8 @@
-import { useTranslations } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { createQueryClient } from "@/shared/lib/query-client";
-import { AuthGuard, UserMenu, authKeys, fetchAuthSession } from "@/modules/auth";
+import { AuthGuard, authKeys, fetchAuthSession } from "@/modules/auth";
+import { DashboardShell } from "./dashboard-shell";
 
 /**
  * Server Component: prefetches the auth session query and hands it down via
@@ -29,22 +29,8 @@ export default async function DashboardLayout({
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <AuthGuard>
-        <div className="flex flex-1 flex-col">
-          <DashboardHeader />
-          <main className="flex flex-1 flex-col p-6">{children}</main>
-        </div>
+        <DashboardShell>{children}</DashboardShell>
       </AuthGuard>
     </HydrationBoundary>
-  );
-}
-
-function DashboardHeader() {
-  const t = useTranslations("common.meta");
-
-  return (
-    <header className="flex items-center justify-between border-b px-6 py-3">
-      <span className="font-semibold">{t("appName")}</span>
-      <UserMenu />
-    </header>
   );
 }

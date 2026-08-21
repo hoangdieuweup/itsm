@@ -2,12 +2,48 @@
   "errors": {
     "somethingWentWrong": "Đã xảy ra lỗi",
     "tryAgain": "Thử lại",
-    "unknown": "Đã xảy ra lỗi không xác định."
+    "unknown": "Đã xảy ra lỗi không xác định.",
+    "network_error": "Lỗi kết nối mạng. Vui lòng kiểm tra lại đường truyền.",
+    "sso_denied": "Đăng nhập SSO bị từ chối hoặc đã hủy.",
+    "sso_state": "Phiên xác thực đã hết hạn — vui lòng đăng nhập lại.",
+    "sso_failed": "Dịch vụ SSO tạm thời không khả dụng.",
+    "suspended": "Tài khoản của bạn đã bị tạm khóa. Liên hệ quản trị viên.",
+    "app_error": "Đã xảy ra lỗi ứng dụng.",
+    "not_found": "Không tìm thấy tài nguyên yêu cầu.",
+    "conflict": "Dữ liệu bị xung đột hoặc đã tồn tại.",
+    "forbidden": "Bạn không có quyền truy cập hoặc thực hiện thao tác này.",
+    "validation_failed": "Dữ liệu nhập vào không hợp lệ.",
+    "integration_error": "Lỗi kết nối dịch vụ tích hợp bên ngoài."
   },
   "meta": {
     "appName": "ITSM",
     "appDescription": "Quản lý dịch vụ CNTT cho WeUpBook",
     "copyright": "© {year} Weupbook — All rights reserved.",
     "loginTitle": "Đăng nhập — ITSM"
+  },
+  "nav": {
+    "dashboard": "Tổng quan",
+    "users": "Người dùng",
+    "roles": "Vai trò",
+    "mainMenu": "Menu chính",
+    "collapseSidebar": "Thu gọn sidebar",
+    "expandSidebar": "Mở rộng sidebar",
+    "openMenu": "Mở menu",
+    "closeMenu": "Đóng menu",
+    "language": "Ngôn ngữ",
+    "account": "Tài khoản"
+  },
+  "dashboard": {
+    "welcomeBack": "Chào mừng trở lại, {name}!",
+    "userManagementTitle": "Quản lý người dùng",
+    "userManagementDesc": "Xem danh sách người dùng, kiểm tra hoạt động và quản lý trạng thái tài khoản.",
+    "roleManagementTitle": "Vai trò & Quyền hạn",
+    "roleManagementDesc": "Cấu hình vai trò tùy chỉnh và phân quyền truy cập hệ thống.",
+    "serviceDeskTitle": "Dịch vụ hỗ trợ (Service Desk)",
+    "serviceDeskDesc": "Tiện ích quản lý sự cố và yêu cầu hỗ trợ sẽ ra mắt trong phiên bản tiếp theo."
+  },
+  "noPermission": {
+    "title": "Truy cập bị từ chối",
+    "description": "Bạn không có quyền truy cập trang này."
   }
 }

@@ -1,0 +1,30 @@
+{
+  "title": "Người dùng",
+  "description": "Quản lý danh sách tài khoản và trạng thái hoạt động.",
+  "columns": {
+    "name": "Họ và tên",
+    "email": "Email",
+    "role": "Vai trò",
+    "status": "Trạng thái",
+    "employeeCode": "Mã nhân viên",
+    "lastLogin": "Đăng nhập lần cuối",
+    "actions": "Thao tác"
+  },
+  "status": {
+    "active": "Hoạt động",
+    "blocked": "Đã khóa"
+  },
+  "actions": {
+    "block": "Khóa",
+    "unblock": "Mở khóa",
+    "blocking": "Đang cập nhật...",
+    "blockConfirm": "Bạn có chắc chắn muốn khóa người dùng này không?",
+    "unblockConfirm": "Bạn có chắc chắn muốn mở khóa người dùng này không?"
+  },
+  "errors": {
+    "users_user_not_found": "Không tìm thấy người dùng.",
+    "users_cannot_block_last_admin": "Đây là quản trị viên cuối cùng — không thể khóa tài khoản này.",
+    "users_cannot_modify_protected_admin": "Tài khoản quản trị viên này được bảo vệ vĩnh viễn và không thể khóa."
+  },
+  "empty": "Không tìm thấy người dùng nào."
+}

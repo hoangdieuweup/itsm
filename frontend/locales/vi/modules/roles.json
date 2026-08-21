@@ -1,0 +1,72 @@
+{
+  "title": "Vai trò & Quyền hạn",
+  "description": "Quản lý vai trò người dùng và phân quyền truy cập.",
+  "createRole": "Tạo vai trò",
+  "editRole": "Chỉnh sửa vai trò",
+  "deleteRole": "Xóa vai trò",
+  "systemRole": "Vai trò hệ thống",
+  "customRole": "Vai trò tùy chỉnh",
+  "permissionsCount": "{count} quyền",
+  "types": {
+    "system": "Hệ thống",
+    "custom": "Tùy chỉnh"
+  },
+  "resources": {
+    "role": "Vai trò (Role)",
+    "permission": "Quyền hạn (Permission)",
+    "user": "Người dùng (User)"
+  },
+  "catalog": {
+    "permissions": {
+      "role": {
+        "create": "Tạo vai trò mới",
+        "read": "Xem danh sách & chi tiết vai trò",
+        "update": "Chỉnh sửa vai trò & phân quyền",
+        "delete": "Xóa vai trò tùy chỉnh"
+      },
+      "permission": {
+        "read": "Xem danh mục quyền hạn"
+      },
+      "user": {
+        "read": "Xem danh sách người dùng",
+        "update_status": "Khóa / Mở khóa tài khoản",
+        "assign_role": "Gán vai trò cho người dùng"
+      }
+    }
+  },
+  "columns": {
+    "name": "Tên vai trò",
+    "type": "Loại",
+    "permissions": "Danh sách quyền",
+    "actions": "Thao tác"
+  },
+  "form": {
+    "nameLabel": "Tên vai trò",
+    "namePlaceholder": "Ví dụ: Kỹ thuật viên, Kiểm toán viên",
+    "permissionsLabel": "Danh sách quyền áp dụng",
+    "save": "Lưu thay đổi",
+    "create": "Tạo vai trò",
+    "cancel": "Hủy",
+    "saving": "Đang lưu...",
+    "selectAll": "Chọn tất cả",
+    "deselectAll": "Bỏ chọn tất cả",
+    "systemRoleHint": "Vai trò hệ thống — không thể đổi tên."
+  },
+  "actions": {
+    "edit": "Sửa",
+    "delete": "Xóa",
+    "deleteConfirm": "Bạn có chắc chắn muốn xóa vai trò này không?"
+  },
+  "errors": {
+    "rbac_role_not_found": "Không tìm thấy vai trò.",
+    "rbac_duplicate_role_name": "Tên vai trò này đã tồn tại trong hệ thống.",
+    "rbac_system_role_immutable": "Vai trò hệ thống không thể đổi tên hoặc xóa.",
+    "rbac_role_in_use": "Vai trò này đang được gán cho người dùng, không thể xóa.",
+    "rbac_cannot_remove_last_admin": "Không thể gỡ vai trò admin của người dùng admin cuối cùng.",
+    "rbac_cannot_modify_protected_admin": "Tài khoản quản trị viên này được bảo vệ vĩnh viễn, không thể thay đổi vai trò.",
+    "rbac_target_user_not_found": "Không tìm thấy người dùng đích để gán vai trò.",
+    "rbac_permission_denied": "Bạn không có quyền thực hiện thao tác này.",
+    "rbac_unknown_permission_id": "Mã quyền hạn không hợp lệ."
+  },
+  "empty": "Không tìm thấy vai trò nào."
+}

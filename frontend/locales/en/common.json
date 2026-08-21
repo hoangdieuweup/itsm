@@ -2,12 +2,48 @@
   "errors": {
     "somethingWentWrong": "Something went wrong",
     "tryAgain": "Try again",
-    "unknown": "Something went wrong."
+    "unknown": "An unexpected error occurred.",
+    "network_error": "Network error. Please check your internet connection.",
+    "sso_denied": "SSO login was denied or cancelled.",
+    "sso_state": "Session expired — please try signing in again.",
+    "sso_failed": "SSO service is temporarily unavailable.",
+    "suspended": "Your account has been suspended. Contact an administrator.",
+    "app_error": "An application error occurred.",
+    "not_found": "Resource not found.",
+    "conflict": "Conflicting state or data already exists.",
+    "forbidden": "You do not have permission to perform this action.",
+    "validation_failed": "Validation failed.",
+    "integration_error": "Upstream integration failed."
   },
   "meta": {
     "appName": "ITSM",
     "appDescription": "IT service management for WeUpBook",
     "copyright": "© {year} Weupbook — All rights reserved.",
     "loginTitle": "Sign in — ITSM"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "roles": "Roles",
+    "mainMenu": "Main Menu",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "language": "Language",
+    "account": "Account"
+  },
+  "dashboard": {
+    "welcomeBack": "Welcome back, {name}!",
+    "userManagementTitle": "User Management",
+    "userManagementDesc": "View users, check account activity, and manage account status.",
+    "roleManagementTitle": "Roles & Permissions",
+    "roleManagementDesc": "Configure custom roles and assign fine-grained permissions.",
+    "serviceDeskTitle": "Service Desk",
+    "serviceDeskDesc": "Incident and ticket management widgets coming in next milestone."
+  },
+  "noPermission": {
+    "title": "Access Denied",
+    "description": "You don't have permission to view this page."
   }
 }

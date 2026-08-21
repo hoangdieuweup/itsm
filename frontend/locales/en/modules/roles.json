@@ -1,0 +1,72 @@
+{
+  "title": "Roles & Permissions",
+  "description": "Manage user roles and assign access permissions.",
+  "createRole": "Create Role",
+  "editRole": "Edit Role",
+  "deleteRole": "Delete Role",
+  "systemRole": "System Role",
+  "customRole": "Custom Role",
+  "permissionsCount": "{count} permissions",
+  "types": {
+    "system": "System",
+    "custom": "Custom"
+  },
+  "resources": {
+    "role": "Roles",
+    "permission": "Permissions",
+    "user": "Users"
+  },
+  "catalog": {
+    "permissions": {
+      "role": {
+        "create": "Create new roles",
+        "read": "View roles and details",
+        "update": "Edit roles and permissions",
+        "delete": "Delete custom roles"
+      },
+      "permission": {
+        "read": "View permission catalog"
+      },
+      "user": {
+        "read": "View user accounts",
+        "update_status": "Block / Unblock user accounts",
+        "assign_role": "Assign roles to users"
+      }
+    }
+  },
+  "columns": {
+    "name": "Role Name",
+    "type": "Type",
+    "permissions": "Permissions",
+    "actions": "Actions"
+  },
+  "form": {
+    "nameLabel": "Role Name",
+    "namePlaceholder": "e.g. Operator, Auditor",
+    "permissionsLabel": "Assigned Permissions",
+    "save": "Save Changes",
+    "create": "Create Role",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "systemRoleHint": "System role — name cannot be changed."
+  },
+  "actions": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteConfirm": "Are you sure you want to delete this role?"
+  },
+  "errors": {
+    "rbac_role_not_found": "Role not found.",
+    "rbac_duplicate_role_name": "A role with this name already exists.",
+    "rbac_system_role_immutable": "This role's name cannot be changed and it cannot be deleted.",
+    "rbac_role_in_use": "This role still has users assigned to it.",
+    "rbac_cannot_remove_last_admin": "This is the last user with the admin role — assign it to someone else first.",
+    "rbac_cannot_modify_protected_admin": "This account's role is permanently locked and cannot be changed.",
+    "rbac_target_user_not_found": "Target user not found.",
+    "rbac_permission_denied": "You do not have permission to perform this action.",
+    "rbac_unknown_permission_id": "Unknown permission id."
+  },
+  "empty": "No roles found."
+}
