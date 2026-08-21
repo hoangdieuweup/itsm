@@ -15,6 +15,7 @@ from app.modules.auth.schemas import UserRead
 from app.modules.auth.services.issue_tokens import AppTokenSet, IssueTokens
 from app.modules.auth.services.sync_external_user import SyncExternalUser
 from app.modules.auth.uow import AbstractAuthUnitOfWork
+from app.modules.rbac.public import RbacApi
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,11 @@ class AuthenticateWithDx(AbstractUseCase):
     The caller (router) is responsible for validating/consuming the PKCE
     state before calling this — that is transport-level (cache lookup), not
     a business decision this use case needs to own.
+
+    For a brand new user, also grants the seeded default rbac role via
+    rbac's public facade (never rbac's internal dependencies.py/services/ —
+    see fastapi-modular-scaffold rule #1) in the same transaction this use
+    case commits — replaces the old DX-role-code auto-mapping.
     """
 
     def __init__(
@@ -44,6 +50,7 @@ class AuthenticateWithDx(AbstractUseCase):
         sync_user: SyncExternalUser,
         issue_tokens: IssueTokens,
         events: EventBus,
+        rbac_api: RbacApi,
     ) -> None:
         self._uow = uow
         self._dx_tokens = dx_tokens
@@ -51,6 +58,7 @@ class AuthenticateWithDx(AbstractUseCase):
         self._sync_user = sync_user
         self._issue_tokens = issue_tokens
         self._events = events
+        self._rbac_api = rbac_api
 
     @use_case
     async def execute(self, code: str, code_verifier: str) -> DxLoginResult:
@@ -60,6 +68,9 @@ class AuthenticateWithDx(AbstractUseCase):
         user, is_new = await self._sync_user.execute(profile)
         if not AuthRules.can_login(user.status):
             raise UserBlocked()
+
+        if is_new:
+            await self._rbac_api.assign_default_role(user.id)
 
         expires_at = datetime.now(UTC) + timedelta(seconds=token.expires_in)
         await self._dx_tokens.save(user.id, token, expires_at=expires_at)

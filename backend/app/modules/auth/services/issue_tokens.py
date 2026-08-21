@@ -29,7 +29,7 @@ class IssueTokens(AbstractUseCase):
     @use_case
     async def execute(self, user: UserRead) -> AppTokenSet:
         access = JwtCodec.encode(
-            {"sub": str(user.id), "role": user.role.value, "type": "access", "jti": uuid.uuid4().hex},
+            {"sub": str(user.id), "type": "access", "jti": uuid.uuid4().hex},
             secret=auth_settings.JWT_SECRET,
             ttl_seconds=auth_settings.ACCESS_TOKEN_TTL_SECONDS,
         )

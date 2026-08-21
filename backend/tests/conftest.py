@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 import pytest
 from httpx import ASGITransport, AsyncClient
 from redis.asyncio import Redis
+from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
@@ -14,6 +15,7 @@ from app.integrations.cache.client import CacheClient
 from app.integrations.cache.config import cache_settings
 from app.integrations.cache.dependencies import get_cache
 from app.main import app
+from app.modules.rbac.models import Role
 
 
 @pytest.fixture(scope="session")
@@ -88,3 +90,20 @@ async def client(engine) -> AsyncIterator[AsyncClient]:
     async with engine.begin() as conn:
         for table in reversed(Base.metadata.sorted_tables):
             await conn.execute(table.delete())
+
+
+@pytest.fixture(autouse=True)
+async def _seed_default_roles(engine, client: AsyncClient) -> None:  # noqa: ARG001 -- see docstring
+    """Every test gets the three default roles present, matching what
+    `python -m app.seeds.seed_rbac` guarantees in a real deploy — needed for
+    auth's /me to resolve a real roleName for a freshly synced user.
+
+    Depends on `client` (not just `engine`) purely for ordering: `client`
+    truncates every table in its own teardown, and fixture setup for the
+    *next* test runs after that teardown, so depending on it here guarantees
+    this insert lands after the tables are already clean. The `client`
+    argument itself is otherwise unused, hence the ARG001 suppression.
+    """
+    async with engine.begin() as conn:
+        for name in ("owner", "admin", "member"):
+            await conn.execute(insert(Role).values(name=name, is_system=True))

@@ -36,3 +36,10 @@ class NotAuthenticated(ForbiddenError):
     code = ErrorCode.NOT_AUTHENTICATED
     status_code = 401
     message = "Authentication required"
+
+
+class CannotBlockLastOwner(ForbiddenError):
+    """Raised when blocking this user would leave zero users holding the owner role."""
+
+    code = ErrorCode.CANNOT_BLOCK_LAST_OWNER
+    message = "This is the last user with the owner role — reassign it before blocking them"

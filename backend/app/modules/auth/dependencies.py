@@ -3,6 +3,13 @@
 The composition root: the only place that names a concrete class
 (AuthUnitOfWork, DxTokenRepository, ...) instead of its Abstract* contract.
 See references/layer-examples.md.
+
+Deliberately imports nothing from rbac: get_authenticate_with_dx and
+get_update_user_status need RbacApi (rbac.public), and rbac.public needs
+auth.public, which needs get_current_user/get_uow from this very file — so
+those two factory functions live in auth/router.py instead, which is never
+imported by anything else and can safely reach into rbac.public without
+closing that cycle. See auth/router.py's and rbac/public.py's docstrings.
 """
 
 import jwt
@@ -10,7 +17,6 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
-from app.core.events import EventBus, get_event_bus
 from app.core.security import JwtCodec
 from app.integrations.cache.client import CacheClient
 from app.integrations.cache.dependencies import get_cache
@@ -23,7 +29,6 @@ from app.modules.auth.constants import AuthCacheNamespaces, AuthCookies
 from app.modules.auth.exceptions import NotAuthenticated, UserBlocked, UserNotFound
 from app.modules.auth.rules import AuthRules
 from app.modules.auth.schemas import UserRead
-from app.modules.auth.services.authenticate import AuthenticateWithDx
 from app.modules.auth.services.issue_tokens import IssueTokens
 from app.modules.auth.services.logout import LogoutUser
 from app.modules.auth.services.sync_external_user import SyncExternalUser
@@ -89,18 +94,6 @@ async def get_sync_external_user(uow: AbstractAuthUnitOfWork = Depends(get_uow))
 async def get_issue_tokens() -> IssueTokens:
     """Provide the app session token issuance use case."""
     return IssueTokens()
-
-
-async def get_authenticate_with_dx(
-    uow: AbstractAuthUnitOfWork = Depends(get_uow),
-    dx_tokens: AbstractDxTokenRepository = Depends(get_dx_token_repository),
-    dx_client: DxCoreClient = Depends(get_dx_core_client),
-    sync_user: SyncExternalUser = Depends(get_sync_external_user),
-    issue_tokens: IssueTokens = Depends(get_issue_tokens),
-    events: EventBus = Depends(get_event_bus),
-) -> AuthenticateWithDx:
-    """Provide the DX OAuth2 callback use case."""
-    return AuthenticateWithDx(uow, dx_tokens, dx_client, sync_user, issue_tokens, events)
 
 
 async def get_logout_user(

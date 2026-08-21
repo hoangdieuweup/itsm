@@ -1,4 +1,4 @@
-"""Single access path to the auth tables (users, departments)."""
+"""Single access path to the auth tables (users)."""
 
 from abc import abstractmethod
 from datetime import datetime
@@ -8,9 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database
 from app.core.base.repository import AbstractRepository
-from app.modules.auth.constants import UserRole, UserStatus
-from app.modules.auth.models import Department, User
-from app.modules.auth.schemas import DepartmentRead, UserRead
+from app.modules.auth.constants import UserStatus
+from app.modules.auth.models import User
+from app.modules.auth.schemas import UserRead
 
 
 class AbstractUserRepository(AbstractRepository[UserRead]):
@@ -37,14 +37,11 @@ class AbstractUserRepository(AbstractRepository[UserRead]):
         *,
         email: str,
         name: str,
-        role: UserRole,
         external_user_id: str,
         employee_code: str | None,
         email_confirmed: bool,
-        department_id: int | None,
     ) -> UserRead:
-        """Create a new user synced from a DX profile. role is set only here —
-        a later profile sync never overwrites it, see update_profile."""
+        """Create a new user synced from a DX profile."""
         raise NotImplementedError
 
     @abstractmethod
@@ -57,16 +54,20 @@ class AbstractUserRepository(AbstractRepository[UserRead]):
         external_user_id: str,
         employee_code: str | None,
         email_confirmed: bool,
-        department_id: int | None,
     ) -> UserRead:
         """Sync an existing user's profile fields from DX. Deliberately excludes
-        role and status: a local admin's promotion/demotion or suspension must
-        never be silently overwritten by the next DX login."""
+        status: a local admin's suspension must never be silently overwritten by
+        the next DX login."""
         raise NotImplementedError
 
     @abstractmethod
     async def set_last_login(self, user_id: int, at: datetime) -> None:
         """Record the timestamp of a completed login."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def set_status(self, user_id: int, status: UserStatus) -> UserRead:
+        """Block or unblock a user."""
         raise NotImplementedError
 
 
@@ -108,11 +109,9 @@ class UserRepository(AbstractUserRepository):
         *,
         email: str,
         name: str,
-        role: UserRole,
         external_user_id: str,
         employee_code: str | None,
         email_confirmed: bool,
-        department_id: int | None,
     ) -> UserRead:
         """Create a new user synced from a DX profile.
 
@@ -123,12 +122,10 @@ class UserRepository(AbstractUserRepository):
         row = User(
             email=email,
             name=name,
-            role=role,
             status=UserStatus.ACTIVE,
             external_user_id=external_user_id,
             employee_code=employee_code,
             email_confirmed=email_confirmed,
-            department_id=department_id,
         )
         self._session.add(row)
         await self._session.flush()
@@ -145,9 +142,8 @@ class UserRepository(AbstractUserRepository):
         external_user_id: str,
         employee_code: str | None,
         email_confirmed: bool,
-        department_id: int | None,
     ) -> UserRead:
-        """Sync an existing user's profile fields from DX (role/status untouched)."""
+        """Sync an existing user's profile fields from DX (status untouched)."""
         row = await self._session.get(User, user_id)
         if row is None:
             raise ValueError(f"user {user_id} does not exist")
@@ -156,7 +152,6 @@ class UserRepository(AbstractUserRepository):
         row.external_user_id = external_user_id
         row.employee_code = employee_code
         row.email_confirmed = email_confirmed
-        row.department_id = department_id
         await self._session.flush()
         await self._session.refresh(row)
         return UserRead.model_validate(row)
@@ -169,56 +164,13 @@ class UserRepository(AbstractUserRepository):
             row.last_login_at = at
             await self._session.flush()
 
-
-class AbstractDepartmentRepository(AbstractRepository[DepartmentRead]):
-    """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
-
-    @abstractmethod
-    async def find_by_code(self, code: str) -> DepartmentRead | None:
-        """Look up a department by its DX code."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def get_or_create_by_code(self, code: str, name: str) -> DepartmentRead:
-        """Return the department for code, creating it from a DX profile if new."""
-        raise NotImplementedError
-
-
-class DepartmentRepository(AbstractDepartmentRepository):
-    """SQLAlchemy implementation. Every read of the departments table goes through this class."""
-
-    def __init__(self, session: AsyncSession) -> None:
-        self._session = session
-
     @database
-    async def get_by_id(self, entity_id: int) -> DepartmentRead | None:
-        """Return one department, or None when it does not exist."""
-        row = await self._session.scalar(select(Department).where(Department.id == entity_id))
-        return DepartmentRead.model_validate(row) if row else None
-
-    @database
-    async def find_by_code(self, code: str) -> DepartmentRead | None:
-        """Look up a department by its DX code."""
-        row = await self._session.scalar(select(Department).where(Department.code == code))
-        return DepartmentRead.model_validate(row) if row else None
-
-    @database
-    async def list_page(self, limit: int, offset: int) -> tuple[list[DepartmentRead], int]:
-        """Return one page of departments together with the total count."""
-        rows = await self._session.scalars(
-            select(Department).order_by(Department.id).limit(limit).offset(offset)
-        )
-        items = [DepartmentRead.model_validate(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(Department))
-        return items, total or 0
-
-    @database
-    async def get_or_create_by_code(self, code: str, name: str) -> DepartmentRead:
-        """Return the department for code, creating it from a DX profile if new."""
-        row = await self._session.scalar(select(Department).where(Department.code == code))
+    async def set_status(self, user_id: int, status: UserStatus) -> UserRead:
+        """Block or unblock a user."""
+        row = await self._session.get(User, user_id)
         if row is None:
-            row = Department(code=code, name=name)
-            self._session.add(row)
-            await self._session.flush()
-            await self._session.refresh(row)
-        return DepartmentRead.model_validate(row)
+            raise ValueError(f"user {user_id} does not exist")
+        row.status = status
+        await self._session.flush()
+        await self._session.refresh(row)
+        return UserRead.model_validate(row)
