@@ -187,3 +187,36 @@ class TestLogout:
         client.cookies.update(callback.cookies)  # simulate a stolen, not-yet-expired cookie
         me_after_logout = await client.get("/api/v1/auth/me")
         assert me_after_logout.status_code == 401
+
+
+class TestRefreshEndpoint:
+    async def test_refresh_issues_new_cookies_and_allows_me_request(self, client: AsyncClient) -> None:
+        _install_fake_dx_client(_profile(email="grace@example.com", sub="dx-sub-router-5"))
+        state = await _start_and_get_state(client)
+        callback = await client.get(
+            "/api/v1/auth/oauth/dx/callback", params={"code": "auth-code", "state": state}
+        )
+        client.cookies.update(callback.cookies)
+
+        # Execute refresh endpoint
+        response = await client.post("/api/v1/auth/refresh")
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+
+        # Check that new cookies are set
+        new_cookies = response.cookies
+        assert AuthCookies.ACCESS_TOKEN in new_cookies
+        assert AuthCookies.REFRESH_TOKEN in new_cookies
+
+        # Update client with new cookies and call /auth/me
+        client.cookies.update(new_cookies)
+        me_response = await client.get("/api/v1/auth/me")
+        assert me_response.status_code == 200
+        assert me_response.json()["data"]["user"]["email"] == "grace@example.com"
+
+    async def test_refresh_without_cookie_returns_401(self, client: AsyncClient) -> None:
+        client.cookies.clear()
+        response = await client.post("/api/v1/auth/refresh")
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == "auth_not_authenticated"
+

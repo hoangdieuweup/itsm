@@ -25,6 +25,13 @@ class AuthCookies:
     SameSite = Literal["lax", "none", "strict"]
 
 
+class TokenType(StrEnum):
+    """JWT token types issued by the auth module."""
+
+    ACCESS = "access"
+    REFRESH = "refresh"
+
+
 class AuthCacheNamespaces:
     """Redis key namespaces owned by the auth module.
 

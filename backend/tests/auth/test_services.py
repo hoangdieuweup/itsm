@@ -10,20 +10,23 @@ from datetime import UTC, datetime
 import jwt
 import pytest
 
+from typing import cast
+
 from app.core.events import DomainEvent
 from app.integrations.cache.keys import CacheKeyBuilder
 from app.integrations.dx_core.client import DxDepartment, DxUserProfile
 from app.integrations.dx_core.repository import AbstractDxTokenRepository
 from app.modules.auth.config import auth_settings
-from app.modules.auth.constants import AuthCacheNamespaces
-from app.modules.auth.exceptions import UserBlocked
+from app.modules.auth.constants import AuthCacheNamespaces, TokenType
+from app.modules.auth.exceptions import NotAuthenticated, UserBlocked
 from app.modules.auth.services.authenticate import AuthenticateWithDx
 from app.modules.auth.services.issue_tokens import IssueTokens
 from app.modules.auth.services.logout import LogoutUser
+from app.modules.auth.services.refresh_token import RefreshToken
 from app.modules.auth.services.sync_external_user import SyncExternalUser
 from app.modules.auth.uow import AbstractAuthUnitOfWork
 from app.modules.common.constants import UserStatus
-from app.modules.users.public import UserRead
+from app.modules.users.public import UserRead, UsersApi
 
 
 class FakeAuthUnitOfWork(AbstractAuthUnitOfWork):
@@ -442,6 +445,72 @@ class TestLogoutUser:
         use_case = LogoutUser(dx_tokens, FakeDxCoreClient(), cache_client)
 
         await use_case.execute(1, "not-a-jwt", None)  # must not raise
+
+
+class TestRefreshToken:
+    @staticmethod
+    def _create_token(sub: str = "1", token_type: str = TokenType.REFRESH, jti: str = "test-jti", exp_offset: int = 3600) -> str:
+        payload = {
+            "sub": sub,
+            "type": token_type,
+            "jti": jti,
+            "exp": int(datetime.now(UTC).timestamp()) + exp_offset,
+            "iat": int(datetime.now(UTC).timestamp()),
+        }
+        return jwt.encode(payload, auth_settings.JWT_SECRET, algorithm="HS256")
+
+    async def test_refreshes_tokens_with_valid_refresh_token_and_rotates(self, cache_client) -> None:
+        users_api = FakeUsersApi()
+        users_api._rows[1] = UserRead(id=1, email="alice@example.com", name="Alice", status=UserStatus.ACTIVE)
+        issue_tokens = IssueTokens()
+        use_case = RefreshToken(cast(UsersApi, users_api), issue_tokens, cache_client)
+
+        old_refresh = self._create_token(sub="1", token_type=TokenType.REFRESH, jti="old-jti")
+        new_tokens = await use_case.execute(old_refresh)
+
+        assert new_tokens.access_token is not None
+        assert new_tokens.refresh_token is not None
+        assert new_tokens.refresh_token != old_refresh
+
+        # Old refresh token should now be blacklisted in Redis
+        blacklist_key = CacheKeyBuilder.session_key(AuthCacheNamespaces.TOKEN_BLACKLIST, "old-jti")
+        assert await cache_client.get_json(blacklist_key) == {"revoked": True}
+
+    async def test_raises_not_authenticated_for_none_token(self, cache_client) -> None:
+        users_api = FakeUsersApi()
+        use_case = RefreshToken(cast(UsersApi, users_api), IssueTokens(), cache_client)
+
+        with pytest.raises(NotAuthenticated):
+            await use_case.execute(None)
+
+    async def test_raises_not_authenticated_for_wrong_token_type(self, cache_client) -> None:
+        users_api = FakeUsersApi()
+        use_case = RefreshToken(cast(UsersApi, users_api), IssueTokens(), cache_client)
+
+        access_token = self._create_token(sub="1", token_type=TokenType.ACCESS)
+        with pytest.raises(NotAuthenticated):
+            await use_case.execute(access_token)
+
+    async def test_raises_not_authenticated_for_blacklisted_token(self, cache_client) -> None:
+        users_api = FakeUsersApi()
+        users_api._rows[1] = UserRead(id=1, email="alice@example.com", name="Alice", status=UserStatus.ACTIVE)
+        use_case = RefreshToken(cast(UsersApi, users_api), IssueTokens(), cache_client)
+
+        token = self._create_token(sub="1", jti="blacklisted-jti")
+        blacklist_key = CacheKeyBuilder.session_key(AuthCacheNamespaces.TOKEN_BLACKLIST, "blacklisted-jti")
+        await cache_client.set_json(blacklist_key, {"revoked": True}, ttl=3600)
+
+        with pytest.raises(NotAuthenticated):
+            await use_case.execute(token)
+
+    async def test_raises_user_blocked_when_user_is_blocked(self, cache_client) -> None:
+        users_api = FakeUsersApi()
+        users_api._rows[1] = UserRead(id=1, email="blocked@example.com", name="Blocked", status=UserStatus.BLOCKED)
+        use_case = RefreshToken(cast(UsersApi, users_api), IssueTokens(), cache_client)
+
+        token = self._create_token(sub="1")
+        with pytest.raises(UserBlocked):
+            await use_case.execute(token)
 
 
 def _blacklist_key(raw_token: str) -> str:
