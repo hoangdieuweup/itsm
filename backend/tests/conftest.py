@@ -5,9 +5,11 @@ from collections.abc import AsyncIterator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from redis.asyncio import Redis
 from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from testcontainers.mongodb import MongoDbContainer
 from testcontainers.postgres import PostgresContainer
 
 from app.config import settings
@@ -38,6 +40,23 @@ async def engine(postgres_url: str):
         await conn.run_sync(Base.metadata.create_all)
     yield engine
     await engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def mongo_url() -> AsyncIterator[str]:
+    """Start one MongoDB container for the whole test session."""
+    with MongoDbContainer("mongo:7") as container:
+        yield container.get_connection_url()
+
+
+@pytest.fixture
+async def mongo_db(mongo_url: str) -> AsyncIterator[AsyncIOMotorDatabase]:
+    """Provide a Motor database backed by the test container, dropped after each test."""
+    client = AsyncIOMotorClient(mongo_url)
+    db = client["itsm_test"]
+    yield db
+    await client.drop_database("itsm_test")
+    client.close()
 
 
 @pytest.fixture
