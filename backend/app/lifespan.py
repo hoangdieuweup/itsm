@@ -8,8 +8,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.config import settings
 from app.integrations.cache.client import RedisConnectionFactory
+from app.integrations.mongo.client import MongoConnectionFactory
 from app.integrations.queue.client import Broker
 from app.integrations.storage.client import StorageClient
+from app.modules.audit.repository import MongoAuditLogRepository
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,9 @@ async def lifespan(app: FastAPI):
     app.state.broker = Broker()
     await app.state.broker.connect()
     app.state.storage = StorageClient()
+    app.state.mongo_client = MongoConnectionFactory.create()
+    app.state.mongo_db = MongoConnectionFactory.database(app.state.mongo_client)
+    await MongoAuditLogRepository(app.state.mongo_db).ensure_indexes()
 
     logger.info("application resources initialized")
     yield
@@ -37,5 +42,6 @@ async def lifespan(app: FastAPI):
     await app.state.redis.aclose()
     await app.state.broker.close()
     await app.state.storage.close()
+    app.state.mongo_client.close()
     await engine.dispose()
     logger.info("application resources released")
