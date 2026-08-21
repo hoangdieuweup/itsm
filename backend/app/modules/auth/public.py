@@ -9,6 +9,7 @@ from fastapi import Depends
 
 from app.core.base.markers import facade
 from app.modules.auth.dependencies import get_current_user, get_uow
+from app.modules.auth.rules import AuthRules
 from app.modules.auth.schemas import UserRead
 from app.modules.auth.uow import AbstractAuthUnitOfWork
 
@@ -33,6 +34,13 @@ class AuthApi:
         module — never for bulk reads, which would mean that module wants its
         own list_page-shaped facade method instead."""
         return await self._uow.users.get_by_id(user_id)
+
+    @facade
+    async def is_protected_admin(self, user_id: int) -> bool:
+        """True when user_id is the seeded break-glass admin account —
+        used by rbac's AssignRole to reject reassigning its role."""
+        user = await self.get_user_by_id(user_id)
+        return user is not None and AuthRules.is_protected_admin_email(user.email)
 
 
 async def get_auth_api(

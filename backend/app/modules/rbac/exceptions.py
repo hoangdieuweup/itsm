@@ -39,6 +39,14 @@ class CannotRemoveLastAdmin(ValidationFailedError):
     message = "This is the last user with the admin role — assign it to someone else first"
 
 
+class CannotModifyProtectedAdmin(ForbiddenError):
+    """Raised when attempting to reassign the role of the seeded break-glass
+    admin account — its role is permanently locked."""
+
+    code = ErrorCode.CANNOT_MODIFY_PROTECTED_ADMIN
+    message = "This account's role is permanently locked and cannot be changed"
+
+
 class TargetUserNotFound(NotFoundError):
     """Raised when assigning a role to a user id that doesn't exist in auth."""
 

@@ -54,6 +54,7 @@ class RbacTypes:
     """Type aliases owned by the rbac module."""
 
     UserLookup = Callable[[int], Awaitable[Any | None]]
+    ProtectionCheck = Callable[[int], Awaitable[bool]]
 
 
 class ErrorCode(StrEnum):
@@ -64,6 +65,7 @@ class ErrorCode(StrEnum):
     SYSTEM_ROLE_IMMUTABLE = "rbac_system_role_immutable"
     ROLE_IN_USE = "rbac_role_in_use"
     CANNOT_REMOVE_LAST_ADMIN = "rbac_cannot_remove_last_admin"
+    CANNOT_MODIFY_PROTECTED_ADMIN = "rbac_cannot_modify_protected_admin"
     TARGET_USER_NOT_FOUND = "rbac_target_user_not_found"
     PERMISSION_DENIED = "rbac_permission_denied"
     UNKNOWN_PERMISSION_ID = "rbac_unknown_permission_id"
