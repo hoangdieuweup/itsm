@@ -14,6 +14,7 @@ import {
 } from "@/shared/ui/dropdown-menu";
 import { useAuthSession } from "../hooks/use-auth-session";
 import { useLogout } from "../hooks/use-logout";
+import { isAuthenticated } from "../model/session";
 
 /**
  * Authenticated user avatar with a dropdown containing profile info and
@@ -26,7 +27,7 @@ export function UserMenu() {
   const { data: session } = useAuthSession();
   const logout = useLogout();
 
-  if (session.status !== "authenticated" || !session.user) {
+  if (!isAuthenticated(session) || !session.user) {
     return null;
   }
 

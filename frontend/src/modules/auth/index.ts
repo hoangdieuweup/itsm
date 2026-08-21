@@ -4,4 +4,11 @@ export { AuthGuard } from "./ui/auth-guard";
 export { useAuthSession } from "./hooks/use-auth-session";
 export { fetchAuthSession } from "./api/session";
 export { authKeys } from "./api/query-keys";
-export type { AuthSession } from "./model/session";
+export {
+  isAuthenticated,
+  AUTH_STATUS,
+  type AuthSession,
+  type AuthenticatedAuthSession,
+  type AuthStatus,
+} from "./model/session";
+

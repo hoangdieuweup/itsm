@@ -7,8 +7,9 @@ import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
-import { Can } from "@/entities/permission";
+import { Can, RESOURCES, ACTIONS } from "@/entities/permission";
 import { USER_STATUS, type User } from "@/entities/user";
+
 import { isProtectedAdminRole, SYSTEM_ROLE_NAMES } from "@/shared/constants/roles";
 import { useUsers } from "../api/use-users";
 import { useUpdateUserStatus } from "../hooks/use-update-user-status";
@@ -209,7 +210,7 @@ export function UsersPageContent() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Can I="assign_role" a="user">
+                          <Can I={ACTIONS.ASSIGN_ROLE} a={RESOURCES.USER}>
                             <Button
                               size="sm"
                               variant="outline"
@@ -219,7 +220,7 @@ export function UsersPageContent() {
                               {t("actions.assignRoles")}
                             </Button>
                           </Can>
-                          <Can I="update_status" a="user">
+                          <Can I={ACTIONS.UPDATE_STATUS} a={RESOURCES.USER}>
                             <Button
                               size="sm"
                               variant={isBlocked ? "outline" : "destructive"}
@@ -235,6 +236,7 @@ export function UsersPageContent() {
                             </Button>
                           </Can>
                         </div>
+
                       </td>
                     </tr>
                   );

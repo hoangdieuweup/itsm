@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { Plus, Shield, ShieldCheck, Edit2, Trash2, AlertCircle, Key, Eye } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
-import { Can } from "@/entities/permission";
+import { Can, RESOURCES, ACTIONS } from "@/entities/permission";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useRoles, isProtectedAdminRole, type Role } from "@/entities/role";
 import { useDeleteRole } from "../hooks/use-delete-role";
@@ -68,7 +68,7 @@ export function RolesPageContent() {
           <p className="mt-1 text-sm text-muted-foreground">{t("description")}</p>
         </div>
 
-        <Can I="create" a="role">
+        <Can I={ACTIONS.CREATE} a={RESOURCES.ROLE}>
           <Button
             onClick={handleCreate}
             className="gap-2 self-start bg-blue-600 font-semibold text-white shadow-xs shadow-blue-500/25 hover:bg-blue-700 sm:self-auto"
@@ -83,89 +83,76 @@ export function RolesPageContent() {
       {errorMessage && (
         <div
           role="alert"
-          className="flex items-center gap-2.5 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive"
+          className="mb-6 flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/50 dark:text-rose-200"
         >
-          <AlertCircle className="size-4 shrink-0" aria-hidden />
-          <span>{errorMessage}</span>
+          <div className="flex items-center gap-2">
+            <AlertCircle className="size-4 shrink-0 text-rose-600 dark:text-rose-400" />
+            <span>{errorMessage}</span>
+          </div>
+          <button
+            onClick={() => setErrorMessage(null)}
+            className="text-rose-500 hover:text-rose-700 dark:hover:text-rose-300"
+          >
+            &times;
+          </button>
         </div>
       )}
 
-      {/* Roles Table */}
-      <div className="overflow-hidden rounded-2xl bg-card shadow-xs">
+      {/* Roles List Table */}
+      <div className="rounded-xl border border-border/80 bg-card shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-muted/40 text-xs font-bold uppercase tracking-wider text-muted-foreground/90">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-border/60 bg-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th scope="col" className="px-6 py-4 font-bold text-foreground/80">
-                  {t("columns.name")}
-                </th>
-                <th scope="col" className="px-6 py-4 font-bold text-foreground/80">
-                  {t("columns.type")}
-                </th>
-                <th scope="col" className="px-6 py-4 font-bold text-foreground/80">
-                  {t("columns.permissions")}
-                </th>
-                <th scope="col" className="px-6 py-4 text-right font-bold text-foreground/80">
-                  {t("columns.actions")}
-                </th>
+                <th className="px-6 py-3.5">{t("columns.name")}</th>
+                <th className="px-6 py-3.5">{t("columns.type")}</th>
+                <th className="px-6 py-3.5">{t("columns.permissions")}</th>
+                <th className="px-6 py-3.5 text-right">{t("columns.actions")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/60">
+            <tbody className="divide-y divide-border/40">
               {page.items.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={4}
-                    className="px-6 py-16 text-center text-muted-foreground"
-                  >
-                    <div className="flex flex-col items-center justify-center gap-2.5">
-                      <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-                        <Key className="size-6 text-muted-foreground/60" />
-                      </div>
-                      <p className="font-medium">{t("empty")}</p>
-                    </div>
+                  <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">
+                    {t("noRoles")}
                   </td>
                 </tr>
               ) : (
                 page.items.map((role) => {
+                  const isSystem = role.isSystem;
                   const isDeleting =
-                    deleteRole.isPending &&
-                    deleteRole.variables === role.id;
+                    deleteRole.isPending && deleteRole.variables === role.id;
 
                   return (
                     <tr
                       key={role.id}
                       className="transition-colors hover:bg-muted/30"
                     >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex size-8 items-center justify-center rounded-lg border border-border/80 bg-muted/60">
-                            {role.isSystem ? (
-                              <ShieldCheck className="size-4 text-blue-600 dark:text-blue-400" />
-                            ) : (
-                              <Shield className="size-4 text-muted-foreground" />
-                            )}
-                          </div>
-                          <span className="font-semibold text-foreground">
-                            {role.name}
-                          </span>
+                      <td className="px-6 py-4 font-medium text-foreground">
+                        <div className="flex items-center gap-2.5">
+                          {isSystem ? (
+                            <ShieldCheck className="size-4 shrink-0 text-indigo-500" />
+                          ) : (
+                            <Shield className="size-4 shrink-0 text-muted-foreground" />
+                          )}
+                          <span>{role.name}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex flex-wrap items-center gap-1.5">
+                        <div className="flex items-center gap-1.5">
                           <span
-                            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
-                              role.isSystem
-                                ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/60 dark:text-blue-300"
-                                : "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-900/60 dark:bg-purple-950/60 dark:text-purple-300"
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                              isSystem
+                                ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300"
+                                : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
                             }`}
                           >
-                            {role.isSystem
-                              ? t("types.system")
-                              : t("types.custom")}
+                            {isSystem ? t("badge.system") : t("badge.custom")}
                           </span>
                           {isProtectedAdminRole(role) && (
-                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/60 dark:text-amber-300">
-                              {t("badges.adminProtected")}
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" title={t("adminRoleProtectedTooltip")}>
+                              <Key className="size-3" />
+                              {t("badge.protected")}
                             </span>
                           )}
                         </div>
@@ -177,7 +164,7 @@ export function RolesPageContent() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Can I="update" a="role">
+                          <Can I={ACTIONS.UPDATE} a={RESOURCES.ROLE}>
                             <Button
                               size="sm"
                               variant="ghost"
@@ -197,7 +184,7 @@ export function RolesPageContent() {
                           </Can>
 
                           {!role.isSystem && (
-                            <Can I="delete" a="role">
+                            <Can I={ACTIONS.DELETE} a={RESOURCES.ROLE}>
                               <Button
                                 size="sm"
                                 variant="ghost"

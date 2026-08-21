@@ -5,8 +5,9 @@ import { useTranslations } from "next-intl";
 import { LayoutDashboard, Users, Shield, Menu, X } from "lucide-react";
 import { Link, usePathname } from "@/shared/lib/i18n/navigation";
 import { ROUTES } from "@/shared/constants/routes";
-import { Can } from "@/entities/permission";
+import { Can, RESOURCES, ACTIONS } from "@/entities/permission";
 import { UserMenu } from "@/modules/auth";
+
 import { LanguageSwitch } from "@/modules/auth/ui/language-switch";
 import { AnimatePresence, m } from "@/shared/lib/motion";
 
@@ -60,7 +61,7 @@ export function DashboardHeader() {
               {t("dashboard")}
             </Link>
 
-            <Can I="read" a="user">
+            <Can I={ACTIONS.READ} a={RESOURCES.USER}>
               <Link
                 href={ROUTES.adminUsers}
                 className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
@@ -74,7 +75,7 @@ export function DashboardHeader() {
               </Link>
             </Can>
 
-            <Can I="read" a="role">
+            <Can I={ACTIONS.READ} a={RESOURCES.ROLE}>
               <Link
                 href={ROUTES.adminRoles}
                 className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
@@ -87,6 +88,7 @@ export function DashboardHeader() {
                 {t("roles")}
               </Link>
             </Can>
+
           </nav>
         </div>
 
@@ -139,7 +141,7 @@ export function DashboardHeader() {
                 {t("dashboard")}
               </Link>
 
-              <Can I="read" a="user">
+              <Can I={ACTIONS.READ} a={RESOURCES.USER}>
                 <Link
                   href={ROUTES.adminUsers}
                   onClick={closeMobileMenu}
@@ -154,7 +156,7 @@ export function DashboardHeader() {
                 </Link>
               </Can>
 
-              <Can I="read" a="role">
+              <Can I={ACTIONS.READ} a={RESOURCES.ROLE}>
                 <Link
                   href={ROUTES.adminRoles}
                   onClick={closeMobileMenu}
@@ -168,6 +170,7 @@ export function DashboardHeader() {
                   {t("roles")}
                 </Link>
               </Can>
+
             </nav>
 
             <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-3 sm:hidden">

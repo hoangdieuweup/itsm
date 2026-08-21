@@ -1,5 +1,6 @@
 import { apiFetch, ApiRequestError } from "@/shared/lib/api-client";
 import { API_CONFIG } from "@/shared/constants/api";
+import { AUTH_STATUS } from "@/shared/constants/auth";
 import { meResponseSchema, type AuthSession } from "../model/session";
 
 /**
@@ -19,7 +20,7 @@ export async function fetchAuthSession(): Promise<AuthSession> {
     const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.AUTH.ME);
     const me = meResponseSchema.parse(raw);
     return {
-      status: "authenticated",
+      status: AUTH_STATUS.AUTHENTICATED,
       user: me.user,
       roleName: me.roleName,
       roleNames: me.roleNames,
@@ -28,7 +29,7 @@ export async function fetchAuthSession(): Promise<AuthSession> {
   } catch (error) {
     if (error instanceof ApiRequestError) {
       return {
-        status: "unauthenticated",
+        status: AUTH_STATUS.UNAUTHENTICATED,
         user: null,
         roleName: "",
         roleNames: [],

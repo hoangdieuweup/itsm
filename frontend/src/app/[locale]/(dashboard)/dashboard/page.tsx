@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { Users, Shield, ArrowRight, Activity, Sparkles } from "lucide-react";
 import { Link } from "@/shared/lib/i18n/navigation";
 import { ROUTES } from "@/shared/constants/routes";
-import { Can } from "@/entities/permission";
+import { Can, RESOURCES, ACTIONS } from "@/entities/permission";
 import { useAuthSession } from "@/modules/auth";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/shared/ui/card";
 
@@ -36,7 +36,7 @@ export default function DashboardPage() {
 
       {/* Quick Navigation Cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        <Can I="read" a="user">
+        <Can I={ACTIONS.READ} a={RESOURCES.USER}>
           <Link href={ROUTES.adminUsers} className="group">
             <Card className="h-full transition-all duration-200 hover:shadow-md shadow-xs bg-card">
               <CardHeader>
@@ -57,7 +57,8 @@ export default function DashboardPage() {
           </Link>
         </Can>
 
-        <Can I="read" a="role">
+        <Can I={ACTIONS.READ} a={RESOURCES.ROLE}>
+
           <Link href={ROUTES.adminRoles} className="group">
             <Card className="h-full transition-all duration-200 hover:shadow-md shadow-xs bg-card">
               <CardHeader>

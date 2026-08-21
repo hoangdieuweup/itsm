@@ -8,7 +8,10 @@ import {
   type ReactNode,
 } from "react";
 
-export type Permission = `${string}.${string}`;
+import type { Permission } from "../lib/permission";
+
+export type { Permission };
+
 
 interface PermissionContextValue {
   permissions: ReadonlySet<Permission>;
