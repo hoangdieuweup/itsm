@@ -5,14 +5,7 @@ Other modules import these with an explicit alias:
 """
 
 from enum import StrEnum
-
-
-class UserRole(StrEnum):
-    """Application role a user is granted after sign in."""
-
-    OWNER = "owner"
-    ADMIN = "admin"
-    MEMBER = "member"
+from typing import Literal
 
 
 class UserStatus(StrEnum):
@@ -44,6 +37,8 @@ class AuthCookies:
     ACCESS_TOKEN = "access_token"
     REFRESH_TOKEN = "refresh_token"
 
+    SameSite = Literal["lax", "none", "strict"]
+
 
 class AuthCacheNamespaces:
     """Redis key namespaces owned by the auth module.
@@ -68,14 +63,3 @@ class LoginPolicy:
     """Statuses that must never be allowed to complete a login, regardless of role."""
 
     BLOCKED_STATUSES: frozenset[UserStatus] = frozenset({UserStatus.BLOCKED})
-
-
-class RoleMapping:
-    """DX external role code -> application UserRole. See docs/tasks/sso-login.md #8."""
-
-    EXTERNAL_ROLE_MAP: dict[str, UserRole] = {
-        "director": UserRole.OWNER,
-        "manager": UserRole.ADMIN,
-        "employee": UserRole.MEMBER,
-    }
-    DEFAULT_EXTERNAL_ROLE_CODE = "employee"
