@@ -23,31 +23,43 @@ def upgrade() -> None:
     sa.Column('created_by', sa.UUID(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['created_by'], ['users.id'], name=op.f('projects_created_by_fkey'), ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(
+        ['created_by'], ['users.id'], name=op.f('projects_created_by_fkey'), ondelete='SET NULL'
+    ),
     sa.PrimaryKeyConstraint('id', name=op.f('projects_pkey'))
     )
     op.create_table('project_links',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('project_id', sa.UUID(), nullable=False),
-    sa.Column('type', sa.Enum('JIRA', 'GIT', 'OTHER', name='projectlinktype', native_enum=False), nullable=False),
+    sa.Column(
+        'type', sa.Enum('JIRA', 'GIT', 'OTHER', name='projectlinktype', native_enum=False), nullable=False
+    ),
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('url', sa.Text(), nullable=False),
     sa.Column('is_default', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['project_id'], ['projects.id'], name=op.f('project_links_project_id_fkey'), ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(
+        ['project_id'], ['projects.id'], name=op.f('project_links_project_id_fkey'), ondelete='CASCADE'
+    ),
     sa.PrimaryKeyConstraint('id', name=op.f('project_links_pkey'))
     )
     op.create_index(op.f('project_links_project_id_idx'), 'project_links', ['project_id'], unique=False)
     op.create_table('environments',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('project_id', sa.UUID(), nullable=False),
-    sa.Column('type', sa.Enum('DEV', 'STAGING', 'PRODUCTION', name='environmenttype', native_enum=False), nullable=False),
+    sa.Column(
+        'type',
+        sa.Enum('DEV', 'STAGING', 'PRODUCTION', name='environmenttype', native_enum=False),
+        nullable=False,
+    ),
     sa.Column('name', sa.String(length=100), nullable=False),
     sa.Column('base_url', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['project_id'], ['projects.id'], name=op.f('environments_project_id_fkey'), ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(
+        ['project_id'], ['projects.id'], name=op.f('environments_project_id_fkey'), ondelete='CASCADE'
+    ),
     sa.PrimaryKeyConstraint('id', name=op.f('environments_pkey')),
     sa.UniqueConstraint('project_id', 'type', name='environments_project_id_type_key')
     )

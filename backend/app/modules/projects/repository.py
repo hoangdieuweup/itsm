@@ -116,7 +116,9 @@ class AbstractEnvironmentRepository(AbstractRepository[EnvironmentRead, UUID]):
         raise NotImplementedError
 
     @abstractmethod
-    async def update(self, environment_id: UUID, *, name: str | None, base_url: str | None) -> EnvironmentRead:
+    async def update(
+        self, environment_id: UUID, *, name: str | None, base_url: str | None
+    ) -> EnvironmentRead:
         """Rename and/or re-point an environment. type is immutable."""
         raise NotImplementedError
 
@@ -137,7 +139,10 @@ class EnvironmentRepository(AbstractEnvironmentRepository):
     async def get_by_id(self, entity_id: UUID) -> EnvironmentRead | None:
         """Return one environment, or None when it does not exist. Cache-aside."""
         return await self._cache.get_or_load(
-            ProjectsCacheKeys.ENVIRONMENT_ENTITY, entity_id, EnvironmentRead, lambda: self._load_by_id(entity_id)
+            ProjectsCacheKeys.ENVIRONMENT_ENTITY,
+            entity_id,
+            EnvironmentRead,
+            lambda: self._load_by_id(entity_id),
         )
 
     @helper
@@ -148,7 +153,8 @@ class EnvironmentRepository(AbstractEnvironmentRepository):
 
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[EnvironmentRead], int]:
-        """Required by AbstractRepository; environments are listed per-project in practice (list_for_project)."""
+        """Required by AbstractRepository; environments are listed per-project
+        in practice (list_for_project)."""
         rows = await self._session.scalars(
             select(Environment).order_by(Environment.id).limit(limit).offset(offset)
         )
@@ -186,7 +192,9 @@ class EnvironmentRepository(AbstractEnvironmentRepository):
         return EnvironmentRead.model_validate(row)
 
     @database
-    async def update(self, environment_id: UUID, *, name: str | None, base_url: str | None) -> EnvironmentRead:
+    async def update(
+        self, environment_id: UUID, *, name: str | None, base_url: str | None
+    ) -> EnvironmentRead:
         """Rename and/or re-point an environment. Caller must confirm environment_id exists first."""
         row = await self._session.get(Environment, environment_id)
         if row is None:

@@ -14,7 +14,9 @@ class UpdateEnvironment(AbstractUseCase):
         self._uow = uow
 
     @use_case
-    async def execute(self, environment_id: UUID, *, name: str | None, base_url: str | None) -> EnvironmentRead:
+    async def execute(
+        self, environment_id: UUID, *, name: str | None, base_url: str | None
+    ) -> EnvironmentRead:
         if await self._uow.environments.get_by_id(environment_id) is None:
             raise EnvironmentNotFound()
         updated = await self._uow.environments.update(environment_id, name=name, base_url=base_url)

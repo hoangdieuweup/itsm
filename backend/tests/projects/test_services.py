@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from app.modules.projects.config import projects_settings
 from app.modules.projects.constants import EnvironmentType, ProjectLinkType
 from app.modules.projects.exceptions import (
     EnvironmentNotFound,
@@ -18,6 +19,15 @@ from app.modules.projects.repository import (
     AbstractProjectRepository,
 )
 from app.modules.projects.schemas import EnvironmentRead, ProjectLinkRead, ProjectRead
+from app.modules.projects.services.create_environment import CreateEnvironment
+from app.modules.projects.services.create_project import CreateProject
+from app.modules.projects.services.create_project_link import CreateProjectLink
+from app.modules.projects.services.delete_environment import DeleteEnvironment
+from app.modules.projects.services.delete_project import DeleteProject
+from app.modules.projects.services.delete_project_link import DeleteProjectLink
+from app.modules.projects.services.update_environment import UpdateEnvironment
+from app.modules.projects.services.update_project import UpdateProject
+from app.modules.projects.services.update_project_link import UpdateProjectLink
 from app.modules.projects.uow import AbstractProjectsUnitOfWork
 
 
@@ -95,7 +105,9 @@ class FakeEnvironmentRepository(AbstractEnvironmentRepository):
         self._rows[env.id] = env
         return env
 
-    async def update(self, environment_id: UUID, *, name: str | None, base_url: str | None) -> EnvironmentRead:
+    async def update(
+        self, environment_id: UUID, *, name: str | None, base_url: str | None
+    ) -> EnvironmentRead:
         existing = self._rows[environment_id]
         updated = existing.model_copy(
             update={
@@ -176,15 +188,8 @@ class FakeProjectsUnitOfWork(AbstractProjectsUnitOfWork):
         self.rollbacks += 1
 
 
-from app.modules.projects.services.create_project import CreateProject
-from app.modules.projects.services.update_project import UpdateProject
-from app.modules.projects.services.delete_project import DeleteProject
-
-
 class TestCreateProject:
     async def test_creates_project_with_configured_default_links(self, monkeypatch) -> None:
-        from app.modules.projects.config import projects_settings
-
         monkeypatch.setattr(projects_settings, "DEFAULT_JIRA_URL", "https://jira.weup.vn")
         monkeypatch.setattr(projects_settings, "DEFAULT_GIT_URL", "https://git.weup.vn")
         uow = FakeProjectsUnitOfWork()
@@ -198,8 +203,6 @@ class TestCreateProject:
         assert uow.commits == 1
 
     async def test_creates_project_with_no_default_links_when_unconfigured(self, monkeypatch) -> None:
-        from app.modules.projects.config import projects_settings
-
         monkeypatch.setattr(projects_settings, "DEFAULT_JIRA_URL", "")
         monkeypatch.setattr(projects_settings, "DEFAULT_GIT_URL", "")
         uow = FakeProjectsUnitOfWork()
@@ -248,11 +251,6 @@ class TestDeleteProject:
         assert uow.commits == 0
 
 
-from app.modules.projects.services.create_environment import CreateEnvironment
-from app.modules.projects.services.update_environment import UpdateEnvironment
-from app.modules.projects.services.delete_environment import DeleteEnvironment
-
-
 class TestCreateEnvironment:
     async def test_creates_environment(self) -> None:
         uow = FakeProjectsUnitOfWork()
@@ -274,7 +272,9 @@ class TestCreateEnvironment:
     async def test_rejects_duplicate_type_for_same_project(self) -> None:
         uow = FakeProjectsUnitOfWork()
         project = await uow.projects.create(name="Website A", description=None, created_by=None)
-        await uow.environments.create(project_id=project.id, type=EnvironmentType.DEV, name="dev", base_url=None)
+        await uow.environments.create(
+            project_id=project.id, type=EnvironmentType.DEV, name="dev", base_url=None
+        )
 
         with pytest.raises(EnvironmentTypeAlreadyExists):
             await CreateEnvironment(uow).execute(project.id, EnvironmentType.DEV, "dev-2", None)
@@ -288,7 +288,9 @@ class TestUpdateEnvironment:
             project_id=project.id, type=EnvironmentType.DEV, name="dev", base_url=None
         )
 
-        updated = await UpdateEnvironment(uow).execute(env.id, name="development", base_url="https://d.example")
+        updated = await UpdateEnvironment(uow).execute(
+            env.id, name="development", base_url="https://d.example"
+        )
 
         assert updated.name == "development"
         assert updated.base_url == "https://d.example"
@@ -319,11 +321,6 @@ class TestDeleteEnvironment:
             await DeleteEnvironment(uow).execute(uuid4())
 
 
-from app.modules.projects.services.create_project_link import CreateProjectLink
-from app.modules.projects.services.update_project_link import UpdateProjectLink
-from app.modules.projects.services.delete_project_link import DeleteProjectLink
-
-
 class TestCreateProjectLink:
     async def test_creates_link_not_marked_default(self) -> None:
         uow = FakeProjectsUnitOfWork()
@@ -348,7 +345,11 @@ class TestUpdateProjectLink:
         uow = FakeProjectsUnitOfWork()
         project = await uow.projects.create(name="Website A", description=None, created_by=None)
         link = await uow.project_links.create(
-            project_id=project.id, type=ProjectLinkType.OTHER, name="Old", url="https://old.example", is_default=False
+            project_id=project.id,
+            type=ProjectLinkType.OTHER,
+            name="Old",
+            url="https://old.example",
+            is_default=False,
         )
 
         updated = await UpdateProjectLink(uow).execute(link.id, name="New", url="https://new.example")
@@ -368,7 +369,11 @@ class TestDeleteProjectLink:
         uow = FakeProjectsUnitOfWork()
         project = await uow.projects.create(name="Website A", description=None, created_by=None)
         link = await uow.project_links.create(
-            project_id=project.id, type=ProjectLinkType.OTHER, name="Old", url="https://old.example", is_default=False
+            project_id=project.id,
+            type=ProjectLinkType.OTHER,
+            name="Old",
+            url="https://old.example",
+            is_default=False,
         )
 
         await DeleteProjectLink(uow).execute(link.id)

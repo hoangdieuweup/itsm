@@ -23,6 +23,8 @@ class CreateEnvironment(AbstractUseCase):
             raise ProjectNotFound()
         if await self._uow.environments.find_by_project_and_type(project_id, type) is not None:
             raise EnvironmentTypeAlreadyExists()
-        env = await self._uow.environments.create(project_id=project_id, type=type, name=name, base_url=base_url)
+        env = await self._uow.environments.create(
+            project_id=project_id, type=type, name=name, base_url=base_url
+        )
         await self._uow.commit()
         return env
