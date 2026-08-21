@@ -17,8 +17,14 @@ class RbacRules:
     @staticmethod
     @rule
     def can_rename_role(role: RoleRead) -> bool:
-        """A system-seeded role's name is fixed; its permission set is still editable."""
+        """A system-seeded role's name is fixed."""
         return not role.is_system
+
+    @staticmethod
+    @rule
+    def can_modify_role_permissions(role: RoleRead) -> bool:
+        """A system admin role's permission set is permanently locked with full permissions."""
+        return role.name != RbacDefaults.ADMIN_ROLE_NAME
 
     @staticmethod
     @rule

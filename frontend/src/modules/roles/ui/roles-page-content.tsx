@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Plus, Shield, ShieldCheck, Edit2, Trash2, AlertCircle, Key } from "lucide-react";
+import { Plus, Shield, ShieldCheck, Edit2, Trash2, AlertCircle, Key, Eye } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Can } from "@/entities/permission";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useRoles } from "../api/use-roles";
 import { useDeleteRole } from "../hooks/use-delete-role";
 import { RoleFormDialog } from "./role-form-dialog";
-import type { Role } from "../model/schema";
+import { isProtectedAdminRole, type Role } from "../model/schema";
 
 export function RolesPageContent() {
   const t = useTranslations("roles");
@@ -140,17 +140,24 @@ export function RolesPageContent() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
-                            role.isSystem
-                              ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/60 dark:text-blue-300"
-                              : "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-900/60 dark:bg-purple-950/60 dark:text-purple-300"
-                          }`}
-                        >
-                          {role.isSystem
-                            ? t("types.system")
-                            : t("types.custom")}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                              role.isSystem
+                                ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/60 dark:text-blue-300"
+                                : "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-900/60 dark:bg-purple-950/60 dark:text-purple-300"
+                            }`}
+                          >
+                            {role.isSystem
+                              ? t("types.system")
+                              : t("types.custom")}
+                          </span>
+                          {isProtectedAdminRole(role) && (
+                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/60 dark:text-amber-300">
+                              {t("badges.adminProtected")}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className="inline-flex rounded-md border border-border/60 bg-muted/50 px-2 py-0.5 font-mono text-xs font-semibold text-foreground">
@@ -165,11 +172,15 @@ export function RolesPageContent() {
                               variant="ghost"
                               onClick={() => handleEdit(role)}
                               className="size-8 p-0 text-muted-foreground hover:text-foreground"
-                              title={t("actions.edit")}
+                              title={isProtectedAdminRole(role) ? t("actions.view") : t("actions.edit")}
                             >
-                              <Edit2 className="size-3.5" />
+                              {isProtectedAdminRole(role) ? (
+                                <Eye className="size-3.5" />
+                              ) : (
+                                <Edit2 className="size-3.5" />
+                              )}
                               <span className="sr-only">
-                                {t("actions.edit")} {role.name}
+                                {isProtectedAdminRole(role) ? t("actions.view") : t("actions.edit")} {role.name}
                               </span>
                             </Button>
                           </Can>

@@ -8,6 +8,7 @@ import { Button } from "@/shared/ui/button";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { Can } from "@/entities/permission";
 import { USER_STATUS, type User } from "@/entities/user";
+import { isProtectedAdminRole } from "@/shared/constants/roles";
 import { useUsers } from "../api/use-users";
 import { useUpdateUserStatus } from "../hooks/use-update-user-status";
 
@@ -142,7 +143,7 @@ export function UsersPageContent() {
                       <td className="px-6 py-4">
                         <span
                           className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
-                            user.roleName === "admin"
+                            isProtectedAdminRole(user.roleName)
                               ? "border border-amber-500/30 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-950/60 dark:text-amber-300"
                               : "border border-border/80 bg-muted/60 text-foreground"
                           }`}

@@ -106,6 +106,8 @@ class FakeUserRoleRepository(AbstractUserRoleRepository):
         role_id = self.grants.get(user_id)
         if role_id is None:
             return None
+        return await self._roles.get_by_id(role_id)
+
     async def get_roles_for_users(self, user_ids: list[int]) -> dict[int, str]:
         result: dict[int, str] = {}
         for uid in user_ids:
@@ -190,11 +192,18 @@ class TestUpdateRole:
         with pytest.raises(SystemRoleImmutable):
             await UpdateRole(uow).execute(10, name="root", permission_ids=None)
 
-    async def test_allows_editing_a_system_roles_permissions(self) -> None:
+    async def test_rejects_editing_admin_role_permissions(self) -> None:
         uow = FakeRbacUnitOfWork()
         uow.roles.seed(_admin_role(grants=1))
 
-        updated = await UpdateRole(uow).execute(10, name=None, permission_ids=[1])
+        with pytest.raises(SystemRoleImmutable):
+            await UpdateRole(uow).execute(10, name=None, permission_ids=[1])
+
+    async def test_allows_editing_a_custom_roles_permissions(self) -> None:
+        uow = FakeRbacUnitOfWork()
+        uow.roles.seed(RoleRead(id=1, name="support", is_system=False, permissions=[]))
+
+        updated = await UpdateRole(uow).execute(1, name=None, permission_ids=[1])
 
         assert {p.id for p in updated.permissions} == {1}
 

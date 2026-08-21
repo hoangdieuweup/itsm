@@ -9,6 +9,12 @@ export const permissionSchema = z.object({
 
 export type PermissionItem = z.infer<typeof permissionSchema>;
 
+export {
+  SYSTEM_ROLE_NAMES,
+  isProtectedAdminRole,
+  type SystemRoleName,
+} from "@/shared/constants/roles";
+
 export const roleSchema = z.object({
   id: z.number(),
   name: z.string(),
