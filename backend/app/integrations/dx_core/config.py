@@ -12,7 +12,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class DxCoreConfig(BaseSettings):
-    """Environment driven settings for the WeUpBook DX OAuth2 client."""
+    """Environment driven settings for the WeUp DX OAuth2 client."""
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="DX_CORE__", extra="ignore")
 

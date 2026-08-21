@@ -21,10 +21,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.config import settings
+from app.modules.common.constants import UserStatus
 from app.modules.rbac.constants import RbacDefaults
 from app.modules.rbac.models import Role, UserRole
 from app.modules.users.config import users_settings
-from app.modules.users.constants import UserStatus
 from app.modules.users.models import User
 
 logger = logging.getLogger(__name__)

@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable
-from typing import TypeVar
+from typing import TypeVar, cast
 
 from pydantic import BaseModel, ValidationError
 from redis.asyncio import ConnectionPool, Redis
@@ -70,7 +70,7 @@ class CacheClient:
             except ValidationError:
                 logger.warning("stale payload schema key=%s", key)
 
-        value = await self._single_flight(key, loader)
+        value = cast(T | None, await self._single_flight(key, loader))
         if value is not None:
             try:
                 await self._redis.set(key, value.model_dump_json(), ex=ttl or self._default_ttl)
@@ -157,7 +157,7 @@ class CacheClient:
         async with self._lock:
             future = self._inflight.get(key)
             if future is not None:
-                return await asyncio.shield(future)
+                return cast(T | None, await asyncio.shield(future))
             future = asyncio.get_running_loop().create_future()
             self._inflight[key] = future
 

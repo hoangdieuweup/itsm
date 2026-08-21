@@ -6,7 +6,8 @@ from sqlalchemy import Boolean, DateTime, Enum, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-from app.modules.users.constants import UserLimits, UserStatus
+from app.modules.common.constants import UserStatus
+from app.modules.users.constants import UserLimits
 
 
 class User(Base):

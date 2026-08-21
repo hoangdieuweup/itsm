@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from app.core.models import FrozenModel
-from app.modules.users.constants import UserStatus
+from app.modules.common.constants import UserStatus
 
 
 class UserRead(FrozenModel):
@@ -18,6 +18,7 @@ class UserRead(FrozenModel):
     email_confirmed: bool
     last_login_at: datetime | None
     created_at: datetime
+    role_name: str | None = None
 
 
 class UserStatusUpdate(FrozenModel):

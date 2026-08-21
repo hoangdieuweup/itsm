@@ -11,7 +11,7 @@ class CacheConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="CACHE__", extra="ignore")
 
-    URL: RedisDsn = "redis://localhost:6379/0"
+    URL: RedisDsn = "redis://localhost:6379/0"  # type: ignore[assignment]
     DEFAULT_TTL: int = CacheDefaults.DEFAULT_TTL_SECONDS
     SOCKET_TIMEOUT: float = 1.0
     MAX_CONNECTIONS: int = 50

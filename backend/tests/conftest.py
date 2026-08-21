@@ -10,12 +10,15 @@ from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
+from app.config import settings
 from app.core.database import Base, get_session
 from app.integrations.cache.client import CacheClient
 from app.integrations.cache.config import cache_settings
 from app.integrations.cache.dependencies import get_cache
 from app.main import app
 from app.modules.rbac.models import Role
+
+settings.FRONTEND_BASE_URL = "http://localhost:3000"
 
 
 @pytest.fixture(scope="session")

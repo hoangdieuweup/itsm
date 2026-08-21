@@ -7,7 +7,7 @@ Other modules import these with an explicit alias:
 from enum import StrEnum
 from typing import Literal
 
-from app.modules.users.public import UserStatus
+from app.modules.common.public import UserStatus
 
 
 class AuthEvents:

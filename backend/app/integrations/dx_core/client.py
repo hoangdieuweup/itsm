@@ -1,4 +1,4 @@
-"""WeUpBook DX OAuth2 + PKCE client. HTTP only — no database, no Redis.
+"""WeUp DX OAuth2 + PKCE client. HTTP only — no database, no Redis.
 
 Implements docs/tasks/sso-login.md section 5.2 against this repo's own
 conventions: httpx per call (no shared pool — DX is called at most twice per
@@ -10,6 +10,7 @@ stdlib `secrets`/`hashlib`, S256 challenge only (DX requires it).
 import base64
 import hashlib
 import secrets
+from typing import Any
 from urllib.parse import urlencode
 
 import httpx
@@ -20,8 +21,6 @@ from app.core.models import FrozenModel
 from app.integrations.dx_core.config import dx_core_settings
 from app.integrations.dx_core.constants import DxDefaults, DxEndpoints
 from app.integrations.dx_core.exceptions import DxCoreUnavailable, TokenExchangeFailed
-
-_CALLBACK_PATH = "/api/v1/auth/oauth/dx/callback"
 
 
 class DxPkcePair(FrozenModel):
@@ -45,7 +44,7 @@ class DxDepartment(FrozenModel):
     """The department object embedded in a DX /oauth2/userinfo response."""
 
     code: str
-    name: str
+    name: str | None = None
 
 
 class DxUserProfile(FrozenModel):
@@ -55,13 +54,15 @@ class DxUserProfile(FrozenModel):
     email: str
     name: str
     department: DxDepartment | None = None
-    roles: list[str] = []
+    roles: list[Any] = []
     employee_code: str | None = None
     email_verified: bool = False
 
 
 class DxCoreClient:
     """Talks to the DX OAuth2 server. One instance per request, built in dependencies.py."""
+
+    CALLBACK_PATH: str = "/api/v1/auth/oauth/dx/callback"
 
     @helper
     def generate_pkce_pair(self) -> DxPkcePair:
@@ -142,7 +143,7 @@ class DxCoreClient:
     @helper
     def _redirect_uri(self) -> str:
         """The callback URL registered on DX — always this backend's own public URL."""
-        return f"{settings.BACKEND_BASE_URL.rstrip('/')}{_CALLBACK_PATH}"
+        return f"{settings.BACKEND_BASE_URL.rstrip('/')}{self.CALLBACK_PATH}"
 
     @helper
     def _basic_auth_header(self) -> str:

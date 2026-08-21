@@ -2,8 +2,9 @@
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
+from app.modules.common.constants import UserStatus
 from app.modules.rbac.public import RbacApi
-from app.modules.users.constants import UsersCacheKeys, UserStatus
+from app.modules.users.constants import UsersCacheKeys
 from app.modules.users.exceptions import CannotBlockLastAdmin, CannotModifyProtectedAdmin
 from app.modules.users.rules import UsersRules
 from app.modules.users.schemas import UserRead

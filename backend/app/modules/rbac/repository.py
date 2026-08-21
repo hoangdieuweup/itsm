@@ -204,6 +204,11 @@ class AbstractUserRoleRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def get_roles_for_users(self, user_ids: list[int]) -> dict[int, str]:
+        """Return a mapping of user_id -> role_name for a batch of users."""
+        raise NotImplementedError
+
+    @abstractmethod
     async def assign(self, user_id: int, role_id: int) -> None:
         """Upsert a user's single role grant."""
         raise NotImplementedError
@@ -220,27 +225,37 @@ class UserRoleRepository(AbstractUserRoleRepository):
     def __init__(self, session: AsyncSession, cache: CacheClient) -> None:
         self._session = session
         self._cache = cache
+        self._roles = RoleRepository(session, cache)
+
+    @database
+    async def get_roles_for_users(self, user_ids: list[int]) -> dict[int, str]:
+        """Return a mapping of user_id -> role_name for a batch of users."""
+        if not user_ids:
+            return {}
+        result = await self._session.execute(
+            select(UserRole.user_id, Role.name)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(UserRole.user_id.in_(user_ids))
+        )
+        return {user_id: role_name for user_id, role_name in result.all()}
 
     @database
     async def get_role_for_user(self, user_id: int) -> RoleRead | None:
-        """Return the role currently granted to a user, or None if never
-        assigned. Cache-aside, keyed by user_id per rule #7 (cache entities,
-        not join results) — this is the user->role mapping, cached
-        separately from the role entity itself (RoleRepository.get_by_id)."""
-        return await self._cache.get_or_load(
-            RbacCacheKeys.USER_ROLE_ENTITY, user_id, RoleRead, lambda: self._load_role_for_user(user_id)
-        )
+        """Return the role currently granted to a user, or None if never assigned.
+        Reads user_id's assigned role_id from database, then delegates to cached RoleRepository
+        so updating a role's permissions immediately reflects for all assigned users."""
+        role_id = await self._load_role_id_for_user(user_id)
+        if role_id is None:
+            return None
+        return await self._roles.get_by_id(role_id)
 
     @helper
-    async def _load_role_for_user(self, user_id: int) -> RoleRead | None:
-        """Direct database read backing get_role_for_user's cache-aside loader."""
+    async def _load_role_id_for_user(self, user_id: int) -> int | None:
+        """Direct database read backing get_role_for_user."""
         row = await self._session.scalar(
-            select(Role)
-            .join(UserRole, UserRole.role_id == Role.id)
-            .options(selectinload(Role.permissions))
-            .where(UserRole.user_id == user_id)
+            select(UserRole.role_id).where(UserRole.user_id == user_id)
         )
-        return RoleRead.model_validate(row) if row else None
+        return row
 
     @database
     async def assign(self, user_id: int, role_id: int) -> None:

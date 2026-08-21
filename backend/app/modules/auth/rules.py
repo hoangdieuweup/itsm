@@ -8,7 +8,7 @@ which call these rules but also do I/O.
 
 from app.core.base.markers import rule
 from app.modules.auth.constants import LoginPolicy
-from app.modules.users.public import UserStatus
+from app.modules.common.public import UserStatus
 
 
 class AuthRules:

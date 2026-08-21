@@ -106,7 +106,15 @@ class FakeUserRoleRepository(AbstractUserRoleRepository):
         role_id = self.grants.get(user_id)
         if role_id is None:
             return None
-        return await self._roles.get_by_id(role_id)
+    async def get_roles_for_users(self, user_ids: list[int]) -> dict[int, str]:
+        result: dict[int, str] = {}
+        for uid in user_ids:
+            rid = self.grants.get(uid)
+            if rid is not None:
+                role = await self._roles.get_by_id(rid)
+                if role:
+                    result[uid] = role.name
+        return result
 
     async def assign(self, user_id: int, role_id: int) -> None:
         self.grants[user_id] = role_id

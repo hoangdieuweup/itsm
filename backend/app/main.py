@@ -4,6 +4,7 @@ import structlog
 from fastapi import FastAPI, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
@@ -26,6 +27,18 @@ app_configs.update(DOCS_ENABLED if settings.ENV == Environment.DEV else DOCS_DIS
 
 app = FastAPI(**app_configs)
 app.add_middleware(RequestIdMiddleware)
+
+cors_origins = list(settings.CORS_ORIGINS)
+if settings.FRONTEND_BASE_URL and settings.FRONTEND_BASE_URL not in cors_origins:
+    cors_origins.append(settings.FRONTEND_BASE_URL)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins or ["http://localhost:3000", "http://localhost:3003"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 if settings.ENV == Environment.STAGING:
     mount_protected_docs(app)

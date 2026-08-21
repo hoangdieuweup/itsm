@@ -1566,7 +1566,7 @@ async def start_dx_oauth(
     cache: CacheClient = Depends(get_cache),
     dx_client: DxCoreClient = Depends(get_dx_core_client),
 ) -> RedirectResponse:
-    """Begin the WeUpBook DX OAuth2 + PKCE flow."""
+    """Begin the WeUp DX OAuth2 + PKCE flow."""
     pair = dx_client.generate_pkce_pair()
     key = CacheKeyBuilder.session_key(DxCacheNamespaces.PKCE_STATE, pair.state)
     await cache.set_json(key, {"code_verifier": pair.code_verifier}, ttl=DxDefaults.PKCE_STATE_TTL_SECONDS)
