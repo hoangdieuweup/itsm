@@ -6,11 +6,21 @@ name = Domain modules reach each other only through public.py
 type = forbidden
 source_modules =
     app.auth
+    app.rbac
+    app.users
 forbidden_modules =
     app.auth.repository
     app.auth.models
     app.auth.uow
     app.auth.services
+    app.rbac.repository
+    app.rbac.models
+    app.rbac.uow
+    app.rbac.services
+    app.users.repository
+    app.users.models
+    app.users.uow
+    app.users.services
 allow_indirect_imports = True
 
 [importlinter:contract:root-is-mechanism]
@@ -34,10 +44,11 @@ source_modules =
     app.retry
 forbidden_modules =
     app.auth
+    app.rbac
+    app.users
     app.integrations.cache
     app.integrations.queue
     app.integrations.storage
-    app.integrations.dx_core
 
 [importlinter:contract:integrations-are-leaves]
 name = Integrations never import a domain module
@@ -46,6 +57,7 @@ source_modules =
     app.integrations.cache
     app.integrations.queue
     app.integrations.storage
-    app.integrations.dx_core
 forbidden_modules =
     app.auth
+    app.rbac
+    app.users

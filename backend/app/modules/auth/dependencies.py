@@ -2,14 +2,16 @@
 
 The composition root: the only place that names a concrete class
 (AuthUnitOfWork, DxTokenRepository, ...) instead of its Abstract* contract.
-See references/layer-examples.md.
 
-Deliberately imports nothing from rbac: get_authenticate_with_dx and
-get_update_user_status need RbacApi (rbac.public), and rbac.public needs
-auth.public, which needs get_current_user/get_uow from this very file — so
-those two factory functions live in auth/router.py instead, which is never
-imported by anything else and can safely reach into rbac.public without
-closing that cycle. See auth/router.py's and rbac/public.py's docstrings.
+get_authenticate_with_dx needs RbacApi (rbac.public), and rbac.public
+needs auth.public (for require_permission's current_user), which needs
+get_current_user from this very file — so that factory lives in
+auth/router.py instead, which is never imported by anything else and can
+safely reach into rbac.public without closing that cycle. Depending on
+users.public here (get_current_user, get_sync_external_user) is safe:
+users.public never imports back to auth. See auth/router.py's and
+rbac/public.py's docstrings, and
+docs/superpowers/specs/2026-08-21-users-module-split-design.md.
 """
 
 import jwt
@@ -26,17 +28,17 @@ from app.integrations.dx_core.dependencies import get_dx_core_client
 from app.integrations.dx_core.repository import AbstractDxTokenRepository, DxTokenRepository
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCacheNamespaces, AuthCookies
-from app.modules.auth.exceptions import NotAuthenticated, UserBlocked, UserNotFound
+from app.modules.auth.exceptions import NotAuthenticated, UserBlocked
 from app.modules.auth.rules import AuthRules
-from app.modules.auth.schemas import UserRead
 from app.modules.auth.services.issue_tokens import IssueTokens
 from app.modules.auth.services.logout import LogoutUser
 from app.modules.auth.services.sync_external_user import SyncExternalUser
-from app.modules.auth.uow import AbstractAuthUnitOfWork, AuthUnitOfWork
+from app.modules.auth.uow import AuthUnitOfWork
+from app.modules.users.public import UserRead, UsersApi, get_users_api
 
 
 async def get_uow(session: AsyncSession = Depends(get_session)) -> AuthUnitOfWork:
-    """Provide a request scoped unit of work. The one place the concrete class is named."""
+    """Provide the request scoped transaction coordinator for the login flow."""
     return AuthUnitOfWork(session)
 
 
@@ -50,14 +52,17 @@ async def get_dx_token_repository(
 
 async def get_current_user(
     request: Request,
-    uow: AbstractAuthUnitOfWork = Depends(get_uow),
+    users_api: UsersApi = Depends(get_users_api),
     cache: CacheClient = Depends(get_cache),
 ) -> UserRead:
     """Resolve the signed in user from the access_token session cookie.
 
     Rejects a token that decodes fine but was blacklisted by a prior
     /auth/logout call (app/modules/auth/services/logout.py) — expiry alone
-    isn't enough once a user can end a session early.
+    isn't enough once a user can end a session early. Raises the same
+    NotAuthenticated whether the token's subject doesn't exist or has any
+    other resolution failure — a deleted-but-still-signed-in user shouldn't
+    read differently from "you're not signed in" to the client.
     """
     raw = request.cookies.get(AuthCookies.ACCESS_TOKEN)
     if raw is None:
@@ -73,9 +78,9 @@ async def get_current_user(
     if await cache.get_json(blacklist_key) is not None:
         raise NotAuthenticated()
 
-    user = await uow.users.get_by_id(int(claims["sub"]))
+    user = await users_api.get_user_by_id(int(claims["sub"]))
     if user is None:
-        raise UserNotFound()
+        raise NotAuthenticated()
     if not AuthRules.can_login(user.status):
         raise UserBlocked()
     return user
@@ -86,9 +91,9 @@ async def require_auth(user: UserRead = Depends(get_current_user)) -> UserRead:
     return user
 
 
-async def get_sync_external_user(uow: AbstractAuthUnitOfWork = Depends(get_uow)) -> SyncExternalUser:
+async def get_sync_external_user(users_api: UsersApi = Depends(get_users_api)) -> SyncExternalUser:
     """Provide the DX profile sync use case."""
-    return SyncExternalUser(uow)
+    return SyncExternalUser(users_api)
 
 
 async def get_issue_tokens() -> IssueTokens:

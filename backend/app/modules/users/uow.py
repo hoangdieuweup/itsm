@@ -1,4 +1,4 @@
-"""Transaction boundary for the rbac module."""
+"""Transaction boundary for the users module."""
 
 import logging
 from abc import abstractmethod
@@ -8,45 +8,49 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.base.markers import database
 from app.core.base.uow import AbstractUnitOfWork
 from app.integrations.cache.client import CacheClient
-from app.modules.rbac.repository import (
-    AbstractPermissionRepository,
-    AbstractRoleRepository,
-    AbstractUserRoleRepository,
-    PermissionRepository,
-    RoleRepository,
-    UserRoleRepository,
-)
+from app.modules.users.repository import AbstractUserRepository, UserRepository
 
 logger = logging.getLogger(__name__)
 
 
-class AbstractRbacUnitOfWork(AbstractUnitOfWork):
+class AbstractUsersUnitOfWork(AbstractUnitOfWork):
     """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
 
-    roles: AbstractRoleRepository
-    permissions: AbstractPermissionRepository
-    user_roles: AbstractUserRoleRepository
+    users: AbstractUserRepository
 
     @abstractmethod
     def mark_stale(self, entity: str, entity_id: int) -> None:
-        """Queue a cache entity for invalidation once this transaction commits."""
+        """Queue a cache entity for invalidation once THIS uow's own commit() runs."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def invalidate_now(self, entity: str, entity_id: int) -> None:
+        """Bump a cache entity's version immediately, bypassing the mark_stale
+        queue. For a cross-module orchestrator (e.g. auth's login flow) that
+        writes through this module's facade but commits its OWN unit of
+        work — this uow's commit() never runs in that case, so mark_stale
+        would silently never flush. See UsersApi.invalidate_user and
+        docs/superpowers/specs/2026-08-21-users-module-split-design.md.
+        """
         raise NotImplementedError
 
 
-class RbacUnitOfWork(AbstractRbacUnitOfWork):
-    """Owns the transaction for the rbac module's tables."""
+class UsersUnitOfWork(AbstractUsersUnitOfWork):
+    """Owns the transaction for the users module's tables."""
 
     def __init__(self, session: AsyncSession, cache: CacheClient) -> None:
         self._session = session
         self._cache = cache
         self._stale: list[tuple[str, int]] = []
-        self.roles = RoleRepository(session, cache)
-        self.permissions = PermissionRepository(session)  # no cache needed — small, fixed catalog
-        self.user_roles = UserRoleRepository(session, cache)
+        self.users = UserRepository(session, cache)
 
     def mark_stale(self, entity: str, entity_id: int) -> None:
         """Queue a cache entity for invalidation once this transaction commits."""
         self._stale.append((entity, entity_id))
+
+    async def invalidate_now(self, entity: str, entity_id: int) -> None:
+        """Bump a cache entity's version immediately, bypassing the queue."""
+        await self._cache.bump_version(entity, entity_id)
 
     @database
     async def commit(self) -> None:
@@ -66,4 +70,4 @@ class RbacUnitOfWork(AbstractRbacUnitOfWork):
         """Roll back the transaction and drop any queued invalidation."""
         await self._session.rollback()
         self._stale.clear()
-        logger.warning("rbac unit of work rolled back")
+        logger.warning("users unit of work rolled back")

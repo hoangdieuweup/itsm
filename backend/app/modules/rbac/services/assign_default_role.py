@@ -21,5 +21,10 @@ class AssignDefaultRole(AbstractUseCase):
                 f"seed role {RbacDefaults.DEFAULT_ROLE_NAME!r} missing — run `python -m app.seeds.seed_rbac`"
             )
         await self._uow.user_roles.assign(user_id, role.id)
+        # No mark_stale() here: this uow's own commit() never runs (auth's
+        # uow commits this same DB transaction instead — see below), so
+        # anything queued here would never flush. Safe to skip: this only
+        # ever runs for a brand-new user_id, so no user_role:{user_id} cache
+        # entry could exist yet to invalidate.
         # deliberately no commit() here — see Task 11: this runs inside
         # AuthenticateWithDx's transaction and is committed by auth's own uow.commit()

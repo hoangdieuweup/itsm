@@ -8,14 +8,14 @@ from app.core.base.use_case import AbstractUseCase
 from app.core.events import EventBus
 from app.integrations.dx_core.client import DxCoreClient
 from app.integrations.dx_core.repository import AbstractDxTokenRepository
-from app.modules.auth.events import UserCreated, UserLoggedIn
+from app.modules.auth.events import UserLoggedIn
 from app.modules.auth.exceptions import UserBlocked
 from app.modules.auth.rules import AuthRules
-from app.modules.auth.schemas import UserRead
 from app.modules.auth.services.issue_tokens import AppTokenSet, IssueTokens
 from app.modules.auth.services.sync_external_user import SyncExternalUser
 from app.modules.auth.uow import AbstractAuthUnitOfWork
 from app.modules.rbac.public import RbacApi
+from app.modules.users.public import UserCreated, UserRead, UsersApi
 
 
 @dataclass(frozen=True)
@@ -39,7 +39,11 @@ class AuthenticateWithDx(AbstractUseCase):
     For a brand new user, also grants the seeded default rbac role via
     rbac's public facade (never rbac's internal dependencies.py/services/ —
     see fastapi-modular-scaffold rule #1) in the same transaction this use
-    case commits — replaces the old DX-role-code auto-mapping.
+    case commits. users_api.invalidate_user runs right after that commit
+    succeeds: the write to the users table happened through UsersApi, but
+    the commit that makes it durable is this use case's own uow, not
+    users' — so users' usual mark_stale-then-commit dance doesn't apply
+    here. See docs/superpowers/specs/2026-08-21-users-module-split-design.md.
     """
 
     def __init__(
@@ -51,6 +55,7 @@ class AuthenticateWithDx(AbstractUseCase):
         issue_tokens: IssueTokens,
         events: EventBus,
         rbac_api: RbacApi,
+        users_api: UsersApi,
     ) -> None:
         self._uow = uow
         self._dx_tokens = dx_tokens
@@ -59,6 +64,7 @@ class AuthenticateWithDx(AbstractUseCase):
         self._issue_tokens = issue_tokens
         self._events = events
         self._rbac_api = rbac_api
+        self._users_api = users_api
 
     @use_case
     async def execute(self, code: str, code_verifier: str) -> DxLoginResult:
@@ -74,8 +80,9 @@ class AuthenticateWithDx(AbstractUseCase):
 
         expires_at = datetime.now(UTC) + timedelta(seconds=token.expires_in)
         await self._dx_tokens.save(user.id, token, expires_at=expires_at)
-        await self._uow.users.set_last_login(user.id, datetime.now(UTC))
+        await self._users_api.set_last_login(user.id, datetime.now(UTC))
         await self._uow.commit()
+        await self._users_api.invalidate_user(user.id)
 
         tokens = await self._issue_tokens.execute(user)
 

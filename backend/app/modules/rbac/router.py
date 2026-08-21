@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends
 
 from app.core.models import ApiResponse
 from app.core.pagination import Page, PaginationParams, pagination_params
-from app.modules.auth.public import UserRead
 from app.modules.rbac.dependencies import get_create_role, get_delete_role, get_update_role
 from app.modules.rbac.dependencies import get_uow as get_rbac_uow
 from app.modules.rbac.exceptions import RoleNotFound
@@ -17,6 +16,7 @@ from app.modules.rbac.services.create_role import CreateRole
 from app.modules.rbac.services.delete_role import DeleteRole
 from app.modules.rbac.services.update_role import UpdateRole
 from app.modules.rbac.uow import AbstractRbacUnitOfWork
+from app.modules.users.public import UserRead
 
 router = APIRouter(prefix="/rbac", tags=["rbac"])
 

@@ -5,7 +5,7 @@ may import from rbac — enforced by scripts/check_module_boundaries.py.
 from fastapi import Depends
 
 from app.core.base.markers import facade
-from app.modules.auth.public import AuthApi, UserRead, get_auth_api
+from app.modules.auth.public import AuthApi, get_auth_api
 from app.modules.rbac.constants import RbacDefaults
 from app.modules.rbac.dependencies import get_uow
 from app.modules.rbac.exceptions import PermissionDenied
@@ -14,6 +14,7 @@ from app.modules.rbac.schemas import RoleSummary
 from app.modules.rbac.services.assign_default_role import AssignDefaultRole
 from app.modules.rbac.services.assign_role import AssignRole
 from app.modules.rbac.uow import AbstractRbacUnitOfWork
+from app.modules.users.public import UserRead, UsersApi, get_users_api
 
 
 class RbacApi:
@@ -41,7 +42,7 @@ class RbacApi:
     @facade
     async def is_last_admin(self, user_id: int) -> bool:
         """True if user_id holds the admin role and is the only one who does —
-        used by auth's UpdateUserStatus to block blocking the last admin."""
+        used by users' UpdateUserStatus to block blocking the last admin."""
         role = await self._uow.user_roles.get_role_for_user(user_id)
         if role is None or role.name != RbacDefaults.ADMIN_ROLE_NAME:
             return False
@@ -56,11 +57,11 @@ async def get_rbac_api(uow: AbstractRbacUnitOfWork = Depends(get_uow)) -> RbacAp
 
 async def get_assign_role(
     uow: AbstractRbacUnitOfWork = Depends(get_uow),
-    auth_api: AuthApi = Depends(get_auth_api),
+    users_api: UsersApi = Depends(get_users_api),
 ) -> AssignRole:
-    """Provide the assign-role use case, wired to auth's user-existence and
+    """Provide the assign-role use case, wired to users' existence and
     protected-admin checks."""
-    return AssignRole(uow, auth_api.get_user_by_id, auth_api.is_protected_admin)
+    return AssignRole(uow, users_api.get_user_by_id, users_api.is_protected_admin)
 
 
 def require_permission(resource: str, action: str):

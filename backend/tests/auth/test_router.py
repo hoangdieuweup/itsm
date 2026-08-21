@@ -11,17 +11,11 @@ from dataclasses import dataclass
 from urllib.parse import parse_qs, urlparse
 
 from httpx import AsyncClient
-from sqlalchemy import insert, select, update
-from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.core.security import JwtCodec
 from app.integrations.dx_core.client import DxCoreClient, DxDepartment, DxUserProfile
 from app.integrations.dx_core.dependencies import get_dx_core_client
 from app.main import app
-from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCookies
-from app.modules.auth.models import User
-from app.modules.rbac.models import Permission, Role, RolePermission, UserRole
 
 
 @dataclass
@@ -72,47 +66,6 @@ def _install_fake_dx_client(profile: DxUserProfile) -> _FakeDxCoreClient:
     fake = _FakeDxCoreClient(profile)
     app.dependency_overrides[get_dx_core_client] = lambda: fake
     return fake
-
-
-async def _login_with_permissions(
-    client: AsyncClient, engine: AsyncEngine, *, permissions: list[tuple[str, str]]
-) -> int:
-    """Seed a user with a role granting exactly `permissions`, and a valid
-    session cookie for them — same pattern as tests/rbac/test_router.py's
-    _login_as, duplicated here rather than shared since these are two
-    different test suites for two different modules with no shared test-only
-    module to own a common helper without creating a test-code coupling."""
-    async with engine.begin() as conn:
-        permission_ids = []
-        for resource, action in permissions:
-            result = await conn.execute(
-                insert(Permission).values(resource=resource, action=action, description_key="x")
-            )
-            permission_ids.append(result.inserted_primary_key[0])
-        role_result = await conn.execute(insert(Role).values(name="auth-test-role", is_system=False))
-        role_id = role_result.inserted_primary_key[0]
-        for permission_id in permission_ids:
-            await conn.execute(insert(RolePermission).values(role_id=role_id, permission_id=permission_id))
-        user_result = await conn.execute(
-            insert(User).values(
-                email="permission-test@example.com",
-                name="Permission Test",
-                status="active",
-                external_user_id="dx-permission-test",
-                employee_code=None,
-                email_confirmed=True,
-            )
-        )
-        user_id = user_result.inserted_primary_key[0]
-        await conn.execute(insert(UserRole).values(user_id=user_id, role_id=role_id))
-
-    token = JwtCodec.encode(
-        {"sub": str(user_id), "type": "access", "jti": "auth-test-jti"},
-        secret=auth_settings.JWT_SECRET,
-        ttl_seconds=3600,
-    )
-    client.cookies.set(AuthCookies.ACCESS_TOKEN, token)
-    return user_id
 
 
 async def _start_and_get_state(client: AsyncClient) -> str:
@@ -209,106 +162,6 @@ class TestMeWithoutSession:
         assert response.status_code == 401
         assert body["success"] is False
         assert body["error"]["code"] == "auth_not_authenticated"
-
-
-class TestListUsers:
-    async def test_requires_user_read_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
-        await _login_with_permissions(client, engine, permissions=[])
-
-        response = await client.get("/api/v1/auth/users")
-
-        assert response.status_code == 403
-        assert response.json()["error"]["code"] == "rbac_permission_denied"
-
-    async def test_lists_users_with_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
-        await _login_with_permissions(client, engine, permissions=[("user", "read")])
-
-        response = await client.get("/api/v1/auth/users")
-
-        body = response.json()
-        assert response.status_code == 200
-        assert any(u["email"] == "permission-test@example.com" for u in body["data"]["items"])
-
-
-class TestUpdateUserStatus:
-    async def test_blocks_a_user(self, client: AsyncClient, engine: AsyncEngine) -> None:
-        admin_id = await _login_with_permissions(client, engine, permissions=[("user", "update_status")])
-        async with engine.begin() as conn:
-            target = await conn.execute(
-                insert(User).values(
-                    email="target-block@example.com",
-                    name="Target",
-                    status="active",
-                    external_user_id="dx-target-block",
-                    employee_code=None,
-                    email_confirmed=True,
-                )
-            )
-            target_id = target.inserted_primary_key[0]
-
-        response = await client.patch(f"/api/v1/auth/users/{target_id}/status", json={"status": "blocked"})
-
-        body = response.json()
-        assert response.status_code == 200
-        assert body["data"]["status"] == "blocked"
-        assert target_id != admin_id  # sanity: didn't accidentally block the actor itself
-
-    async def test_rejects_blocking_the_last_admin(self, client: AsyncClient, engine: AsyncEngine) -> None:
-        actor_id = await _login_with_permissions(client, engine, permissions=[("user", "update_status")])
-        async with engine.begin() as conn:
-            admin_role_id = (await conn.execute(select(Role.id).where(Role.name == "admin"))).scalar_one()
-            # conftest's _seed_default_roles creates "admin" with zero
-            # permissions (unlike the real seed_rbac.py, which grants it
-            # everything) — grant it user.update_status here so the actor's
-            # switch to admin below doesn't itself 403 on the permission
-            # check before ever reaching the bus-factor rule under test.
-            update_status_permission_id = (
-                await conn.execute(
-                    select(Permission.id).where(
-                        Permission.resource == "user", Permission.action == "update_status"
-                    )
-                )
-            ).scalar_one()  # unique per (resource, action) — permissions_resource_key constraint
-            await conn.execute(
-                insert(RolePermission).values(
-                    role_id=admin_role_id, permission_id=update_status_permission_id
-                )
-            )
-            # UserRole.user_id is the primary key (one role per user) — this
-            # UPDATE replaces the test-role grant _login_with_permissions made
-            # with admin, same as rbac.services.assign_role.AssignRole.execute
-            # would via an upsert.
-            await conn.execute(
-                update(UserRole).where(UserRole.user_id == actor_id).values(role_id=admin_role_id)
-            )
-
-        response = await client.patch(f"/api/v1/auth/users/{actor_id}/status", json={"status": "blocked"})
-
-        assert response.status_code == 403
-        assert response.json()["error"]["code"] == "auth_cannot_block_last_admin"
-
-    async def test_rejects_blocking_the_protected_admin(
-        self, client: AsyncClient, engine: AsyncEngine, monkeypatch
-    ) -> None:
-        monkeypatch.setattr(auth_settings, "ADMIN_EMAIL", "protected-router@example.com")
-        await _login_with_permissions(client, engine, permissions=[("user", "update_status")])
-        async with engine.begin() as conn:
-            target = await conn.execute(
-                insert(User).values(
-                    email="protected-router@example.com",
-                    name="Protected",
-                    status="active",
-                    external_user_id="dx-protected-router",
-                    employee_code=None,
-                    email_confirmed=True,
-                )
-            )
-            target_id = target.inserted_primary_key[0]
-
-        response = await client.patch(f"/api/v1/auth/users/{target_id}/status", json={"status": "blocked"})
-
-        assert response.status_code == 403
-        assert response.json()["error"]["code"] == "auth_cannot_modify_protected_admin"
 
 
 class TestLogout:

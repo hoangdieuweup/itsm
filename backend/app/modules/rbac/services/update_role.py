@@ -2,6 +2,7 @@
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
+from app.modules.rbac.constants import RbacCacheKeys
 from app.modules.rbac.exceptions import RoleNotFound, SystemRoleImmutable, UnknownPermissionId
 from app.modules.rbac.rules import RbacRules
 from app.modules.rbac.schemas import RoleRead
@@ -27,5 +28,6 @@ class UpdateRole(AbstractUseCase):
             if len(found) != len(set(permission_ids)):
                 raise UnknownPermissionId()
         updated = await self._uow.roles.update(role_id, name=name, permission_ids=permission_ids)
+        self._uow.mark_stale(RbacCacheKeys.ROLE_ENTITY, role_id)
         await self._uow.commit()
         return updated

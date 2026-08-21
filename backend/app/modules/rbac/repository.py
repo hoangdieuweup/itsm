@@ -8,6 +8,8 @@ from sqlalchemy.orm import selectinload
 
 from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
+from app.integrations.cache.client import CacheClient
+from app.modules.rbac.constants import RbacCacheKeys
 from app.modules.rbac.models import Permission, Role, RolePermission, UserRole
 from app.modules.rbac.schemas import PermissionRead, RoleRead
 
@@ -44,8 +46,9 @@ class AbstractRoleRepository(AbstractRepository[RoleRead]):
 class RoleRepository(AbstractRoleRepository):
     """SQLAlchemy implementation. Every read/write of roles+role_permissions goes through this class."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, cache: CacheClient) -> None:
         self._session = session
+        self._cache = cache
 
     @helper
     async def _get(self, role_id: int) -> Role | None:
@@ -55,7 +58,16 @@ class RoleRepository(AbstractRoleRepository):
 
     @database
     async def get_by_id(self, entity_id: int) -> RoleRead | None:
-        """Return one role with its permissions, or None when it does not exist."""
+        """Return one role with its permissions, or None when it does not
+        exist. Cache-aside: a miss loads from the database and populates
+        the cache."""
+        return await self._cache.get_or_load(
+            RbacCacheKeys.ROLE_ENTITY, entity_id, RoleRead, lambda: self._load_by_id(entity_id)
+        )
+
+    @helper
+    async def _load_by_id(self, entity_id: int) -> RoleRead | None:
+        """Direct database read backing get_by_id's cache-aside loader."""
         row = await self._get(entity_id)
         return RoleRead.model_validate(row) if row else None
 
@@ -86,7 +98,7 @@ class RoleRepository(AbstractRoleRepository):
         for permission_id in permission_ids:
             self._session.add(RolePermission(role_id=row.id, permission_id=permission_id))
         await self._session.flush()
-        result = await self.get_by_id(row.id)
+        result = await self._load_by_id(row.id)
         assert result is not None  # the row we just inserted always exists
         return result
 
@@ -103,7 +115,10 @@ class RoleRepository(AbstractRoleRepository):
             for permission_id in permission_ids:
                 self._session.add(RolePermission(role_id=role_id, permission_id=permission_id))
         await self._session.flush()
-        result = await self.get_by_id(role_id)
+        # Reads fresh, not via the cached get_by_id: the cache for role_id isn't
+        # invalidated until the caller's uow.commit() runs after this returns —
+        # using get_by_id here could hand back stale pre-update data.
+        result = await self._load_by_id(role_id)
         assert result is not None  # role_id was already confirmed to exist above
         return result
 
@@ -202,12 +217,23 @@ class AbstractUserRoleRepository(ABC):
 class UserRoleRepository(AbstractUserRoleRepository):
     """SQLAlchemy implementation. Every read/write of user_roles goes through this class."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, cache: CacheClient) -> None:
         self._session = session
+        self._cache = cache
 
     @database
     async def get_role_for_user(self, user_id: int) -> RoleRead | None:
-        """Return the role currently granted to a user, or None if never assigned."""
+        """Return the role currently granted to a user, or None if never
+        assigned. Cache-aside, keyed by user_id per rule #7 (cache entities,
+        not join results) — this is the user->role mapping, cached
+        separately from the role entity itself (RoleRepository.get_by_id)."""
+        return await self._cache.get_or_load(
+            RbacCacheKeys.USER_ROLE_ENTITY, user_id, RoleRead, lambda: self._load_role_for_user(user_id)
+        )
+
+    @helper
+    async def _load_role_for_user(self, user_id: int) -> RoleRead | None:
+        """Direct database read backing get_role_for_user's cache-aside loader."""
         row = await self._session.scalar(
             select(Role)
             .join(UserRole, UserRole.role_id == Role.id)
@@ -228,13 +254,16 @@ class UserRoleRepository(AbstractUserRoleRepository):
 
     @database
     async def user_has_permission(self, user_id: int, resource: str, action: str) -> bool:
-        """Return whether user_id's granted role includes resource.action."""
-        stmt = (
-            select(Permission.id)
-            .join(RolePermission, RolePermission.permission_id == Permission.id)
-            .join(Role, Role.id == RolePermission.role_id)
-            .join(UserRole, UserRole.role_id == Role.id)
-            .where(UserRole.user_id == user_id, Permission.resource == resource, Permission.action == action)
-        )
-        result = await self._session.execute(stmt)
-        return result.first() is not None
+        """Return whether user_id's granted role includes resource.action.
+
+        Reuses get_role_for_user's cache instead of its own JOIN — a cache
+        hit answers this from the already-cached role+permissions with no
+        query at all. This is the authorization gate every protected
+        request goes through (require_permission), so a revoked permission
+        stays effective for an already-cached user until that entry's TTL
+        expires, same as any other read through this cache.
+        """
+        role = await self.get_role_for_user(user_id)
+        if role is None:
+            return False
+        return any(p.resource == resource and p.action == action for p in role.permissions)
