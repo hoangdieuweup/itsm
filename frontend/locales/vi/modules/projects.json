@@ -1,0 +1,68 @@
+{
+  "title": "Dự án",
+  "description": "Quản lý dự án, môi trường, và các liên kết ngoài.",
+  "createProject": "Tạo dự án",
+  "editProject": "Sửa dự án",
+  "createEnvironment": "Thêm môi trường",
+  "editEnvironment": "Sửa môi trường",
+  "createLink": "Thêm liên kết",
+  "editLink": "Sửa liên kết",
+  "actions": {
+    "create": "Dự án mới",
+    "addEnvironment": "Thêm",
+    "addLink": "Thêm"
+  },
+  "table": {
+    "name": "Tên",
+    "description": "Mô tả"
+  },
+  "sections": {
+    "environments": "Môi trường",
+    "links": "Liên kết ngoài"
+  },
+  "environmentTypes": {
+    "dev": "Dev",
+    "staging": "Staging",
+    "production": "Production"
+  },
+  "linkTypes": {
+    "jira": "Jira",
+    "git": "Git",
+    "other": "Khác"
+  },
+  "badges": {
+    "default": "Mặc định"
+  },
+  "empty": {
+    "title": "Chưa có dự án nào",
+    "description": "Tạo dự án đầu tiên để bắt đầu quản lý môi trường, Cloudflare và log.",
+    "environments": "Chưa có môi trường nào.",
+    "links": "Chưa có liên kết nào."
+  },
+  "form": {
+    "nameLabel": "Tên",
+    "descriptionLabel": "Mô tả",
+    "typeLabel": "Loại",
+    "baseUrlLabel": "Base URL",
+    "linkTypeLabel": "Loại liên kết",
+    "urlLabel": "URL",
+    "cancel": "Huỷ",
+    "save": "Lưu",
+    "create": "Tạo",
+    "saving": "Đang lưu..."
+  },
+  "deleteConfirm": {
+    "title": "Xoá dự án?",
+    "description": "Thao tác này sẽ xoá vĩnh viễn \"{name}\" cùng mọi môi trường và liên kết thuộc dự án.",
+    "environmentTitle": "Xoá môi trường?",
+    "environmentDescription": "Thao tác này sẽ xoá vĩnh viễn môi trường \"{name}\".",
+    "linkTitle": "Xoá liên kết?",
+    "linkDescription": "Thao tác này sẽ xoá vĩnh viễn liên kết \"{name}\"."
+  },
+  "errors": {
+    "projects_project_not_found": "Không tìm thấy dự án.",
+    "projects_environment_not_found": "Không tìm thấy môi trường.",
+    "projects_environment_type_already_exists": "Dự án đã có môi trường loại này.",
+    "projects_project_link_not_found": "Không tìm thấy liên kết."
+  }
+}

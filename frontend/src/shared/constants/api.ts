@@ -22,5 +22,13 @@ export const API_CONFIG = {
       USER_ROLE: (userId: string) => `/rbac/users/${userId}/role`,
       USER_ROLES: (userId: string) => `/rbac/users/${userId}/roles`,
     },
+    PROJECTS: {
+      ROOT: "/projects",
+      DETAIL: (id: string) => `/projects/${id}`,
+      ENVIRONMENTS: (projectId: string) => `/projects/${projectId}/environments`,
+      ENVIRONMENT_DETAIL: (id: string) => `/environments/${id}`,
+      LINKS: (projectId: string) => `/projects/${projectId}/links`,
+      LINK_DETAIL: (id: string) => `/links/${id}`,
+    },
   },
 } as const;

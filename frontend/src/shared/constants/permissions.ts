@@ -2,6 +2,8 @@ export const RESOURCES = {
   ROLE: "role",
   PERMISSION: "permission",
   USER: "user",
+  PROJECT: "project",
+  ENVIRONMENT: "environment",
 } as const;
 
 export type Resource = (typeof RESOURCES)[keyof typeof RESOURCES];
@@ -34,5 +36,19 @@ export const PERMISSIONS = {
     READ: `${RESOURCES.USER}.${ACTIONS.READ}` as const,
     UPDATE_STATUS: `${RESOURCES.USER}.${ACTIONS.UPDATE_STATUS}` as const,
     ASSIGN_ROLE: `${RESOURCES.USER}.${ACTIONS.ASSIGN_ROLE}` as const,
+  },
+  PROJECT: {
+    RESOURCE: RESOURCES.PROJECT,
+    CREATE: `${RESOURCES.PROJECT}.${ACTIONS.CREATE}` as const,
+    READ: `${RESOURCES.PROJECT}.${ACTIONS.READ}` as const,
+    UPDATE: `${RESOURCES.PROJECT}.${ACTIONS.UPDATE}` as const,
+    DELETE: `${RESOURCES.PROJECT}.${ACTIONS.DELETE}` as const,
+  },
+  ENVIRONMENT: {
+    RESOURCE: RESOURCES.ENVIRONMENT,
+    CREATE: `${RESOURCES.ENVIRONMENT}.${ACTIONS.CREATE}` as const,
+    READ: `${RESOURCES.ENVIRONMENT}.${ACTIONS.READ}` as const,
+    UPDATE: `${RESOURCES.ENVIRONMENT}.${ACTIONS.UPDATE}` as const,
+    DELETE: `${RESOURCES.ENVIRONMENT}.${ACTIONS.DELETE}` as const,
   },
 } as const;
