@@ -317,3 +317,66 @@ class TestDeleteEnvironment:
 
         with pytest.raises(EnvironmentNotFound):
             await DeleteEnvironment(uow).execute(uuid4())
+
+
+from app.modules.projects.services.create_project_link import CreateProjectLink
+from app.modules.projects.services.update_project_link import UpdateProjectLink
+from app.modules.projects.services.delete_project_link import DeleteProjectLink
+
+
+class TestCreateProjectLink:
+    async def test_creates_link_not_marked_default(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+
+        link = await CreateProjectLink(uow).execute(
+            project.id, ProjectLinkType.OTHER, "Runbook", "https://wiki.example/runbook"
+        )
+
+        assert link.is_default is False
+        assert uow.commits == 1
+
+    async def test_rejects_unknown_project(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+
+        with pytest.raises(ProjectNotFound):
+            await CreateProjectLink(uow).execute(uuid4(), ProjectLinkType.OTHER, "X", "https://x.example")
+
+
+class TestUpdateProjectLink:
+    async def test_updates_name_and_url(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+        link = await uow.project_links.create(
+            project_id=project.id, type=ProjectLinkType.OTHER, name="Old", url="https://old.example", is_default=False
+        )
+
+        updated = await UpdateProjectLink(uow).execute(link.id, name="New", url="https://new.example")
+
+        assert updated.name == "New"
+        assert updated.url == "https://new.example"
+
+    async def test_rejects_unknown_link(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+
+        with pytest.raises(ProjectLinkNotFound):
+            await UpdateProjectLink(uow).execute(uuid4(), name="x", url=None)
+
+
+class TestDeleteProjectLink:
+    async def test_deletes_link(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+        link = await uow.project_links.create(
+            project_id=project.id, type=ProjectLinkType.OTHER, name="Old", url="https://old.example", is_default=False
+        )
+
+        await DeleteProjectLink(uow).execute(link.id)
+
+        assert await uow.project_links.get_by_id(link.id) is None
+
+    async def test_rejects_unknown_link(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+
+        with pytest.raises(ProjectLinkNotFound):
+            await DeleteProjectLink(uow).execute(uuid4())
