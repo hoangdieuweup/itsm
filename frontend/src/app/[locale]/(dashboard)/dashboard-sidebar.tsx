@@ -7,6 +7,7 @@ import {
   Users,
   Shield,
   FolderKanban,
+  ScrollText,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -297,6 +298,13 @@ export function DashboardSidebar({
       icon: FolderKanban,
       active: pathname === ROUTES.adminProjects,
       permission: { action: "read", resource: "project" },
+    },
+    {
+      href: ROUTES.adminAuditLog,
+      label: t("auditLog"),
+      icon: ScrollText,
+      active: pathname === ROUTES.adminAuditLog,
+      permission: { action: "read", resource: "audit_log" },
     },
   ];
 

@@ -4,6 +4,7 @@ export const RESOURCES = {
   USER: "user",
   PROJECT: "project",
   ENVIRONMENT: "environment",
+  AUDIT_LOG: "audit_log",
 } as const;
 
 export type Resource = (typeof RESOURCES)[keyof typeof RESOURCES];
@@ -50,5 +51,9 @@ export const PERMISSIONS = {
     READ: `${RESOURCES.ENVIRONMENT}.${ACTIONS.READ}` as const,
     UPDATE: `${RESOURCES.ENVIRONMENT}.${ACTIONS.UPDATE}` as const,
     DELETE: `${RESOURCES.ENVIRONMENT}.${ACTIONS.DELETE}` as const,
+  },
+  AUDIT_LOG: {
+    RESOURCE: RESOURCES.AUDIT_LOG,
+    READ: `${RESOURCES.AUDIT_LOG}.${ACTIONS.READ}` as const,
   },
 } as const;

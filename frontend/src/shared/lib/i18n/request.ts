@@ -8,12 +8,13 @@ export default getRequestConfig(async ({ requestLocale }) => {
     ? requested
     : routing.defaultLocale;
 
-  const [common, auth, users, roles, projects] = await Promise.all([
+  const [common, auth, users, roles, projects, auditLog] = await Promise.all([
     import(`../../../../locales/${locale}/common.json`),
     import(`../../../../locales/${locale}/modules/auth.json`),
     import(`../../../../locales/${locale}/modules/users.json`),
     import(`../../../../locales/${locale}/modules/roles.json`),
     import(`../../../../locales/${locale}/modules/projects.json`),
+    import(`../../../../locales/${locale}/modules/audit-log.json`),
   ]);
 
   return {
@@ -24,6 +25,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       users: users.default,
       roles: roles.default,
       projects: projects.default,
+      auditLog: auditLog.default,
     },
   };
 });

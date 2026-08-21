@@ -26,6 +26,7 @@
     "users": "Users",
     "roles": "Roles",
     "projects": "Projects",
+    "auditLog": "Audit Log",
     "mainMenu": "Main Menu",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
