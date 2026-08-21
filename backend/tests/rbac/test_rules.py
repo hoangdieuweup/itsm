@@ -7,7 +7,7 @@ from app.modules.rbac.schemas import RoleRead
 
 
 def _role(*, is_system: bool) -> RoleRead:
-    return RoleRead(id=1, name="owner" if is_system else "custom", is_system=is_system, permissions=[])
+    return RoleRead(id=1, name="admin" if is_system else "custom", is_system=is_system, permissions=[])
 
 
 @pytest.mark.parametrize(("is_system", "expected"), [(True, False), (False, True)])
@@ -21,13 +21,13 @@ def test_can_rename_role(is_system: bool, expected: bool) -> None:
 
 
 @pytest.mark.parametrize(
-    ("role_name", "remaining_owner_grants", "expected"),
+    ("role_name", "remaining_admin_grants", "expected"),
     [
-        ("owner", 1, True),  # this is the only owner left — block
-        ("owner", 2, False),  # another owner still exists — fine
-        ("admin", 1, False),  # not the owner role at all — never blocked
+        ("admin", 1, True),  # this is the only admin left — block
+        ("admin", 2, False),  # another admin still exists — fine
+        ("support", 1, False),  # not the admin role at all — never blocked
         ("member", 0, False),
     ],
 )
-def test_blocks_last_owner_removal(role_name: str, remaining_owner_grants: int, expected: bool) -> None:
-    assert RbacRules.blocks_last_owner_removal(role_name, remaining_owner_grants) is expected
+def test_blocks_last_admin_removal(role_name: str, remaining_admin_grants: int, expected: bool) -> None:
+    assert RbacRules.blocks_last_admin_removal(role_name, remaining_admin_grants) is expected

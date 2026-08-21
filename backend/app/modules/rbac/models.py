@@ -28,7 +28,14 @@ class Role(Base):
 
 
 class Permission(Base):
-    """One (resource, action) pair. A fixed catalog the app defines, not admin-invented."""
+    """One (resource, action) pair. A fixed catalog the app defines, not admin-invented.
+
+    description_key is an i18n message key (e.g. "permissions.role.create"),
+    not display text — the frontend translates it, the same way
+    ErrorPayload.code is a key, not a message. See the nextjs-modular-
+    architecture skill's references/i18n-and-errors.md for the pattern this
+    mirrors.
+    """
 
     __tablename__ = "permissions"
     __table_args__ = (UniqueConstraint("resource", "action", name="permissions_resource_key"),)
@@ -36,7 +43,7 @@ class Permission(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     resource: Mapped[str] = mapped_column(String(100))
     action: Mapped[str] = mapped_column(String(50))
-    description: Mapped[str] = mapped_column(String(255))
+    description_key: Mapped[str] = mapped_column(String(255))
 
 
 class RolePermission(Base):

@@ -5,7 +5,7 @@ import pytest
 
 from app.modules.rbac.constants import RbacDefaults
 from app.modules.rbac.exceptions import (
-    CannotRemoveLastOwner,
+    CannotRemoveLastAdmin,
     DuplicateRoleName,
     RoleInUse,
     RoleNotFound,
@@ -27,8 +27,8 @@ from app.modules.rbac.services.update_role import UpdateRole
 from app.modules.rbac.uow import AbstractRbacUnitOfWork
 
 _CATALOG = [
-    PermissionRead(id=1, resource="role", action="read", description="View roles"),
-    PermissionRead(id=2, resource="role", action="create", description="Create roles"),
+    PermissionRead(id=1, resource="role", action="read", description_key="permissions.role.read"),
+    PermissionRead(id=2, resource="role", action="create", description_key="permissions.role.create"),
 ]
 
 
@@ -128,8 +128,8 @@ class FakeRbacUnitOfWork(AbstractRbacUnitOfWork):
         pass
 
 
-def _owner_role(*, grants: int) -> RoleRead:
-    return RoleRead(id=10, name=RbacDefaults.OWNER_ROLE_NAME, is_system=True, permissions=[])
+def _admin_role(*, grants: int) -> RoleRead:
+    return RoleRead(id=10, name=RbacDefaults.ADMIN_ROLE_NAME, is_system=True, permissions=[])
 
 
 class TestCreateRole:
@@ -168,14 +168,14 @@ class TestUpdateRole:
 
     async def test_rejects_renaming_a_system_role(self) -> None:
         uow = FakeRbacUnitOfWork()
-        uow.roles.seed(_owner_role(grants=1))
+        uow.roles.seed(_admin_role(grants=1))
 
         with pytest.raises(SystemRoleImmutable):
             await UpdateRole(uow).execute(10, name="root", permission_ids=None)
 
     async def test_allows_editing_a_system_roles_permissions(self) -> None:
         uow = FakeRbacUnitOfWork()
-        uow.roles.seed(_owner_role(grants=1))
+        uow.roles.seed(_admin_role(grants=1))
 
         updated = await UpdateRole(uow).execute(10, name=None, permission_ids=[1])
 
@@ -199,7 +199,7 @@ class TestDeleteRole:
 
     async def test_rejects_deleting_a_system_role(self) -> None:
         uow = FakeRbacUnitOfWork()
-        uow.roles.seed(_owner_role(grants=1))
+        uow.roles.seed(_admin_role(grants=1))
 
         with pytest.raises(SystemRoleImmutable):
             await DeleteRole(uow).execute(10)
@@ -234,16 +234,16 @@ class TestAssignRole:
         with pytest.raises(TargetUserNotFound):
             await AssignRole(uow, user_lookup).execute(42, 1)
 
-    async def test_rejects_reassigning_the_last_owner_away(self) -> None:
+    async def test_rejects_reassigning_the_last_admin_away(self) -> None:
         uow = FakeRbacUnitOfWork()
-        uow.roles.seed(_owner_role(grants=1))
+        uow.roles.seed(_admin_role(grants=1))
         uow.roles.seed(RoleRead(id=1, name="support", is_system=False, permissions=[]))
-        uow.user_roles.grants[42] = 10  # currently the owner
+        uow.user_roles.grants[42] = 10  # currently the admin
 
         async def user_lookup(user_id: int):
             return object()
 
-        with pytest.raises(CannotRemoveLastOwner):
+        with pytest.raises(CannotRemoveLastAdmin):
             await AssignRole(uow, user_lookup).execute(42, 1)
 
     async def test_missing_target_role_raises(self) -> None:

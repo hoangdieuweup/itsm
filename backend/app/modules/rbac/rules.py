@@ -11,7 +11,7 @@ class RbacRules:
     @staticmethod
     @rule
     def can_delete_role(role: RoleRead) -> bool:
-        """A system-seeded role (owner/admin/member) can never be deleted."""
+        """A system-seeded role (admin/member) can never be deleted."""
         return not role.is_system
 
     @staticmethod
@@ -22,8 +22,8 @@ class RbacRules:
 
     @staticmethod
     @rule
-    def blocks_last_owner_removal(role_name: str, remaining_owner_grants: int) -> bool:
+    def blocks_last_admin_removal(role_name: str, remaining_admin_grants: int) -> bool:
         """True when reassigning/blocking this grant would leave zero users able to
-        manage roles or users. remaining_owner_grants counts owner-role holders
+        manage roles or users. remaining_admin_grants counts admin-role holders
         *including* the one about to be changed."""
-        return role_name == RbacDefaults.OWNER_ROLE_NAME and remaining_owner_grants <= 1
+        return role_name == RbacDefaults.ADMIN_ROLE_NAME and remaining_admin_grants <= 1

@@ -3,7 +3,7 @@
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
 from app.modules.rbac.constants import RbacTypes
-from app.modules.rbac.exceptions import CannotRemoveLastOwner, RoleNotFound, TargetUserNotFound
+from app.modules.rbac.exceptions import CannotRemoveLastAdmin, RoleNotFound, TargetUserNotFound
 from app.modules.rbac.rules import RbacRules
 from app.modules.rbac.uow import AbstractRbacUnitOfWork
 
@@ -28,9 +28,9 @@ class AssignRole(AbstractUseCase):
 
         current = await self._uow.user_roles.get_role_for_user(user_id)
         if current is not None:
-            owner_grants = await self._uow.roles.count_users_with_role(current.id)
-            if RbacRules.blocks_last_owner_removal(current.name, owner_grants):
-                raise CannotRemoveLastOwner()
+            admin_grants = await self._uow.roles.count_users_with_role(current.id)
+            if RbacRules.blocks_last_admin_removal(current.name, admin_grants):
+                raise CannotRemoveLastAdmin()
 
         await self._uow.user_roles.assign(user_id, role_id)
         await self._uow.commit()

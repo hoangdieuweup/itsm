@@ -17,7 +17,7 @@ from app.modules.rbac.models import Permission, Role, RolePermission, UserRole
 async def _seed_permission(engine: AsyncEngine, resource: str, action: str) -> int:
     async with engine.begin() as conn:
         result = await conn.execute(
-            insert(Permission).values(resource=resource, action=action, description="x")
+            insert(Permission).values(resource=resource, action=action, description_key="x")
         )
         return result.inserted_primary_key[0]
 

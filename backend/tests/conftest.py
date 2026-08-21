@@ -94,7 +94,7 @@ async def client(engine) -> AsyncIterator[AsyncClient]:
 
 @pytest.fixture(autouse=True)
 async def _seed_default_roles(engine, client: AsyncClient) -> None:  # noqa: ARG001 -- see docstring
-    """Every test gets the three default roles present, matching what
+    """Every test gets the two default roles present, matching what
     `python -m app.seeds.seed_rbac` guarantees in a real deploy — needed for
     auth's /me to resolve a real roleName for a freshly synced user.
 
@@ -105,5 +105,5 @@ async def _seed_default_roles(engine, client: AsyncClient) -> None:  # noqa: ARG
     argument itself is otherwise unused, hence the ARG001 suppression.
     """
     async with engine.begin() as conn:
-        for name in ("owner", "admin", "member"):
+        for name in ("admin", "member"):
             await conn.execute(insert(Role).values(name=name, is_system=True))

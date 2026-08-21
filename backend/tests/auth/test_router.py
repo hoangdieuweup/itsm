@@ -86,7 +86,7 @@ async def _login_with_permissions(
         permission_ids = []
         for resource, action in permissions:
             result = await conn.execute(
-                insert(Permission).values(resource=resource, action=action, description="x")
+                insert(Permission).values(resource=resource, action=action, description_key="x")
             )
             permission_ids.append(result.inserted_primary_key[0])
         role_result = await conn.execute(insert(Role).values(name="auth-test-role", is_system=False))
@@ -253,14 +253,14 @@ class TestUpdateUserStatus:
         assert body["data"]["status"] == "blocked"
         assert target_id != admin_id  # sanity: didn't accidentally block the actor itself
 
-    async def test_rejects_blocking_the_last_owner(self, client: AsyncClient, engine: AsyncEngine) -> None:
+    async def test_rejects_blocking_the_last_admin(self, client: AsyncClient, engine: AsyncEngine) -> None:
         actor_id = await _login_with_permissions(client, engine, permissions=[("user", "update_status")])
         async with engine.begin() as conn:
-            owner_role_id = (await conn.execute(select(Role.id).where(Role.name == "owner"))).scalar_one()
-            # conftest's _seed_default_roles creates "owner" with zero
+            admin_role_id = (await conn.execute(select(Role.id).where(Role.name == "admin"))).scalar_one()
+            # conftest's _seed_default_roles creates "admin" with zero
             # permissions (unlike the real seed_rbac.py, which grants it
             # everything) — grant it user.update_status here so the actor's
-            # switch to owner below doesn't itself 403 on the permission
+            # switch to admin below doesn't itself 403 on the permission
             # check before ever reaching the bus-factor rule under test.
             update_status_permission_id = (
                 await conn.execute(
@@ -271,21 +271,21 @@ class TestUpdateUserStatus:
             ).scalar_one()  # unique per (resource, action) — permissions_resource_key constraint
             await conn.execute(
                 insert(RolePermission).values(
-                    role_id=owner_role_id, permission_id=update_status_permission_id
+                    role_id=admin_role_id, permission_id=update_status_permission_id
                 )
             )
             # UserRole.user_id is the primary key (one role per user) — this
             # UPDATE replaces the test-role grant _login_with_permissions made
-            # with owner, same as rbac.services.assign_role.AssignRole.execute
+            # with admin, same as rbac.services.assign_role.AssignRole.execute
             # would via an upsert.
             await conn.execute(
-                update(UserRole).where(UserRole.user_id == actor_id).values(role_id=owner_role_id)
+                update(UserRole).where(UserRole.user_id == actor_id).values(role_id=admin_role_id)
             )
 
         response = await client.patch(f"/api/v1/auth/users/{actor_id}/status", json={"status": "blocked"})
 
         assert response.status_code == 403
-        assert response.json()["error"]["code"] == "auth_cannot_block_last_owner"
+        assert response.json()["error"]["code"] == "auth_cannot_block_last_admin"
 
 
 class TestLogout:

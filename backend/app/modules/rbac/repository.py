@@ -6,7 +6,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.base.markers import database
+from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
 from app.modules.rbac.models import Permission, Role, RolePermission, UserRole
 from app.modules.rbac.schemas import PermissionRead, RoleRead
@@ -47,6 +47,7 @@ class RoleRepository(AbstractRoleRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
+    @helper
     async def _get(self, role_id: int) -> Role | None:
         return await self._session.scalar(
             select(Role).options(selectinload(Role.permissions)).where(Role.id == role_id)

@@ -3,14 +3,14 @@
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
 from app.modules.auth.constants import UserStatus
-from app.modules.auth.exceptions import CannotBlockLastOwner
+from app.modules.auth.exceptions import CannotBlockLastAdmin
 from app.modules.auth.schemas import UserRead
 from app.modules.auth.uow import AbstractAuthUnitOfWork
 from app.modules.rbac.public import RbacApi
 
 
 class UpdateUserStatus(AbstractUseCase):
-    """Block or unblock a user. Blocking the last owner is rejected — bus-factor
+    """Block or unblock a user. Blocking the last admin is rejected — bus-factor
     safety, mirroring rbac's AssignRole for the analogous role-reassignment case."""
 
     def __init__(self, uow: AbstractAuthUnitOfWork, rbac_api: RbacApi) -> None:
@@ -19,8 +19,8 @@ class UpdateUserStatus(AbstractUseCase):
 
     @use_case
     async def execute(self, user_id: int, status: UserStatus) -> UserRead:
-        if status == UserStatus.BLOCKED and await self._rbac_api.is_last_owner(user_id):
-            raise CannotBlockLastOwner()
+        if status == UserStatus.BLOCKED and await self._rbac_api.is_last_admin(user_id):
+            raise CannotBlockLastAdmin()
         updated = await self._uow.users.set_status(user_id, status)
         await self._uow.commit()
         return updated

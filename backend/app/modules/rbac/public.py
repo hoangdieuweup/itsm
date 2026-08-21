@@ -39,14 +39,14 @@ class RbacApi:
         )
 
     @facade
-    async def is_last_owner(self, user_id: int) -> bool:
-        """True if user_id holds the owner role and is the only one who does —
-        used by auth's UpdateUserStatus to block blocking the last owner."""
+    async def is_last_admin(self, user_id: int) -> bool:
+        """True if user_id holds the admin role and is the only one who does —
+        used by auth's UpdateUserStatus to block blocking the last admin."""
         role = await self._uow.user_roles.get_role_for_user(user_id)
-        if role is None or role.name != RbacDefaults.OWNER_ROLE_NAME:
+        if role is None or role.name != RbacDefaults.ADMIN_ROLE_NAME:
             return False
-        owner_grants = await self._uow.roles.count_users_with_role(role.id)
-        return RbacRules.blocks_last_owner_removal(role.name, owner_grants)
+        admin_grants = await self._uow.roles.count_users_with_role(role.id)
+        return RbacRules.blocks_last_admin_removal(role.name, admin_grants)
 
 
 async def get_rbac_api(uow: AbstractRbacUnitOfWork = Depends(get_uow)) -> RbacApi:
