@@ -15,7 +15,7 @@ import { useUpdateUserStatus } from "../hooks/use-update-user-status";
 
 export function UsersPageContent() {
   const t = useTranslations("users");
-  const tCommon = useTranslations("confirmDialog");
+  const tCommon = useTranslations("common.confirmDialog");
   const getErrorMessage = useApiErrorMessage("users");
   const { data: page } = useUsers(50, 0);
   const updateStatus = useUpdateUserStatus();
