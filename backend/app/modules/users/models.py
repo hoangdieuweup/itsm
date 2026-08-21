@@ -1,7 +1,7 @@
 """ORM models owned by the users module. No other module may query these tables."""
 
-from datetime import datetime
 import uuid
+from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Enum, String, func
 from sqlalchemy.dialects.postgresql import UUID

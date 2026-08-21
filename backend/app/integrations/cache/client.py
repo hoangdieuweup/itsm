@@ -5,7 +5,6 @@ import json
 import logging
 from collections.abc import Awaitable, Callable
 from typing import TypeVar, cast
-
 from uuid import UUID
 
 from pydantic import BaseModel, ValidationError

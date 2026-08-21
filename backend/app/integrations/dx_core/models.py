@@ -4,8 +4,8 @@ access_token/refresh_token store Fernet ciphertext (base64), never plaintext
 — see app.core.crypto.FernetCodec and app.integrations.dx_core.repository.
 """
 
-from datetime import datetime
 import uuid
+from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Text, func
 from sqlalchemy.dialects.postgresql import UUID

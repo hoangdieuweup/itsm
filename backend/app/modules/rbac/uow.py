@@ -2,7 +2,6 @@
 
 import logging
 from abc import abstractmethod
-
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
