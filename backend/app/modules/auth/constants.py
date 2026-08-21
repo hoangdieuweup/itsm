@@ -57,6 +57,7 @@ class ErrorCode(StrEnum):
     USER_BLOCKED = "auth_user_blocked"
     INVALID_CREDENTIALS = "auth_invalid_credentials"
     NOT_AUTHENTICATED = "auth_not_authenticated"
+    CANNOT_BLOCK_LAST_OWNER = "auth_cannot_block_last_owner"
 
 
 class LoginPolicy:

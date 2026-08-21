@@ -17,13 +17,14 @@ from app.integrations.dx_core.repository import AbstractDxTokenRepository
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCacheNamespaces, UserStatus
 from app.modules.auth.events import UserCreated, UserLoggedIn
-from app.modules.auth.exceptions import UserBlocked
+from app.modules.auth.exceptions import CannotBlockLastOwner, UserBlocked
 from app.modules.auth.repository import AbstractUserRepository
 from app.modules.auth.schemas import UserRead
 from app.modules.auth.services.authenticate import AuthenticateWithDx
 from app.modules.auth.services.issue_tokens import IssueTokens
 from app.modules.auth.services.logout import LogoutUser
 from app.modules.auth.services.sync_external_user import SyncExternalUser
+from app.modules.auth.services.update_user_status import UpdateUserStatus
 from app.modules.auth.uow import AbstractAuthUnitOfWork
 
 
@@ -130,14 +131,19 @@ class FakeAuthUnitOfWork(AbstractAuthUnitOfWork):
 
 class FakeRbacApi:
     """Duck-typed stand-in for app.modules.rbac.public.RbacApi — same pattern as
-    FakeDxCoreClient below: AuthenticateWithDx only ever calls assign_default_role
-    on it, so that's the only method this fake needs."""
+    FakeDxCoreClient below: AuthenticateWithDx only calls assign_default_role,
+    UpdateUserStatus only calls is_last_owner, so those are the only two
+    methods this fake needs."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, last_owner_ids: frozenset[int] = frozenset()) -> None:
         self.calls: list[int] = []
+        self._last_owner_ids = last_owner_ids
 
     async def assign_default_role(self, user_id: int) -> None:
         self.calls.append(user_id)
+
+    async def is_last_owner(self, user_id: int) -> bool:
+        return user_id in self._last_owner_ids
 
 
 @dataclass
@@ -428,6 +434,58 @@ class TestLogoutUser:
         use_case = LogoutUser(dx_tokens, FakeDxCoreClient(), cache_client)
 
         await use_case.execute(1, "not-a-jwt", None)  # must not raise
+
+
+class TestUpdateUserStatus:
+    """UpdateUserStatus: block/unblock a user, rejecting a block that would
+    leave zero users holding the owner role."""
+
+    async def test_blocks_an_active_user(self) -> None:
+        uow = FakeAuthUnitOfWork()
+        user = await uow.users.create(
+            email="target@example.com",
+            name="Target",
+            external_user_id="dx-target",
+            employee_code=None,
+            email_confirmed=True,
+        )
+        rbac_api = FakeRbacApi()
+
+        updated = await UpdateUserStatus(uow, rbac_api).execute(user.id, UserStatus.BLOCKED)
+
+        assert updated.status is UserStatus.BLOCKED
+        assert uow.commits == 1
+
+    async def test_unblocking_never_consults_the_bus_factor_rule(self) -> None:
+        uow = FakeAuthUnitOfWork()
+        user = await uow.users.create(
+            email="target@example.com",
+            name="Target",
+            external_user_id="dx-target",
+            employee_code=None,
+            email_confirmed=True,
+        )
+        rbac_api = FakeRbacApi(last_owner_ids=frozenset({user.id}))  # would block if this were a BLOCK
+
+        updated = await UpdateUserStatus(uow, rbac_api).execute(user.id, UserStatus.ACTIVE)
+
+        assert updated.status is UserStatus.ACTIVE
+
+    async def test_rejects_blocking_the_last_owner(self) -> None:
+        uow = FakeAuthUnitOfWork()
+        user = await uow.users.create(
+            email="owner@example.com",
+            name="Owner",
+            external_user_id="dx-owner",
+            employee_code=None,
+            email_confirmed=True,
+        )
+        rbac_api = FakeRbacApi(last_owner_ids=frozenset({user.id}))
+
+        with pytest.raises(CannotBlockLastOwner):
+            await UpdateUserStatus(uow, rbac_api).execute(user.id, UserStatus.BLOCKED)
+
+        assert uow.commits == 0
 
 
 def _blacklist_key(raw_token: str) -> str:

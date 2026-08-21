@@ -18,3 +18,17 @@ class UserRead(FrozenModel):
     email_confirmed: bool
     last_login_at: datetime | None
     created_at: datetime
+
+
+class MeResponse(FrozenModel):
+    """/me's response: the user's profile plus their resolved role/permissions."""
+
+    user: UserRead
+    role_name: str
+    permissions: list[str]
+
+
+class UserStatusUpdate(FrozenModel):
+    """Request body for PATCH /auth/users/{id}/status."""
+
+    status: UserStatus
