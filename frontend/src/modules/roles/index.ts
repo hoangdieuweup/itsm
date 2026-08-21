@@ -9,9 +9,11 @@ export {
   deleteRole,
 } from "./api/fetchers";
 export { rolesKeys } from "./api/query-keys";
+export { SYSTEM_ROLE_NAMES, isProtectedAdminRole } from "./model/schema";
 export type {
   Role,
   RolesPage,
   PermissionItem,
   PermissionsList,
+  SystemRoleName,
 } from "./model/schema";

@@ -24,6 +24,8 @@ class UpdateRole(AbstractUseCase):
         if name is not None and not RbacRules.can_rename_role(role):
             raise SystemRoleImmutable()
         if permission_ids is not None:
+            if not RbacRules.can_modify_role_permissions(role):
+                raise SystemRoleImmutable()
             found = await self._uow.permissions.find_by_ids(permission_ids)
             if len(found) != len(set(permission_ids)):
                 raise UnknownPermissionId()

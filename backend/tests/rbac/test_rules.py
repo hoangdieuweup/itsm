@@ -21,6 +21,19 @@ def test_can_rename_role(is_system: bool, expected: bool) -> None:
 
 
 @pytest.mark.parametrize(
+    ("role_name", "expected"),
+    [
+        ("admin", False),
+        ("member", True),
+        ("custom", True),
+    ],
+)
+def test_can_modify_role_permissions(role_name: str, expected: bool) -> None:
+    role = RoleRead(id=1, name=role_name, is_system=role_name in ("admin", "member"), permissions=[])
+    assert RbacRules.can_modify_role_permissions(role) is expected
+
+
+@pytest.mark.parametrize(
     ("role_name", "remaining_admin_grants", "expected"),
     [
         ("admin", 1, True),  # this is the only admin left — block

@@ -50,12 +50,18 @@
     "saving": "Đang lưu...",
     "selectAll": "Chọn tất cả",
     "deselectAll": "Bỏ chọn tất cả",
-    "systemRoleHint": "Vai trò hệ thống — không thể đổi tên."
+    "systemRoleHint": "Vai trò hệ thống — không thể đổi tên.",
+    "adminProtectedAlert": "Vai trò Quản trị viên (admin) mặc định sở hữu toàn bộ quyền trong hệ thống và không thể sửa đổi để đảm bảo an toàn."
   },
   "actions": {
     "edit": "Sửa",
+    "view": "Xem chi tiết",
     "delete": "Xóa",
-    "deleteConfirm": "Bạn có chắc chắn muốn xóa vai trò này không?"
+    "deleteConfirm": "Bạn có chắc chắn muốn xóa vai trò này không?",
+    "adminProtectedTooltip": "Vai trò hệ thống được bảo vệ, không thể xóa hoặc sửa quyền."
+  },
+  "badges": {
+    "adminProtected": "Toàn quyền"
   },
   "errors": {
     "rbac_role_not_found": "Không tìm thấy vai trò.",
