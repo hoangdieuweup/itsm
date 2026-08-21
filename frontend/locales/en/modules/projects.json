@@ -1,0 +1,68 @@
+{
+  "title": "Projects",
+  "description": "Manage projects, their environments, and external links.",
+  "createProject": "Create Project",
+  "editProject": "Edit Project",
+  "createEnvironment": "Add Environment",
+  "editEnvironment": "Edit Environment",
+  "createLink": "Add Link",
+  "editLink": "Edit Link",
+  "actions": {
+    "create": "New Project",
+    "addEnvironment": "Add",
+    "addLink": "Add"
+  },
+  "table": {
+    "name": "Name",
+    "description": "Description"
+  },
+  "sections": {
+    "environments": "Environments",
+    "links": "External Links"
+  },
+  "environmentTypes": {
+    "dev": "Dev",
+    "staging": "Staging",
+    "production": "Production"
+  },
+  "linkTypes": {
+    "jira": "Jira",
+    "git": "Git",
+    "other": "Other"
+  },
+  "badges": {
+    "default": "Default"
+  },
+  "empty": {
+    "title": "No projects yet",
+    "description": "Create your first project to start managing environments, Cloudflare, and logs.",
+    "environments": "No environments yet.",
+    "links": "No links yet."
+  },
+  "form": {
+    "nameLabel": "Name",
+    "descriptionLabel": "Description",
+    "typeLabel": "Type",
+    "baseUrlLabel": "Base URL",
+    "linkTypeLabel": "Link type",
+    "urlLabel": "URL",
+    "cancel": "Cancel",
+    "save": "Save",
+    "create": "Create",
+    "saving": "Saving..."
+  },
+  "deleteConfirm": {
+    "title": "Delete project?",
+    "description": "This will permanently delete \"{name}\" and every environment and link attached to it.",
+    "environmentTitle": "Delete environment?",
+    "environmentDescription": "This will permanently delete the \"{name}\" environment.",
+    "linkTitle": "Delete link?",
+    "linkDescription": "This will permanently delete the \"{name}\" link."
+  },
+  "errors": {
+    "projects_project_not_found": "Project not found.",
+    "projects_environment_not_found": "Environment not found.",
+    "projects_environment_type_already_exists": "This project already has an environment of that type.",
+    "projects_project_link_not_found": "Link not found."
+  }
+}

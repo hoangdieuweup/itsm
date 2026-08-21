@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Users,
   Shield,
+  FolderKanban,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -289,6 +290,13 @@ export function DashboardSidebar({
       icon: Shield,
       active: pathname === ROUTES.adminRoles,
       permission: { action: "read", resource: "role" },
+    },
+    {
+      href: ROUTES.adminProjects,
+      label: t("projects"),
+      icon: FolderKanban,
+      active: pathname === ROUTES.adminProjects,
+      permission: { action: "read", resource: "project" },
     },
   ];
 

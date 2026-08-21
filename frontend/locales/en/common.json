@@ -25,6 +25,7 @@
     "dashboard": "Dashboard",
     "users": "Users",
     "roles": "Roles",
+    "projects": "Projects",
     "mainMenu": "Main Menu",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
