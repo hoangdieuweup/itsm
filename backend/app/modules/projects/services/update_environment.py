@@ -4,6 +4,7 @@ from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
+from app.modules.projects.constants import ProjectAuditActions
 from app.modules.projects.exceptions import EnvironmentNotFound
 from app.modules.projects.schemas import EnvironmentRead
 from app.modules.projects.uow import AbstractProjectsUnitOfWork
@@ -34,7 +35,7 @@ class UpdateEnvironment(AbstractUseCase):
         await self._audit_api.log_event(
             type=AuditEventType.AUDIT,
             source=AuditSource.USER_ACTION,
-            action="ENVIRONMENT_UPDATED",
+            action=ProjectAuditActions.ENVIRONMENT_UPDATED,
             severity=AuditSeverity.INFO,
             message=f"Environment '{updated.name}' updated",
             project_id=existing.project_id,
