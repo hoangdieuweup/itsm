@@ -1,26 +1,59 @@
 [importlinter]
 root_package = app
 
-[importlinter:contract:module-facades]
-name = Domain modules reach each other only through public.py
+[importlinter:contract:auth-facade]
+name = Other modules reach auth only through public.py
 type = forbidden
 source_modules =
-    app.auth
-    app.rbac
-    app.users
+    app.modules.rbac
+    app.modules.users
+    app.modules.common
 forbidden_modules =
-    app.auth.repository
-    app.auth.models
-    app.auth.uow
-    app.auth.services
-    app.rbac.repository
-    app.rbac.models
-    app.rbac.uow
-    app.rbac.services
-    app.users.repository
-    app.users.models
-    app.users.uow
-    app.users.services
+    app.modules.auth.repository
+    app.modules.auth.models
+    app.modules.auth.uow
+    app.modules.auth.services
+    app.modules.auth.utils
+allow_indirect_imports = True
+
+[importlinter:contract:rbac-facade]
+name = Other modules reach rbac only through public.py
+type = forbidden
+source_modules =
+    app.modules.auth
+    app.modules.users
+    app.modules.common
+forbidden_modules =
+    app.modules.rbac.repository
+    app.modules.rbac.models
+    app.modules.rbac.uow
+    app.modules.rbac.services
+allow_indirect_imports = True
+
+[importlinter:contract:users-facade]
+name = Other modules reach users only through public.py
+type = forbidden
+source_modules =
+    app.modules.auth
+    app.modules.rbac
+    app.modules.common
+forbidden_modules =
+    app.modules.users.repository
+    app.modules.users.models
+    app.modules.users.uow
+    app.modules.users.services
+    app.modules.users.utils
+allow_indirect_imports = True
+
+[importlinter:contract:common-is-a-leaf-module]
+name = common is a promotion target, not a hub — it never imports another domain module
+type = forbidden
+source_modules =
+    app.modules.common
+forbidden_modules =
+    app.modules.auth
+    app.modules.rbac
+    app.modules.users
 allow_indirect_imports = True
 
 [importlinter:contract:root-is-mechanism]
@@ -29,26 +62,13 @@ type = forbidden
 source_modules =
     app.config
     app.constants
-    app.exceptions
-    app.models
-    app.database
-    app.pagination
-    app.events
-    app.middleware
-    app.logging_config
-    app.docs
-    app.repository
-    app.uow
-    app.use_case
-    app.markers
-    app.retry
+    app.core
 forbidden_modules =
-    app.auth
-    app.rbac
-    app.users
+    app.modules
     app.integrations.cache
     app.integrations.queue
     app.integrations.storage
+    app.integrations.dx_core
 
 [importlinter:contract:integrations-are-leaves]
 name = Integrations never import a domain module
@@ -57,7 +77,6 @@ source_modules =
     app.integrations.cache
     app.integrations.queue
     app.integrations.storage
+    app.integrations.dx_core
 forbidden_modules =
-    app.auth
-    app.rbac
-    app.users
+    app.modules

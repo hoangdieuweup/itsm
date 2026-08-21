@@ -26,6 +26,23 @@ Nothing points back up. `rules.py` imports nothing from the project. `repository
 
 Every import stays at the top of the file (`ruff`'s `PLC0415` enforces this) and no two files import each other. If a function-body import shows up to dodge a circular-import crash, that crash is the actual signal — don't silence it with a local import. Find the piece both files need and move it down a layer (a shared type into `constants.py`/`schemas.py`) or up into `public.py`, so the dependency only ever points one way again.
 
+## Intra-module import order
+
+Files inside one module form tiers, not a flat bag — this is rule #13 ("no circular imports, ever") spelled out file by file. A file only imports from a file in an earlier tier; never a sibling in the same tier, never anything later.
+
+| Tier | Files | May import (same module) | Why |
+|---|---|---|---|
+| 0 | `constants.py`, `config.py` | nothing from this module | the vocabulary and settings everything else is written in terms of |
+| 1 | `exceptions.py`, `schemas.py`, `models.py`, `events.py` | tier 0 | shapes and errors defined in terms of that vocabulary, no decisions |
+| 2 | `rules.py`, `utils/` | tier 0–1 | decisions and transforms, no I/O |
+| 3 | `repository.py`, `uow.py` | tier 0–2 | persistence, built from the shapes above it |
+| 4 | `services/*.py` | tier 0–3 | orchestration — the only place tier 2 and tier 3 meet |
+| 5 | `dependencies.py` | tier 0–4 | composition root — the one place a concrete class is named |
+| 6 | `router.py` | tier 0–1 directly, tier 5 via `Depends()` | HTTP translation only, per rule #10 — never imports `services/` or `repository.py` itself |
+| 7 | `public.py` | whatever tier it re-exports | the facade other modules see |
+
+If two files seem to need each other — `rules.py` wanting something from `services/`, `schemas.py` wanting something from `repository.py` — that's the circular-import warning rule #13 already names. Move the shared piece down a tier (into `constants.py`/`schemas.py`) or expose it up through `public.py`. A function-body import that dodges the cycle is a symptom to fix, not a workaround to keep.
+
 ## Layer responsibilities
 
 | File | Owns | Must not |

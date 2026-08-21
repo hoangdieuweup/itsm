@@ -28,6 +28,7 @@ A second question resolves most of the remainder: **if this module were extracte
 | `Environment` enum | `app/constants.py` | About the process, not the business |
 | Type aliases (`Literal[...]`, `TypeAlias`, `TypeVar`) | `<module>/constants.py`, as a class attribute of the class that owns the concept | A type alias is a constant — `AuthCookies.SameSite`, not `_SameSite = Literal[...]` at the top of a utility file |
 | Redis key construction | `integrations/cache/keys.py`, as a `CacheKeyBuilder`-style class | One place, or invalidation cannot be reasoned about |
+| An enum/limit 3+ modules need (`UserStatus`) | `app/modules/common/constants.py` | Promoted, per "When duplication is correct" below — not a first draft, and not `app/constants.py` (mechanism only) |
 
 ## Grouped into a class
 
@@ -89,10 +90,12 @@ Each of these means the boundary has already leaked:
 - A bare `NAME = value`, a type alias (`_SameSite = Literal[...]`), or a bare `def helper(...)` sits above a class in `constants.py`, `rules.py` or a file inside `utils/` — the concept still needs an owning class, not just an owning file
 - A `Literal`/`TypeAlias`/`TypeVar` is defined locally in a utility, service, or schema file instead of in `<module>/constants.py` as a class attribute — type aliases are constants, not local implementation details
 
-The last one is the most serious: it means two modules share a concept, and the concept has no owner. Either it belongs to one of them and the other should go through `public.py`, or it is genuinely universal and belongs at the root — but that case is rarer than it first appears, and duplicating a constant is often cheaper than coupling two modules to share it.
+The last one is the most serious: it means two modules share a concept, and the concept has no owner. Either it belongs to one of them and the other should go through `public.py`, or — once a third module needs it too — it gets promoted into `app/modules/common/` (see "When duplication is correct" below). It does not belong at `app/core` or `app/constants.py`: those are mechanism (rule #4), and a shared enum like `UserStatus` is still a business concept, just one two or more modules happen to need. Two modules alone sharing something is usually still cheaper to duplicate than to couple.
 
 ## When duplication is correct
 
 Sharing has a cost that is invisible at the moment you introduce it and obvious a year later: every change to a shared thing needs coordination across everyone who uses it. Two modules each holding their own `MAX_RETRIES = 3` are free to diverge when their needs diverge. One shared `MAX_RETRIES` means the first divergence turns into an argument or a parameter.
 
 Duplicate until three modules need the same thing *and* it is stable *and* divergence would be a bug rather than a feature. Only then promote it, and promote the smallest possible version.
+
+Promote it into `app/modules/common/`, never into whichever of the three modules defined it first, and never into `app/core` — `common` is a module like any other (its own `constants.py`, and a `public.py` if other modules should only see part of it), just one every domain module is allowed to depend on. It stays that small because the same three-module bar gates every addition to it, not just the first one, and it never imports a domain module back — that direction is what would turn it into the accumulate-everything `shared/` folder this skill's opening section warns against. Reaching it from a domain module follows the same rule as reaching any other module: `app.modules.common.public` or `app.modules.common.constants`, never a private submodule inside `common`.

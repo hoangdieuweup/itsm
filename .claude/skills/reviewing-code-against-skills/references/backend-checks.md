@@ -48,8 +48,12 @@ If the project has an access-control module following `fastapi-modular-scaffold`
 ## Local imports and circular imports
 `ruff check` reports `PLC0415` for any import inside a function body, if the project's `pyproject.toml` enables it — flag it as a gap if a changed `pyproject.toml` doesn't select `PLC0415`. A local import existing specifically to dodge a circular-import crash is not a pass — it's evidence of a real cycle between two files, which is the actual finding to report. Trace which two files import each other and name both in the finding; the fix is moving the shared piece down into `constants.py`/`schemas.py` or up into `public.py`, not keeping the local import.
 
+Even without a local-import workaround, check the direction of every intra-module import against the tier order in the governing skill's `references/architecture.md#intra-module-import-order` (`constants`/`config` → `exceptions`/`schemas`/`models`/`events` → `rules`/`utils` → `repository`/`uow` → `services` → `dependencies` → `router` → `public`). A same-tier import (two files under `services/` importing each other, `rules.py` importing `utils/`) or an upward one (`schemas.py` importing from `repository.py`, `repository.py` importing from `services/`) is a violation even when `ruff` and `check_module_boundaries.py` both stay quiet — neither tool looks inside a single module.
+
 ## Cross-module boundary imports
-`lint-imports` catches some of this, but `scripts/check_module_boundaries.py --strict` is the project-specific, AST-based check. It enforces the rule: if a file in `app/modules/<A>/` imports from `app.modules.<B>` (where `B ≠ A`), that import **must** resolve to `app.modules.<B>.public`. Any other cross-module import path — `.guards`, `.schemas`, `.services`, `.repository`, `.models` — is a boundary violation.
+`lint-imports` catches some of this, but `scripts/check_module_boundaries.py --strict` is the project-specific, AST-based check. It enforces the rule: if a file in `app/modules/<A>/` imports from `app.modules.<B>` (where `B ≠ A`), that import **must** resolve to `app.modules.<B>.public` or `app.modules.<B>.constants` — those are the two allowed cross-module targets, per `fastapi-modular-scaffold` rule #2. Any other cross-module import path — `.guards`, `.schemas`, `.services`, `.repository`, `.models` — is a boundary violation.
+
+`app.modules.common` is a module like any other under this check, with one extra direction rule the script doesn't enforce: flag any import inside `app/modules/common/` that reaches into `app.modules.<domain>` — `common` is the promotion target for shared concepts (rule #17), and it must never depend back on the modules that depend on it.
 
 Run it as part of the review:
 ```bash

@@ -7,7 +7,7 @@ description: Scaffold and extend production-grade modular FastAPI projects with 
 
 Build backends that survive growth. The organizing idea, taken from Netflix Dispatch and the widely used `zhanymkanov/fastapi-best-practices` convention, is that **a module owns everything it needs**: its tables, its enums, its error codes, its settings, its helpers. The application root holds mechanism only — base classes and connections — and no business concept at all.
 
-This inverts the instinct to create `shared/utils.py` and `shared/constants.py`. Those files start small, accumulate everything, and end up imported by every module while importing from several — a new version of the mess the structure was meant to prevent.
+This inverts the instinct to create `shared/utils.py` and `shared/constants.py`. Those files start small, accumulate everything, and end up imported by every module while importing from several — a new version of the mess the structure was meant to prevent. The one sanctioned exception is `modules/common/` — a real module, not a dumping ground, that a concept only enters once it clears the promotion bar in `references/placement.md#when-duplication-is-correct` (needed by three or more modules, stable, and one where divergence would be a bug). See rule #17.
 
 ## When to do what
 
@@ -16,7 +16,8 @@ This inverts the instinct to create `shared/utils.py` and `shared/constants.py`.
 | New project | Run `scripts/scaffold.py`, then read `references/architecture.md` |
 | Add a domain module | `scripts/scaffold.py --add-module <name>` |
 | Add cache, queue, storage or tracing | `scripts/scaffold.py --add-integration <name>` |
-| "Where does this constant/enum/exception go?" | Read `references/placement.md` |
+| "Where does this constant/enum/exception go, or does it belong in `modules/common`?" | Read `references/placement.md` |
+| Circular-import error, or unsure which file in a module is allowed to import which | Read `references/architecture.md#intra-module-import-order` |
 | Full worked example of every layer, with `Abstract*` classes and validation on schemas | Read `references/layer-examples.md` |
 | Wire caching, fix stale data | Read `references/caching.md` |
 | Add queue, outbox, consumers | Read `references/messaging.md` |
@@ -85,7 +86,10 @@ app/
 │   │   ├── dependencies.py  Depends wiring — the composition root, the one place a concrete class is named
 │   │   ├── router.py        HTTP surface
 │   │   └── public.py        the ONLY import surface for other modules, @facade
-│   └── billing/ ...     same shape, one folder per domain module
+│   ├── billing/ ...     same shape, one folder per domain module
+│   └── common/          only once 3+ modules need the same concept — rule #17
+│       ├── constants.py     the promoted enum/limit, still grouped into a class, rule #16
+│       └── public.py        every domain module imports through here or `common.constants`, never the reverse
 │
 └── integrations/
     ├── cache/           client.py config.py constants.py exceptions.py keys.py
@@ -123,6 +127,7 @@ The recurring question is where a given piece of code belongs. The test is **who
 | `Page`, `CustomModel`, session factory | `app/core/`, as mechanism |
 | `AbstractRepository`, `AbstractUnitOfWork` | `app/core/base/`, as abstract contract |
 | `@database`, `@helper`, `@rule` markers | `app/core/base/markers.py` |
+| `UserStatus` or another enum/limit 3+ modules need | `modules/common/constants.py` — promotion only, never a first draft |
 
 The line between `rules.py` and `utils/` is worth holding: rules encode business decisions and change when the business changes; utils are formatting and shaping and don't. Keeping them apart means rules stay small and heavily tested while utils stay boring. Both live inside a class per rule #16 — see `references/layer-examples.md`.
 
@@ -168,6 +173,10 @@ Reading the call site tells you where the constant came from. A bare relative im
 **15. `repository.py`, `uow.py` and every `services/*.py` class extend an `Abstract*` contract owned by `core/base/`.** `app/core/base/repository.py` (`AbstractRepository[T]`), `app/core/base/uow.py` (`AbstractUnitOfWork`) and `app/core/base/use_case.py` (`AbstractUseCase`) — a module's concrete `{X}Repository`/`{X}UnitOfWork`/use-case classes implement these, and every service depends on the abstraction, never the concrete SQLAlchemy class. Enforced by Python itself: an incomplete implementation raises `TypeError` at instantiation, not a lint warning at review time. `dependencies.py` is the one composition root allowed to name the concrete class. This is what makes a `Fake{X}Repository` unit test possible — see `references/layer-examples.md`.
 
 **16. No bare constant, type alias, or bare helper function at module level.** A limit, a cache key, a type alias, a text formatter — every one still lives in the file that owns it (`constants.py`, `utils/`) and still gets imported from there, but nothing sits outside a class *within* that file: `CatalogLimits.MAX_NAME_LENGTH`, not a loose `MAX_NAME_LENGTH = 255`; `AuthCookies.SameSite` (a `Literal["lax", "none", "strict"]`), not a `_SameSite = Literal[...]` at the top of whichever file happens to use it; `CatalogTextUtils.normalize_name(...)`, not a bare `def normalize_name(...)`. Type aliases (`Literal`, `TypeAlias`, `TypeVar`) are constants — they belong in `<module>/constants.py` as a class attribute of the class that owns the concept, not scattered across utility or service files. `utils.py` is a package (`utils/__init__.py` + one file per concern), the same way `services/` is one file per use case. This does not reach `router.py`/`dependencies.py`/`lifespan.py` — a FastAPI dependency provider has to stay a plain function `Depends()` calls directly. `app/core/base/markers.py`'s `@database`/`@helper`/`@rule`/`@use_case`/`@facade`/`@integration` decorator classes tag each **method** with its role — never the whole class, since a class has main operations and auxiliary ones supporting them (a repository's `get_by_id` vs. its private `_load_by_id`) — visible at the method's definition, not only inferable from the file. `app/core/retry.py`'s `@retry` and `integrations/queue/idempotency.py`'s `@idempotent` are a different kind of decorator — they change behavior, not just tag it — and stack under a role marker (`@integration` outermost) rather than living in `markers.py`. See `references/layer-examples.md`.
+
+**17. `modules/common/` is the only sanctioned shared module, and it is one-way.** Every domain module may import it, the same as any other module (through `common.public` or `common.constants`, rule #2); `common` itself may never import a domain module — that would create exactly the cross-module cycle rule #13 forbids, just one hop removed. A concept lands here only once it clears the bar in `references/placement.md#when-duplication-is-correct` (three or more modules need it, it's stable, and divergence would be a bug) — it is a promotion, not a first draft. `common` keeps the same shape as any module (its own `constants.py`, `public.py`, `exceptions.py` if it needs one) and the same size discipline as rule #12; the moment it wants a `router.py` or a table of its own, what's living there was a domain concept with an owner all along, not something genuinely shared.
+
+**18. Within a module, imports run one direction only.** `constants.py`/`config.py` → `exceptions.py`/`schemas.py`/`models.py`/`events.py` → `rules.py`/`utils/` → `repository.py`/`uow.py` → `services/*.py` → `dependencies.py` → `router.py` → `public.py`. A file only imports from a file earlier in that chain; two files in the same module never import each other, and nothing points back up it — the same principle as rule #13, spelled out file by file in `references/architecture.md#intra-module-import-order`.
 
 ## Deciding how far to go
 
