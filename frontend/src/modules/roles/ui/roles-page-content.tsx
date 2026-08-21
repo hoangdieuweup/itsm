@@ -14,7 +14,7 @@ import { isProtectedAdminRole, type Role } from "../model/schema";
 
 export function RolesPageContent() {
   const t = useTranslations("roles");
-  const tCommon = useTranslations("confirmDialog");
+  const tCommon = useTranslations("common.confirmDialog");
   const getErrorMessage = useApiErrorMessage("roles");
   const { data: page } = useRoles(50, 0);
   const deleteRole = useDeleteRole();
