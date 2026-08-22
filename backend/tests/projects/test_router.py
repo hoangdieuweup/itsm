@@ -73,6 +73,47 @@ class TestCreateProject:
         assert body["data"]["name"] == "Website A"
 
 
+class TestGetEnvironment:
+    async def test_returns_one_environment(self, client: AsyncClient, engine: AsyncEngine) -> None:
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[("project", "create"), ("environment", "create"), ("environment", "read")],
+        )
+        project_resp = await client.post("/api/v1/projects", json={"name": "Site"})
+        project_id = project_resp.json()["data"]["id"]
+        env_resp = await client.post(
+            f"/api/v1/projects/{project_id}/environments",
+            json={"type": "dev", "name": "Dev"},
+        )
+        env_id = env_resp.json()["data"]["id"]
+
+        response = await client.get(f"/api/v1/environments/{env_id}")
+
+        assert response.status_code == 200
+        assert response.json()["data"]["id"] == env_id
+        assert response.json()["data"]["name"] == "Dev"
+
+    async def test_returns_404_for_unknown_environment(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        await _login_with_permissions(client, engine, permissions=[("environment", "read")])
+
+        response = await client.get(f"/api/v1/environments/{UUID(int=0)}")
+
+        assert response.status_code == 404
+        assert response.json()["error"]["code"] == "projects_environment_not_found"
+
+    async def test_requires_environment_read_permission(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        await _login_with_permissions(client, engine, permissions=[])
+
+        response = await client.get(f"/api/v1/environments/{UUID(int=0)}")
+
+        assert response.status_code == 403
+
+
 class TestProjectEnvironmentsAndLinks:
     async def test_full_lifecycle(self, client: AsyncClient, engine: AsyncEngine) -> None:
         await _login_with_permissions(

@@ -21,7 +21,7 @@ from app.modules.projects.dependencies import (
     get_update_project,
     get_update_project_link,
 )
-from app.modules.projects.exceptions import ProjectNotFound
+from app.modules.projects.exceptions import EnvironmentNotFound, ProjectNotFound
 from app.modules.projects.schemas import (
     EnvironmentCreate,
     EnvironmentRead,
@@ -133,6 +133,19 @@ async def create_environment(
         project_id, body.type, body.name, body.base_url, actor_id=user.id, actor_email=user.email
     )
     return ApiResponse[EnvironmentRead](success=True, data=env)
+
+
+@router.get("/environments/{environment_id}")
+async def get_environment(
+    environment_id: UUID,
+    uow: AbstractProjectsUnitOfWork = Depends(get_uow),
+    _user: UserRead = Depends(require_permission("environment", "read")),
+) -> ApiResponse[EnvironmentRead]:
+    """Return one environment, 404 if it doesn't exist."""
+    environment = await uow.environments.get_by_id(environment_id)
+    if environment is None:
+        raise EnvironmentNotFound()
+    return ApiResponse[EnvironmentRead](success=True, data=environment)
 
 
 @router.patch("/environments/{environment_id}")
