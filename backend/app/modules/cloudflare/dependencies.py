@@ -18,15 +18,24 @@ from app.modules.cloudflare.exceptions import CloudflareConfigNotFound
 from app.modules.cloudflare.schemas import AccountAccessGrant
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
+from app.modules.cloudflare.services.create_config import CreateCloudflareConfig
+from app.modules.cloudflare.services.create_dns_record import CreateDnsRecord
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
+from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
+from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
+from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
+from app.modules.cloudflare.services.list_zones import ListZones
 from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
+from app.modules.cloudflare.services.update_config import UpdateCloudflareConfig
+from app.modules.cloudflare.services.update_dns_record import UpdateDnsRecord
 from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork, CloudflareUnitOfWork
+from app.modules.projects.public import ProjectsApi, get_projects_api
 from app.modules.rbac.public import RbacApi, get_rbac_api
 from app.modules.users.public import UsersApi, get_users_api
 
@@ -167,3 +176,70 @@ async def get_remove_manager(
 ) -> RemoveCloudflareAccountManager:
     """Provide the remove-manager use case."""
     return RemoveCloudflareAccountManager(uow, audit_api)
+
+
+async def get_create_config(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    rbac_api: RbacApi = Depends(get_rbac_api),
+    projects_api: ProjectsApi = Depends(get_projects_api),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> CreateCloudflareConfig:
+    """Provide the create-config use case."""
+    return CreateCloudflareConfig(uow, client, rbac_api, projects_api, audit_api)
+
+
+async def get_update_config(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> UpdateCloudflareConfig:
+    """Provide the update-config use case."""
+    return UpdateCloudflareConfig(uow, client, audit_api)
+
+
+async def get_delete_config(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow), audit_api: AuditApi = Depends(get_audit_api)
+) -> DeleteCloudflareConfig:
+    """Provide the delete-config use case."""
+    return DeleteCloudflareConfig(uow, audit_api)
+
+
+async def get_list_zones(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+) -> ListZones:
+    """Provide the list-zones use case."""
+    return ListZones(uow, client)
+
+
+async def get_list_dns_records(uow: AbstractCloudflareUnitOfWork = Depends(get_uow)) -> ListDnsRecords:
+    """Provide the list-dns-records use case."""
+    return ListDnsRecords(uow)
+
+
+async def get_create_dns_record(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> CreateDnsRecord:
+    """Provide the create-dns-record use case."""
+    return CreateDnsRecord(uow, client, audit_api)
+
+
+async def get_update_dns_record(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> UpdateDnsRecord:
+    """Provide the update-dns-record use case."""
+    return UpdateDnsRecord(uow, client, audit_api)
+
+
+async def get_delete_dns_record(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> DeleteDnsRecord:
+    """Provide the delete-dns-record use case."""
+    return DeleteDnsRecord(uow, client, audit_api)
