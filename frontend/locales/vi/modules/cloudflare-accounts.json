@@ -1,0 +1,60 @@
+{
+  "title": "Tài khoản Cloudflare",
+  "description": "Quản lý thông tin đăng nhập tài khoản Cloudflare và quyền truy cập.",
+  "createAccount": "Thêm tài khoản",
+  "editAccount": "Sửa tài khoản",
+  "empty": "Chưa có tài khoản Cloudflare nào.",
+  "table": {
+    "label": "Tên gợi nhớ",
+    "cfAccountId": "Cloudflare Account ID",
+    "createdAt": "Ngày tạo",
+    "actions": "Thao tác"
+  },
+  "actions": {
+    "testConnection": "Kiểm tra kết nối",
+    "testConnectionSuccess": "Kết nối thành công.",
+    "revealToken": "Xem token",
+    "hideToken": "Ẩn token",
+    "copyToken": "Sao chép",
+    "manageAccess": "Quản lý quyền truy cập"
+  },
+  "form": {
+    "label": "Tên gợi nhớ",
+    "cfAccountId": "Cloudflare Account ID",
+    "apiToken": "API Token",
+    "apiTokenHint": "Cloudflare phải chấp nhận token này trước khi lưu tài khoản.",
+    "rotateToken": "Đổi token",
+    "cancel": "Hủy",
+    "save": "Lưu",
+    "create": "Tạo",
+    "saving": "Đang lưu..."
+  },
+  "deleteConfirm": {
+    "title": "Xóa tài khoản Cloudflare?",
+    "description": "Không thể hoàn tác. Mọi environment đang gắn với account này (Phase 4) sẽ bị lỗi."
+  },
+  "managers": {
+    "title": "Người quản lý",
+    "empty": "Chưa có ai được cấp quyền truy cập tài khoản này.",
+    "assign": "Gán người quản lý",
+    "user": "Người dùng",
+    "accessLevel": "Cấp độ truy cập",
+    "levels": {
+      "owner": "Chủ sở hữu",
+      "editor": "Biên tập",
+      "viewer": "Chỉ xem"
+    },
+    "removeConfirm": {
+      "title": "Xóa người quản lý này?",
+      "description": "Họ sẽ mất toàn bộ quyền truy cập tài khoản này."
+    }
+  },
+  "errors": {
+    "cloudflare_account_not_found": "Tài khoản Cloudflare này không còn tồn tại.",
+    "cloudflare_account_manager_not_found": "Người quản lý này không còn tồn tại.",
+    "cloudflare_invalid_token": "Cloudflare từ chối API token này.",
+    "cloudflare_api_unavailable": "Không thể kết nối Cloudflare. Vui lòng thử lại sau.",
+    "cloudflare_insufficient_account_access": "Bạn không có đủ quyền trên tài khoản này.",
+    "cloudflare_last_owner_removal_blocked": "Không thể xóa hoặc hạ quyền chủ sở hữu cuối cùng của tài khoản này."
+  }
+}
