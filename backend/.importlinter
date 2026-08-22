@@ -55,6 +55,7 @@ source_modules =
     app.modules.rbac
     app.modules.users
     app.modules.common
+    app.modules.cloudflare
 forbidden_modules =
     app.modules.projects.repository
     app.modules.projects.models
