@@ -6,9 +6,10 @@ from uuid import uuid4
 
 import pytest
 
+from app.modules.cloudflare.access import resolve_account_access_grant
 from app.modules.cloudflare.constants import AccessLevel
-from app.modules.cloudflare.dependencies import require_account_access
-from app.modules.cloudflare.exceptions import InsufficientAccountAccess
+from app.modules.cloudflare.dependencies import require_account_access, require_account_access_for_environment
+from app.modules.cloudflare.exceptions import CloudflareConfigNotFound, InsufficientAccountAccess
 from app.modules.cloudflare.repository import CloudflareAccountManagerRow
 from app.modules.users.public import UserRead
 
@@ -108,4 +109,68 @@ async def test_no_manager_row_and_no_manage_all_raises() -> None:
             auth_api=FakeAuthApi(_FAKE_USER),
             rbac_api=FakeRbacApi(manage_all=False),
             uow=_make_uow(None),
+        )
+
+
+class FakeConfigs:
+    def __init__(self, cloudflare_account_id) -> None:
+        self._account_id = cloudflare_account_id
+
+    async def get_by_environment_id(self, environment_id):
+        if self._account_id is None:
+            return None
+
+        class _Row:
+            cloudflare_account_id = self._account_id
+
+        return _Row()
+
+
+class FakeUowWithConfigs:
+    def __init__(self, manager_row, cloudflare_account_id) -> None:
+        self.account_managers = FakeAccountManagers(manager_row)
+        self.configs = FakeConfigs(cloudflare_account_id)
+
+
+async def test_resolve_account_access_grant_is_the_shared_implementation() -> None:
+    """Direct-call test for the extracted helper — the regression proof that
+    require_account_access's existing behavior didn't change lives in the
+    untouched tests above this one in the file (all still exercise
+    require_account_access's public signature unchanged)."""
+    account_id = uuid4()
+    grant = await resolve_account_access_grant(
+        account_id, _FAKE_USER, FakeRbacApi(manage_all=True), _make_uow(None), AccessLevel.OWNER
+    )
+    assert grant.held_level is None
+
+
+async def test_require_account_access_for_environment_resolves_via_config() -> None:
+    account_id = uuid4()
+    row = CloudflareAccountManagerRow(
+        cloudflare_account_id=account_id,
+        user_id=_FAKE_USER.id,
+        access_level=AccessLevel.EDITOR,
+        created_at=datetime.now(UTC),
+    )
+    check = require_account_access_for_environment(AccessLevel.EDITOR)
+
+    grant = await check(
+        environment_id=uuid4(),
+        auth_api=FakeAuthApi(_FAKE_USER),
+        rbac_api=FakeRbacApi(manage_all=False),
+        uow=FakeUowWithConfigs(row, account_id),
+    )
+
+    assert grant.held_level is AccessLevel.EDITOR
+
+
+async def test_require_account_access_for_environment_raises_when_unbound() -> None:
+    check = require_account_access_for_environment(AccessLevel.VIEWER)
+
+    with pytest.raises(CloudflareConfigNotFound):
+        await check(
+            environment_id=uuid4(),
+            auth_api=FakeAuthApi(_FAKE_USER),
+            rbac_api=FakeRbacApi(manage_all=False),
+            uow=FakeUowWithConfigs(None, None),
         )

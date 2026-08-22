@@ -11,10 +11,10 @@ from app.integrations.cache.client import CacheClient
 from app.integrations.cache.dependencies import get_cache
 from app.modules.audit.public import AuditApi, get_audit_api
 from app.modules.auth.public import AuthApi, get_auth_api
+from app.modules.cloudflare.access import resolve_account_access_grant
 from app.modules.cloudflare.client import CloudflareClient
 from app.modules.cloudflare.constants import AccessLevel
-from app.modules.cloudflare.exceptions import InsufficientAccountAccess
-from app.modules.cloudflare.rules import CloudflareAccountRules
+from app.modules.cloudflare.exceptions import CloudflareConfigNotFound
 from app.modules.cloudflare.schemas import AccountAccessGrant
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
@@ -46,11 +46,13 @@ async def get_cloudflare_client() -> CloudflareClient:
 def require_account_access(min_level: AccessLevel):
     """Return a dependency that 403s unless the current user's per-account
     access_level (cloudflare_account_managers) meets min_level, OR they hold
-    the cloudflare_account:manage_all Layer-1 permission. Returns the
-    resolved AccountAccessGrant rather than a bare UserRead — callers that
-    need a stricter, request-body-dependent check (UpdateCloudflareAccount's
-    OWNER-for-token-rotation rule) re-validate the grant themselves instead
-    of this being expressible as a second static Depends factory."""
+    the cloudflare_account:manage_all Layer-1 permission. account_id is read
+    from the path — see require_account_access_for_environment for the
+    environment-keyed variant. Returns the resolved AccountAccessGrant rather
+    than a bare UserRead — callers that need a stricter, request-body-dependent
+    check (UpdateCloudflareAccount's OWNER-for-token-rotation rule) re-validate
+    the grant themselves instead of this being expressible as a second static
+    Depends factory."""
 
     async def check(
         account_id: UUID,
@@ -59,19 +61,35 @@ def require_account_access(min_level: AccessLevel):
         uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
     ) -> AccountAccessGrant:
         user = auth_api.current_user()
-        if await rbac_api.has_permission(user.id, "cloudflare_account", "manage_all"):
-            return AccountAccessGrant(user=user, held_level=None)
+        return await resolve_account_access_grant(account_id, user, rbac_api, uow, min_level)
 
-        manager_row = await uow.account_managers.get_for_user(account_id, user.id)
-        # IMPORTANT: do not funnel "no row" through satisfies_level(None, ...) —
-        # None there means "manage_all bypass, always sufficient" (see rules.py),
-        # which is a DIFFERENT meaning than "no relationship to this account at
-        # all". Guard the no-row case explicitly so the two never collide.
-        if manager_row is None or not CloudflareAccountRules.satisfies_level(
-            manager_row.access_level, min_level
-        ):
-            raise InsufficientAccountAccess()
-        return AccountAccessGrant(user=user, held_level=manager_row.access_level)
+    return check
+
+
+def require_account_access_for_environment(min_level: AccessLevel):
+    """Same check as require_account_access, but keyed by environment_id
+    (read from the path) instead of account_id — resolves the environment's
+    cloudflare_configs row to find which account to check against. Used by
+    every DNS/binding route except POST /cloudflare-configs itself, where no
+    binding exists yet to resolve from (see CreateCloudflareConfig, which
+    calls resolve_account_access_grant directly with the body's account_id —
+    account_id is body-only there, and FastAPI cannot resolve a bare-scalar
+    sub-dependency parameter from the body, only from the path or query
+    string, so no Depends factory can express that check)."""
+
+    async def check(
+        environment_id: UUID,
+        auth_api: AuthApi = Depends(get_auth_api),
+        rbac_api: RbacApi = Depends(get_rbac_api),
+        uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    ) -> AccountAccessGrant:
+        user = auth_api.current_user()
+        config = await uow.configs.get_by_environment_id(environment_id)
+        if config is None:
+            raise CloudflareConfigNotFound()
+        return await resolve_account_access_grant(
+            config.cloudflare_account_id, user, rbac_api, uow, min_level
+        )
 
     return check
 
