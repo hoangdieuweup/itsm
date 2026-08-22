@@ -21,9 +21,11 @@ from app.modules.cloudflare.exceptions import (
     CloudflareConfigNotFound,
     CloudflareEnvironmentNotFound,
     DnsRecordsExistForConfig,
+    DnsRecordSyncFailed,
     InsufficientAccountAccess,
     InvalidCloudflareToken,
     LastOwnerRemovalBlocked,
+    MissingDnsRecordPriority,
     ZoneNotOwnedByAccount,
 )
 from app.modules.cloudflare.exceptions import CloudflareApiUnavailable as CfUnavailable
@@ -42,6 +44,7 @@ from app.modules.cloudflare.schemas import (
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
 from app.modules.cloudflare.services.create_config import CreateCloudflareConfig
+from app.modules.cloudflare.services.create_dns_record import CreateDnsRecord
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
 from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
@@ -1014,3 +1017,114 @@ class TestListDnsRecords:
 
         with pytest.raises(CloudflareConfigNotFound):
             await ListDnsRecords(uow).execute(uuid4())
+
+
+class FakeDnsClient(FakeCloudflareClient):
+    """Extends FakeCloudflareClient with the 3 DNS write methods, each
+    independently configurable to raise."""
+
+    def __init__(
+        self,
+        create_returns: str = "rec-new",
+        create_raises: Exception | None = None,
+        delete_raises: Exception | None = None,
+    ) -> None:
+        super().__init__()
+        self._create_returns = create_returns
+        self._create_raises = create_raises
+        self._delete_raises = delete_raises
+        self.deleted: list[str] = []
+
+    async def create_dns_record(self, **kwargs) -> str:
+        if self._create_raises is not None:
+            raise self._create_raises
+        return self._create_returns
+
+    async def delete_dns_record(self, *, zone_id, cf_record_id, api_token) -> None:
+        if self._delete_raises is not None:
+            raise self._delete_raises
+        self.deleted.append(cf_record_id)
+
+
+class FailingDnsRecordsRepo(FakeDnsRecordsRepo):
+    """Every create() call raises, simulating a local DB failure AFTER
+    Cloudflare already accepted the write."""
+
+    async def create(self, **kwargs):
+        raise RuntimeError("simulated DB failure")
+
+
+class TestCreateDnsRecord:
+    async def test_creates_record_with_real_cf_record_id(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+        client = FakeDnsClient(create_returns="rec-new")
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        record = await CreateDnsRecord(uow, client, FakeAuditApi()).execute(
+            env_id, DnsRecordType.A, "app", "1.2.3.4", None, True, 1, actor=actor
+        )
+
+        assert record.cf_record_id == "rec-new"
+        assert record.managed_by == ManagedBy.SYSTEM
+
+    async def test_mx_without_priority_raises_before_calling_cloudflare(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+        client = FakeDnsClient()
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(MissingDnsRecordPriority):
+            await CreateDnsRecord(uow, client, FakeAuditApi()).execute(
+                env_id, DnsRecordType.MX, "app", "mail.example.com", None, False, 1, actor=actor
+            )
+
+    async def test_local_failure_after_cf_success_attempts_compensating_delete(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        uow.dns_records = FailingDnsRecordsRepo()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+        client = FakeDnsClient(create_returns="rec-orphan-risk")
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(DnsRecordSyncFailed):
+            await CreateDnsRecord(uow, client, FakeAuditApi()).execute(
+                env_id, DnsRecordType.A, "app", "1.2.3.4", None, False, 1, actor=actor
+            )
+
+        assert client.deleted == ["rec-orphan-risk"]
+
+    async def test_rejects_unbound_environment(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(CloudflareConfigNotFound):
+            await CreateDnsRecord(uow, FakeDnsClient(), FakeAuditApi()).execute(
+                uuid4(), DnsRecordType.A, "app", "1.2.3.4", None, False, 1, actor=actor
+            )
