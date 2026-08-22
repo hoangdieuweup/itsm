@@ -7,32 +7,34 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.core.crypto import FernetCodec
+from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import AccessLevel, CloudflareAccountAuditActions
 from app.modules.cloudflare.exceptions import (
     CloudflareAccountManagerNotFound,
     CloudflareAccountNotFound,
     InsufficientAccountAccess,
+    InvalidCloudflareToken,
     LastOwnerRemovalBlocked,
 )
 from app.modules.cloudflare.exceptions import CloudflareApiUnavailable as CfUnavailable
-from app.modules.cloudflare.exceptions import InvalidCloudflareToken
 from app.modules.cloudflare.repository import (
     AbstractCloudflareAccountManagerRepository,
     AbstractCloudflareAccountRepository,
     CloudflareAccountManagerRow,
 )
 from app.modules.cloudflare.schemas import AccountAccessGrant, CloudflareAccountRead
-from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
+from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
 from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
-from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
+from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
+from app.modules.users.public import UserRead
 
 
 class FakeCloudflareAccountRepository(AbstractCloudflareAccountRepository):
@@ -183,8 +185,6 @@ def _cloudflare_fernet_key(monkeypatch) -> None:
     """Every test in this file that encrypts/decrypts a token needs a real
     32-byte Fernet key — the module's own default is "" (fail-fast, per
     CloudflareConfig's docstring convention), which Fernet() rejects outright."""
-    from app.modules.cloudflare.config import cloudflare_settings
-
     monkeypatch.setattr(cloudflare_settings, "FERNET_KEY", TEST_FERNET_KEY)
 
 
@@ -242,8 +242,6 @@ class TestCreateCloudflareAccount:
 
 
 def _grant(held_level: AccessLevel | None) -> AccountAccessGrant:
-    from app.modules.users.public import UserRead
-
     return AccountAccessGrant(user=UserRead.model_construct(id=ACTOR_ID), held_level=held_level)
 
 
@@ -432,8 +430,6 @@ class FakeUsersApi:
 
 class TestListCloudflareAccountManagers:
     async def test_lists_managers_enriched_with_user_info(self) -> None:
-        from app.modules.users.public import UserRead
-
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
             label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
