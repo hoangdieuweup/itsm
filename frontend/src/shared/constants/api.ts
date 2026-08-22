@@ -41,5 +41,13 @@ export const API_CONFIG = {
       MANAGERS: (id: string) => `/cloudflare-accounts/${id}/managers`,
       MANAGER_DETAIL: (id: string, userId: string) => `/cloudflare-accounts/${id}/managers/${userId}`,
     },
+    CLOUDFLARE_DNS: {
+      ZONES: (accountId: string) => `/cloudflare-accounts/${accountId}/zones`,
+      CONFIGS_ROOT: "/cloudflare-configs",
+      CONFIG: (environmentId: string) => `/environments/${environmentId}/cloudflare-config`,
+      RECORDS: (environmentId: string) => `/environments/${environmentId}/dns-records`,
+      RECORD_DETAIL: (environmentId: string, recordId: string) =>
+        `/environments/${environmentId}/dns-records/${recordId}`,
+    },
   },
 } as const;
