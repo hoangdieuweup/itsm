@@ -18,6 +18,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 
 from app.core.models import ApiResponse
+from app.integrations.cloudflare.schemas import ZoneOption
 from app.modules.cloudflare.constants import AccessLevel
 from app.modules.cloudflare.dependencies import (
     get_assign_manager,
@@ -58,7 +59,6 @@ from app.modules.cloudflare.schemas import (
     DnsRecordRead,
     DnsRecordUpdate,
     TokenRevealResponse,
-    ZoneOption,
 )
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount

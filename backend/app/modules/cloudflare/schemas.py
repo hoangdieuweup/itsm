@@ -81,13 +81,6 @@ class AccountAccessGrant(FrozenModel):
     held_level: AccessLevel | None
 
 
-class ZoneOption(FrozenModel):
-    """One zone available to bind, from GET /cloudflare-accounts/{id}/zones."""
-
-    id: str
-    name: str
-
-
 class CloudflareConfigRead(FrozenModel):
     """One environment's Cloudflare binding."""
 

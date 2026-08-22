@@ -7,6 +7,9 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.core.crypto import FernetCodec
+from app.integrations.cloudflare.exceptions import CloudflareApiUnavailable as CfUnavailable
+from app.integrations.cloudflare.exceptions import InvalidCloudflareToken
+from app.integrations.cloudflare.schemas import ZoneOption
 from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import (
     AccessLevel,
@@ -24,12 +27,10 @@ from app.modules.cloudflare.exceptions import (
     DnsRecordsExistForConfig,
     DnsRecordSyncFailed,
     InsufficientAccountAccess,
-    InvalidCloudflareToken,
     LastOwnerRemovalBlocked,
     MissingDnsRecordPriority,
     ZoneNotOwnedByAccount,
 )
-from app.modules.cloudflare.exceptions import CloudflareApiUnavailable as CfUnavailable
 from app.modules.cloudflare.repository import (
     AbstractCloudflareAccountManagerRepository,
     AbstractCloudflareAccountRepository,
@@ -40,7 +41,6 @@ from app.modules.cloudflare.schemas import (
     CloudflareAccountRead,
     CloudflareConfigRead,
     DnsRecordRead,
-    ZoneOption,
 )
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount

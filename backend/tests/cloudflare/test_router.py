@@ -9,13 +9,13 @@ from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.security import JwtCodec
+from app.integrations.cloudflare.dependencies import get_cloudflare_client
+from app.integrations.cloudflare.exceptions import InvalidCloudflareToken
+from app.integrations.cloudflare.schemas import ZoneOption
 from app.main import app
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCookies
 from app.modules.cloudflare.config import cloudflare_settings
-from app.modules.cloudflare.dependencies import get_cloudflare_client
-from app.modules.cloudflare.exceptions import InvalidCloudflareToken
-from app.modules.cloudflare.schemas import ZoneOption
 from app.modules.rbac.models import Permission, Role, RolePermission, UserRole
 from app.modules.users.models import User
 

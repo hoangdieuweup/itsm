@@ -9,10 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.integrations.cache.client import CacheClient
 from app.integrations.cache.dependencies import get_cache
+from app.integrations.cloudflare.client import CloudflareClient
+from app.integrations.cloudflare.dependencies import get_cloudflare_client
 from app.modules.audit.public import AuditApi, get_audit_api
 from app.modules.auth.public import AuthApi, get_auth_api
 from app.modules.cloudflare.access import resolve_account_access_grant
-from app.modules.cloudflare.client import CloudflareClient
 from app.modules.cloudflare.constants import AccessLevel
 from app.modules.cloudflare.exceptions import CloudflareConfigNotFound
 from app.modules.cloudflare.schemas import AccountAccessGrant
@@ -45,11 +46,6 @@ async def get_uow(
 ) -> CloudflareUnitOfWork:
     """Provide a request scoped unit of work. The one place the concrete class is named."""
     return CloudflareUnitOfWork(session, cache)
-
-
-async def get_cloudflare_client() -> CloudflareClient:
-    """Provide the Cloudflare API client. No transport override in production."""
-    return CloudflareClient()
 
 
 def require_account_access(min_level: AccessLevel):

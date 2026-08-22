@@ -1,23 +1,23 @@
-"""Cloudflare REST API client. HTTP only — no database.
+"""Cloudflare REST API client. HTTP only — no database, no business logic.
 
-Lives inside app/modules/cloudflare/ rather than a new app/integrations/
-package: unlike dx_core (one consumer, no facade contract), this client
-will gain many consumers across Phases 4/5/6/9 (DNS, Tunnels, log viewer,
-alerting) — keeping it inside the module lets a real .importlinter
-cloudflare-facade contract force every one of them through
-cloudflare/public.py instead of reaching in directly.
+Lives here (not app/modules/cloudflare/) per the Netflix Dispatch convention
+this repo already follows for dx_core/cache/queue/storage/mongo: any
+third-party API adapter is a leaf under app/integrations/, imported by
+whichever module needs it via dependency injection. app/modules/cloudflare/
+owns the business domain (accounts, 2-layer ACL, DNS records, configs) and
+reaches this client only through modules/cloudflare/dependencies.py.
 """
 
 import httpx
 
-from app.core.base.markers import integration
-from app.modules.cloudflare.config import cloudflare_settings
-from app.modules.cloudflare.exceptions import (
+from app.core.base.markers import helper, integration
+from app.integrations.cloudflare.config import cloudflare_settings
+from app.integrations.cloudflare.exceptions import (
     CloudflareApiUnavailable,
     CloudflareDnsOperationRejected,
     InvalidCloudflareToken,
 )
-from app.modules.cloudflare.schemas import ZoneOption
+from app.integrations.cloudflare.schemas import ZoneOption
 
 
 class CloudflareClient:
@@ -92,6 +92,7 @@ class CloudflareClient:
                 page += 1
         return zones
 
+    @helper
     async def _write(self, path: str, method: str, api_token: str, *, json: dict | None = None) -> dict:
         """Shared envelope-check for the 3 DNS write methods below — a
         rejected write here means Cloudflare itself rejected the payload

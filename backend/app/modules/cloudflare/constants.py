@@ -41,8 +41,6 @@ class ErrorCode(StrEnum):
 
     ACCOUNT_NOT_FOUND = "cloudflare_account_not_found"
     MANAGER_NOT_FOUND = "cloudflare_account_manager_not_found"
-    INVALID_TOKEN = "cloudflare_invalid_token"
-    API_UNAVAILABLE = "cloudflare_api_unavailable"
     INSUFFICIENT_ACCESS = "cloudflare_insufficient_account_access"
     LAST_OWNER_REMOVAL_BLOCKED = "cloudflare_last_owner_removal_blocked"
     CONFIG_NOT_FOUND = "cloudflare_config_not_found"
@@ -51,7 +49,6 @@ class ErrorCode(StrEnum):
     DNS_RECORD_NOT_FOUND = "cloudflare_dns_record_not_found"
     ZONE_NOT_OWNED_BY_ACCOUNT = "cloudflare_zone_not_owned_by_account"
     MISSING_DNS_PRIORITY = "cloudflare_missing_dns_priority"
-    DNS_OPERATION_REJECTED = "cloudflare_dns_operation_rejected"
     DNS_SYNC_FAILED = "cloudflare_dns_sync_failed"
     DNS_RECORDS_EXIST_FOR_CONFIG = "cloudflare_dns_records_exist_for_config"
 

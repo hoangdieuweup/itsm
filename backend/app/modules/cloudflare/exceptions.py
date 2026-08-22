@@ -1,4 +1,7 @@
-"""Errors owned by the cloudflare module."""
+"""Errors owned by the cloudflare module. Transport/protocol-level errors
+(CloudflareApiUnavailable, InvalidCloudflareToken, CloudflareDnsOperationRejected)
+live in app.integrations.cloudflare.exceptions instead — they originate in
+the Cloudflare REST client, not a business decision this module owns."""
 
 from app.core.exceptions import (
     ConflictError,
@@ -22,21 +25,6 @@ class CloudflareAccountManagerNotFound(NotFoundError):
 
     code = ErrorCode.MANAGER_NOT_FOUND
     message = "Cloudflare account manager not found"
-
-
-class InvalidCloudflareToken(ValidationFailedError):
-    """Raised when Cloudflare rejects the provided API token (bad token, or a
-    200 response with the v4 envelope's success=false)."""
-
-    code = ErrorCode.INVALID_TOKEN
-    message = "Cloudflare rejected the provided API token"
-
-
-class CloudflareApiUnavailable(IntegrationError):
-    """Raised when the Cloudflare API cannot be reached or returns a server error."""
-
-    code = ErrorCode.API_UNAVAILABLE
-    message = "Cloudflare API unavailable"
 
 
 class InsufficientAccountAccess(ForbiddenError):
@@ -98,15 +86,6 @@ class MissingDnsRecordPriority(ValidationFailedError):
 
     code = ErrorCode.MISSING_DNS_PRIORITY
     message = "MX records require a priority value"
-
-
-class CloudflareDnsOperationRejected(ValidationFailedError):
-    """Raised when Cloudflare itself rejects a DNS write (malformed record,
-    conflicting name, etc.) — distinct from InvalidCloudflareToken, which is
-    specifically about authentication."""
-
-    code = ErrorCode.DNS_OPERATION_REJECTED
-    message = "Cloudflare rejected this DNS record operation"
 
 
 class DnsRecordSyncFailed(IntegrationError):

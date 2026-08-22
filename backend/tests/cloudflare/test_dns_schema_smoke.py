@@ -3,6 +3,8 @@ behavior is exercised by test_rules.py/test_client.py/test_services.py/
 test_router.py — this only guards against a typo'd name breaking every
 downstream import at once."""
 
+from app.integrations.cloudflare.exceptions import CloudflareDnsOperationRejected
+from app.integrations.cloudflare.schemas import ZoneOption
 from app.modules.cloudflare.constants import (
     CloudflareDnsAuditActions,
     DnsRecordType,
@@ -13,7 +15,6 @@ from app.modules.cloudflare.constants import (
 from app.modules.cloudflare.exceptions import (
     CloudflareConfigAlreadyExists,
     CloudflareConfigNotFound,
-    CloudflareDnsOperationRejected,
     CloudflareEnvironmentNotFound,
     DnsRecordNotFound,
     DnsRecordSyncFailed,
@@ -27,7 +28,6 @@ from app.modules.cloudflare.schemas import (
     DnsRecordCreate,
     DnsRecordRead,
     DnsRecordUpdate,
-    ZoneOption,
 )
 
 

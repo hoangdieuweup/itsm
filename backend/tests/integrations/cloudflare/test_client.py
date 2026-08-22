@@ -1,16 +1,16 @@
-"""Unit tests for app.modules.cloudflare.client — no real network calls, a
-fake httpx transport stands in for Cloudflare's API."""
+"""Unit tests for app.integrations.cloudflare.client — no real network calls,
+a fake httpx transport stands in for Cloudflare's API."""
 
 import httpx
 import pytest
 
-from app.modules.cloudflare.client import CloudflareClient
-from app.modules.cloudflare.exceptions import (
+from app.integrations.cloudflare.client import CloudflareClient
+from app.integrations.cloudflare.exceptions import (
     CloudflareApiUnavailable,
     CloudflareDnsOperationRejected,
     InvalidCloudflareToken,
 )
-from app.modules.cloudflare.schemas import ZoneOption
+from app.integrations.cloudflare.schemas import ZoneOption
 
 
 class TestTestConnection:

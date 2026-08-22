@@ -8,10 +8,10 @@ from uuid import UUID
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
 from app.core.crypto import FernetCodec
+from app.integrations.cloudflare.client import CloudflareClient
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
 from app.modules.cloudflare.access import resolve_account_access_grant
-from app.modules.cloudflare.client import CloudflareClient
 from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import AccessLevel, CloudflareDnsAuditActions
 from app.modules.cloudflare.exceptions import (
