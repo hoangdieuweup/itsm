@@ -5,6 +5,7 @@ export const RESOURCES = {
   PROJECT: "project",
   ENVIRONMENT: "environment",
   AUDIT_LOG: "audit_log",
+  CLOUDFLARE_ACCOUNT: "cloudflare_account",
 } as const;
 
 export type Resource = (typeof RESOURCES)[keyof typeof RESOURCES];
@@ -16,6 +17,8 @@ export const ACTIONS = {
   DELETE: "delete",
   UPDATE_STATUS: "update_status",
   ASSIGN_ROLE: "assign_role",
+  VIEW: "view",
+  MANAGE: "manage",
 } as const;
 
 export type Action = (typeof ACTIONS)[keyof typeof ACTIONS];
@@ -55,5 +58,10 @@ export const PERMISSIONS = {
   AUDIT_LOG: {
     RESOURCE: RESOURCES.AUDIT_LOG,
     READ: `${RESOURCES.AUDIT_LOG}.${ACTIONS.READ}` as const,
+  },
+  CLOUDFLARE_ACCOUNT: {
+    RESOURCE: RESOURCES.CLOUDFLARE_ACCOUNT,
+    VIEW: `${RESOURCES.CLOUDFLARE_ACCOUNT}.${ACTIONS.VIEW}` as const,
+    MANAGE: `${RESOURCES.CLOUDFLARE_ACCOUNT}.${ACTIONS.MANAGE}` as const,
   },
 } as const;

@@ -33,5 +33,13 @@ export const API_CONFIG = {
     AUDIT_LOGS: {
       ROOT: "/audit-logs",
     },
+    CLOUDFLARE_ACCOUNTS: {
+      ROOT: "/cloudflare-accounts",
+      DETAIL: (id: string) => `/cloudflare-accounts/${id}`,
+      TEST_CONNECTION: (id: string) => `/cloudflare-accounts/${id}/test-connection`,
+      REVEAL_TOKEN: (id: string) => `/cloudflare-accounts/${id}/reveal-token`,
+      MANAGERS: (id: string) => `/cloudflare-accounts/${id}/managers`,
+      MANAGER_DETAIL: (id: string, userId: string) => `/cloudflare-accounts/${id}/managers/${userId}`,
+    },
   },
 } as const;

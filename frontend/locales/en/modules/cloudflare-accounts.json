@@ -1,0 +1,60 @@
+{
+  "title": "Cloudflare Accounts",
+  "description": "Manage Cloudflare account credentials and who can access them.",
+  "createAccount": "New Account",
+  "editAccount": "Edit Account",
+  "empty": "No Cloudflare accounts yet.",
+  "table": {
+    "label": "Label",
+    "cfAccountId": "Cloudflare Account ID",
+    "createdAt": "Created",
+    "actions": "Actions"
+  },
+  "actions": {
+    "testConnection": "Test Connection",
+    "testConnectionSuccess": "Connection succeeded.",
+    "revealToken": "Reveal Token",
+    "hideToken": "Hide Token",
+    "copyToken": "Copy",
+    "manageAccess": "Manage Access"
+  },
+  "form": {
+    "label": "Label",
+    "cfAccountId": "Cloudflare Account ID",
+    "apiToken": "API Token",
+    "apiTokenHint": "Cloudflare must accept this token before the account can be saved.",
+    "rotateToken": "Rotate token",
+    "cancel": "Cancel",
+    "save": "Save",
+    "create": "Create",
+    "saving": "Saving..."
+  },
+  "deleteConfirm": {
+    "title": "Delete Cloudflare account?",
+    "description": "This cannot be undone. Any environment binding using this account (Phase 4) will break."
+  },
+  "managers": {
+    "title": "Managers",
+    "empty": "No one has been granted access to this account yet.",
+    "assign": "Assign Manager",
+    "user": "User",
+    "accessLevel": "Access Level",
+    "levels": {
+      "owner": "Owner",
+      "editor": "Editor",
+      "viewer": "Viewer"
+    },
+    "removeConfirm": {
+      "title": "Remove this manager?",
+      "description": "They will lose all access to this account."
+    }
+  },
+  "errors": {
+    "cloudflare_account_not_found": "This Cloudflare account no longer exists.",
+    "cloudflare_account_manager_not_found": "This manager no longer exists.",
+    "cloudflare_invalid_token": "Cloudflare rejected this API token.",
+    "cloudflare_api_unavailable": "Could not reach Cloudflare. Try again shortly.",
+    "cloudflare_insufficient_account_access": "You don't have sufficient access on this account.",
+    "cloudflare_last_owner_removal_blocked": "You can't remove or downgrade the last owner of this account."
+  }
+}

@@ -1,0 +1,151 @@
+"""FastAPI dependency providers for the cloudflare module. Every provider
+depends on an Abstract* contract."""
+
+from uuid import UUID
+
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_session
+from app.integrations.cache.client import CacheClient
+from app.integrations.cache.dependencies import get_cache
+from app.modules.audit.public import AuditApi, get_audit_api
+from app.modules.auth.public import AuthApi, get_auth_api
+from app.modules.cloudflare.client import CloudflareClient
+from app.modules.cloudflare.constants import AccessLevel
+from app.modules.cloudflare.exceptions import InsufficientAccountAccess
+from app.modules.cloudflare.rules import CloudflareAccountRules
+from app.modules.cloudflare.schemas import AccountAccessGrant
+from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
+from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
+from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
+from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
+from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
+from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
+from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
+from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
+from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
+from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
+from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork, CloudflareUnitOfWork
+from app.modules.rbac.public import RbacApi, get_rbac_api
+from app.modules.users.public import UsersApi, get_users_api
+
+
+async def get_uow(
+    session: AsyncSession = Depends(get_session), cache: CacheClient = Depends(get_cache)
+) -> CloudflareUnitOfWork:
+    """Provide a request scoped unit of work. The one place the concrete class is named."""
+    return CloudflareUnitOfWork(session, cache)
+
+
+async def get_cloudflare_client() -> CloudflareClient:
+    """Provide the Cloudflare API client. No transport override in production."""
+    return CloudflareClient()
+
+
+def require_account_access(min_level: AccessLevel):
+    """Return a dependency that 403s unless the current user's per-account
+    access_level (cloudflare_account_managers) meets min_level, OR they hold
+    the cloudflare_account:manage_all Layer-1 permission. Returns the
+    resolved AccountAccessGrant rather than a bare UserRead — callers that
+    need a stricter, request-body-dependent check (UpdateCloudflareAccount's
+    OWNER-for-token-rotation rule) re-validate the grant themselves instead
+    of this being expressible as a second static Depends factory."""
+
+    async def check(
+        account_id: UUID,
+        auth_api: AuthApi = Depends(get_auth_api),
+        rbac_api: RbacApi = Depends(get_rbac_api),
+        uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    ) -> AccountAccessGrant:
+        user = auth_api.current_user()
+        if await rbac_api.has_permission(user.id, "cloudflare_account", "manage_all"):
+            return AccountAccessGrant(user=user, held_level=None)
+
+        manager_row = await uow.account_managers.get_for_user(account_id, user.id)
+        # IMPORTANT: do not funnel "no row" through satisfies_level(None, ...) —
+        # None there means "manage_all bypass, always sufficient" (see rules.py),
+        # which is a DIFFERENT meaning than "no relationship to this account at
+        # all". Guard the no-row case explicitly so the two never collide.
+        if manager_row is None or not CloudflareAccountRules.satisfies_level(
+            manager_row.access_level, min_level
+        ):
+            raise InsufficientAccountAccess()
+        return AccountAccessGrant(user=user, held_level=manager_row.access_level)
+
+    return check
+
+
+async def get_create_account(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> CreateCloudflareAccount:
+    """Provide the create-account use case."""
+    return CreateCloudflareAccount(uow, client, audit_api)
+
+
+async def get_update_account(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> UpdateCloudflareAccount:
+    """Provide the update-account use case."""
+    return UpdateCloudflareAccount(uow, client, audit_api)
+
+
+async def get_delete_account(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow), audit_api: AuditApi = Depends(get_audit_api)
+) -> DeleteCloudflareAccount:
+    """Provide the delete-account use case."""
+    return DeleteCloudflareAccount(uow, audit_api)
+
+
+async def get_test_connection(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+) -> TestCloudflareAccountConnection:
+    """Provide the test-connection use case."""
+    return TestCloudflareAccountConnection(uow, client)
+
+
+async def get_reveal_token(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow), audit_api: AuditApi = Depends(get_audit_api)
+) -> RevealCloudflareAccountToken:
+    """Provide the reveal-token use case."""
+    return RevealCloudflareAccountToken(uow, audit_api)
+
+
+async def get_list_visible_accounts(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow), rbac_api: RbacApi = Depends(get_rbac_api)
+) -> ListVisibleCloudflareAccounts:
+    """Provide the list-visible-accounts use case."""
+    return ListVisibleCloudflareAccounts(uow, rbac_api)
+
+
+async def get_list_account_managers(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow), users_api: UsersApi = Depends(get_users_api)
+) -> ListCloudflareAccountManagers:
+    """Provide the list-account-managers use case."""
+    return ListCloudflareAccountManagers(uow, users_api)
+
+
+async def get_assign_manager(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow), audit_api: AuditApi = Depends(get_audit_api)
+) -> AssignCloudflareAccountManager:
+    """Provide the assign-manager use case."""
+    return AssignCloudflareAccountManager(uow, audit_api)
+
+
+async def get_update_manager(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow), audit_api: AuditApi = Depends(get_audit_api)
+) -> UpdateCloudflareAccountManager:
+    """Provide the update-manager use case."""
+    return UpdateCloudflareAccountManager(uow, audit_api)
+
+
+async def get_remove_manager(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow), audit_api: AuditApi = Depends(get_audit_api)
+) -> RemoveCloudflareAccountManager:
+    """Provide the remove-manager use case."""
+    return RemoveCloudflareAccountManager(uow, audit_api)

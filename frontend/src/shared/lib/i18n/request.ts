@@ -8,13 +8,14 @@ export default getRequestConfig(async ({ requestLocale }) => {
     ? requested
     : routing.defaultLocale;
 
-  const [common, auth, users, roles, projects, auditLog] = await Promise.all([
+  const [common, auth, users, roles, projects, auditLog, cloudflareAccounts] = await Promise.all([
     import(`../../../../locales/${locale}/common.json`),
     import(`../../../../locales/${locale}/modules/auth.json`),
     import(`../../../../locales/${locale}/modules/users.json`),
     import(`../../../../locales/${locale}/modules/roles.json`),
     import(`../../../../locales/${locale}/modules/projects.json`),
     import(`../../../../locales/${locale}/modules/audit-log.json`),
+    import(`../../../../locales/${locale}/modules/cloudflare-accounts.json`),
   ]);
 
   return {
@@ -26,6 +27,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       roles: roles.default,
       projects: projects.default,
       auditLog: auditLog.default,
+      cloudflareAccounts: cloudflareAccounts.default,
     },
   };
 });

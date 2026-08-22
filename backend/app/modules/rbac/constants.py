@@ -37,6 +37,9 @@ class RbacPermissionCatalog:
         ("environment", "update", "permissions.environment.update"),
         ("environment", "delete", "permissions.environment.delete"),
         ("audit_log", "read", "permissions.audit_log.read"),
+        ("cloudflare_account", "manage", "permissions.cloudflare_account.manage"),
+        ("cloudflare_account", "view", "permissions.cloudflare_account.view"),
+        ("cloudflare_account", "manage_all", "permissions.cloudflare_account.manage_all"),
     ]
 
 
