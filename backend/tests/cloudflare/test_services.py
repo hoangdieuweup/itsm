@@ -19,6 +19,7 @@ from app.modules.cloudflare.repository import (
 from app.modules.cloudflare.schemas import AccountAccessGrant, CloudflareAccountRead
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
+from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
@@ -408,3 +409,50 @@ class TestRevealCloudflareAccountToken:
             await RevealCloudflareAccountToken(uow, FakeAuditApi()).execute(
                 uuid4(), actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
             )
+
+
+class FakeUsersApi:
+    """Duck-typed stand-in for app.modules.users.public.UsersApi."""
+
+    def __init__(self, users: dict[UUID, object]) -> None:
+        self._users = users
+
+    async def get_user_by_id(self, user_id: UUID):
+        return self._users.get(user_id)
+
+
+class TestListCloudflareAccountManagers:
+    async def test_lists_managers_enriched_with_user_info(self) -> None:
+        from app.modules.users.public import UserRead
+
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+        await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
+        user = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL, name="Actor")
+        users_api = FakeUsersApi({ACTOR_ID: user})
+
+        managers = await ListCloudflareAccountManagers(uow, users_api).execute(account.id)
+
+        assert len(managers) == 1
+        assert managers[0].email == ACTOR_EMAIL
+        assert managers[0].access_level is AccessLevel.OWNER
+
+    async def test_skips_a_manager_row_whose_user_was_deleted(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+        await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
+        users_api = FakeUsersApi({})  # ACTOR_ID resolves to None
+
+        managers = await ListCloudflareAccountManagers(uow, users_api).execute(account.id)
+
+        assert managers == []
+
+    async def test_rejects_unknown_account(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+
+        with pytest.raises(CloudflareAccountNotFound):
+            await ListCloudflareAccountManagers(uow, FakeUsersApi({})).execute(uuid4())
