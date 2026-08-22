@@ -8,7 +8,12 @@ import pytest
 
 from app.core.crypto import FernetCodec
 from app.modules.cloudflare.constants import AccessLevel, CloudflareAccountAuditActions
-from app.modules.cloudflare.exceptions import CloudflareAccountNotFound, InsufficientAccountAccess
+from app.modules.cloudflare.exceptions import (
+    CloudflareAccountManagerNotFound,
+    CloudflareAccountNotFound,
+    InsufficientAccountAccess,
+    LastOwnerRemovalBlocked,
+)
 from app.modules.cloudflare.exceptions import CloudflareApiUnavailable as CfUnavailable
 from app.modules.cloudflare.exceptions import InvalidCloudflareToken
 from app.modules.cloudflare.repository import (
@@ -21,7 +26,9 @@ from app.modules.cloudflare.services.create_account import CreateCloudflareAccou
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
+from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
+from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
@@ -482,4 +489,119 @@ class TestAssignCloudflareAccountManager:
         with pytest.raises(CloudflareAccountNotFound):
             await AssignCloudflareAccountManager(uow, FakeAuditApi()).execute(
                 uuid4(), uuid4(), AccessLevel.VIEWER, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
+
+
+class TestUpdateCloudflareAccountManager:
+    async def test_changes_access_level(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+        target_id = uuid4()
+        await uow.account_managers.upsert(account.id, target_id, AccessLevel.VIEWER)
+
+        await UpdateCloudflareAccountManager(uow, FakeAuditApi()).execute(
+            account.id, target_id, AccessLevel.EDITOR, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        row = await uow.account_managers.get_for_user(account.id, target_id)
+        assert row.access_level is AccessLevel.EDITOR
+
+    async def test_blocks_downgrading_the_last_owner(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+        await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
+
+        with pytest.raises(LastOwnerRemovalBlocked):
+            await UpdateCloudflareAccountManager(uow, FakeAuditApi()).execute(
+                account.id, ACTOR_ID, AccessLevel.EDITOR, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
+
+        row = await uow.account_managers.get_for_user(account.id, ACTOR_ID)
+        assert row.access_level is AccessLevel.OWNER
+
+    async def test_allows_downgrading_one_of_two_owners(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+        second_owner = uuid4()
+        await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
+        await uow.account_managers.upsert(account.id, second_owner, AccessLevel.OWNER)
+
+        await UpdateCloudflareAccountManager(uow, FakeAuditApi()).execute(
+            account.id, ACTOR_ID, AccessLevel.EDITOR, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        row = await uow.account_managers.get_for_user(account.id, ACTOR_ID)
+        assert row.access_level is AccessLevel.EDITOR
+
+    async def test_rejects_unknown_manager(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+
+        with pytest.raises(CloudflareAccountManagerNotFound):
+            await UpdateCloudflareAccountManager(uow, FakeAuditApi()).execute(
+                account.id, uuid4(), AccessLevel.EDITOR, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
+
+
+class TestRemoveCloudflareAccountManager:
+    async def test_removes_manager(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+        target_id = uuid4()
+        await uow.account_managers.upsert(account.id, target_id, AccessLevel.VIEWER)
+
+        await RemoveCloudflareAccountManager(uow, FakeAuditApi()).execute(
+            account.id, target_id, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        assert await uow.account_managers.get_for_user(account.id, target_id) is None
+
+    async def test_blocks_removing_the_last_owner(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+        await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
+
+        with pytest.raises(LastOwnerRemovalBlocked):
+            await RemoveCloudflareAccountManager(uow, FakeAuditApi()).execute(
+                account.id, ACTOR_ID, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
+
+        assert await uow.account_managers.get_for_user(account.id, ACTOR_ID) is not None
+
+    async def test_allows_removing_a_non_owner(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+        await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
+        target_id = uuid4()
+        await uow.account_managers.upsert(account.id, target_id, AccessLevel.EDITOR)
+
+        await RemoveCloudflareAccountManager(uow, FakeAuditApi()).execute(
+            account.id, target_id, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        assert await uow.account_managers.get_for_user(account.id, target_id) is None
+
+    async def test_rejects_unknown_manager(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+
+        with pytest.raises(CloudflareAccountManagerNotFound):
+            await RemoveCloudflareAccountManager(uow, FakeAuditApi()).execute(
+                account.id, uuid4(), actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
             )
