@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.modules.cloudflare.constants import AccessLevel, CloudflareAccountAuditActions
+from app.modules.cloudflare.exceptions import CloudflareAccountNotFound, InsufficientAccountAccess
 from app.modules.cloudflare.exceptions import CloudflareApiUnavailable as CfUnavailable
 from app.modules.cloudflare.exceptions import InvalidCloudflareToken
 from app.modules.cloudflare.repository import (
@@ -14,8 +15,9 @@ from app.modules.cloudflare.repository import (
     AbstractCloudflareAccountRepository,
     CloudflareAccountManagerRow,
 )
-from app.modules.cloudflare.schemas import CloudflareAccountRead
+from app.modules.cloudflare.schemas import AccountAccessGrant, CloudflareAccountRead
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
+from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 
 
@@ -223,3 +225,110 @@ class TestCreateCloudflareAccount:
             )
 
         assert uow.commits == 0
+
+
+def _grant(held_level: AccessLevel | None) -> AccountAccessGrant:
+    from app.modules.users.public import UserRead
+
+    return AccountAccessGrant(user=UserRead.model_construct(id=ACTOR_ID), held_level=held_level)
+
+
+class TestUpdateCloudflareAccount:
+    async def test_editor_can_rename_label(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="Old", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+
+        updated = await UpdateCloudflareAccount(uow, FakeCloudflareClient(), FakeAuditApi()).execute(
+            account.id,
+            label="New",
+            api_token=None,
+            grant=_grant(AccessLevel.EDITOR),
+            actor_email=ACTOR_EMAIL,
+        )
+
+        assert updated.label == "New"
+        assert uow.commits == 1
+
+    async def test_editor_cannot_rotate_token(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="Old", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+
+        with pytest.raises(InsufficientAccountAccess):
+            await UpdateCloudflareAccount(uow, FakeCloudflareClient(), FakeAuditApi()).execute(
+                account.id,
+                label=None,
+                api_token="new-token",
+                grant=_grant(AccessLevel.EDITOR),
+                actor_email=ACTOR_EMAIL,
+            )
+
+        assert uow.commits == 0
+
+    async def test_owner_can_rotate_token(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="Old", cf_account_id="cf-1", api_token="old-ciphertext", created_by=ACTOR_ID
+        )
+        client = FakeCloudflareClient()
+
+        await UpdateCloudflareAccount(uow, client, FakeAuditApi()).execute(
+            account.id,
+            label=None,
+            api_token="new-plaintext-token",
+            grant=_grant(AccessLevel.OWNER),
+            actor_email=ACTOR_EMAIL,
+        )
+
+        assert client.calls == [("cf-1", "new-plaintext-token")]
+        stored = await uow.accounts.get_token_ciphertext(account.id)
+        assert stored != "new-plaintext-token"
+        assert stored != "old-ciphertext"
+
+    async def test_manage_all_bypass_can_rotate_token(self) -> None:
+        """held_level=None (manage_all bypass) satisfies OWNER too."""
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="Old", cf_account_id="cf-1", api_token="old-ciphertext", created_by=ACTOR_ID
+        )
+
+        await UpdateCloudflareAccount(uow, FakeCloudflareClient(), FakeAuditApi()).execute(
+            account.id,
+            label=None,
+            api_token="rotated",
+            grant=_grant(None),
+            actor_email=ACTOR_EMAIL,
+        )
+
+        assert uow.commits == 1
+
+    async def test_rejects_bad_rotated_token_before_persisting(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="Old", cf_account_id="cf-1", api_token="old-ciphertext", created_by=ACTOR_ID
+        )
+        client = FakeCloudflareClient(raises=InvalidCloudflareToken())
+
+        with pytest.raises(InvalidCloudflareToken):
+            await UpdateCloudflareAccount(uow, client, FakeAuditApi()).execute(
+                account.id,
+                label=None,
+                api_token="bad-token",
+                grant=_grant(AccessLevel.OWNER),
+                actor_email=ACTOR_EMAIL,
+            )
+
+        assert uow.commits == 0
+        stored = await uow.accounts.get_token_ciphertext(account.id)
+        assert stored == "old-ciphertext"
+
+    async def test_rejects_unknown_account(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+
+        with pytest.raises(CloudflareAccountNotFound):
+            await UpdateCloudflareAccount(uow, FakeCloudflareClient(), FakeAuditApi()).execute(
+                uuid4(), label="X", api_token=None, grant=_grant(AccessLevel.OWNER), actor_email=ACTOR_EMAIL
+            )
