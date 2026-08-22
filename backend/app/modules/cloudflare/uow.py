@@ -12,8 +12,12 @@ from app.integrations.cache.client import CacheClient
 from app.modules.cloudflare.repository import (
     AbstractCloudflareAccountManagerRepository,
     AbstractCloudflareAccountRepository,
+    AbstractCloudflareConfigRepository,
+    AbstractDnsRecordRepository,
     CloudflareAccountManagerRepository,
     CloudflareAccountRepository,
+    CloudflareConfigRepository,
+    DnsRecordRepository,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,6 +28,8 @@ class AbstractCloudflareUnitOfWork(AbstractUnitOfWork):
 
     accounts: AbstractCloudflareAccountRepository
     account_managers: AbstractCloudflareAccountManagerRepository
+    configs: AbstractCloudflareConfigRepository
+    dns_records: AbstractDnsRecordRepository
 
     @abstractmethod
     def mark_stale(self, entity: str, entity_id: UUID) -> None:
@@ -40,6 +46,8 @@ class CloudflareUnitOfWork(AbstractCloudflareUnitOfWork):
         self._stale: list[tuple[str, UUID]] = []
         self.accounts = CloudflareAccountRepository(session, cache)
         self.account_managers = CloudflareAccountManagerRepository(session)
+        self.configs = CloudflareConfigRepository(session)
+        self.dns_records = DnsRecordRepository(session)
 
     def mark_stale(self, entity: str, entity_id: UUID) -> None:
         """Queue a cache entity for invalidation once this transaction commits."""
