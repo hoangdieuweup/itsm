@@ -18,6 +18,7 @@ from app.modules.cloudflare.repository import (
 )
 from app.modules.cloudflare.schemas import AccountAccessGrant, CloudflareAccountRead
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
+from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
@@ -456,3 +457,29 @@ class TestListCloudflareAccountManagers:
 
         with pytest.raises(CloudflareAccountNotFound):
             await ListCloudflareAccountManagers(uow, FakeUsersApi({})).execute(uuid4())
+
+
+class TestAssignCloudflareAccountManager:
+    async def test_assigns_manager(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+        target_id = uuid4()
+
+        await AssignCloudflareAccountManager(uow, FakeAuditApi()).execute(
+            account.id, target_id, AccessLevel.VIEWER, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        row = await uow.account_managers.get_for_user(account.id, target_id)
+        assert row is not None
+        assert row.access_level is AccessLevel.VIEWER
+        assert uow.commits == 1
+
+    async def test_rejects_unknown_account(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+
+        with pytest.raises(CloudflareAccountNotFound):
+            await AssignCloudflareAccountManager(uow, FakeAuditApi()).execute(
+                uuid4(), uuid4(), AccessLevel.VIEWER, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )

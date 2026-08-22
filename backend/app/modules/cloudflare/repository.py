@@ -1,6 +1,7 @@
 """Single access path to the cloudflare_accounts and cloudflare_account_managers tables."""
 
 from abc import abstractmethod
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -22,7 +23,7 @@ class CloudflareAccountManagerRow(FrozenModel):
     cloudflare_account_id: UUID
     user_id: UUID
     access_level: AccessLevel
-    created_at: object
+    created_at: datetime
 
 
 class AbstractCloudflareAccountRepository(AbstractRepository[CloudflareAccountRead, UUID]):

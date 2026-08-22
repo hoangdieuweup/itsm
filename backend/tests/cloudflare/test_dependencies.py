@@ -1,6 +1,7 @@
 """Unit tests for app.modules.cloudflare.dependencies.require_account_access —
 Fake-based, no database. Exercises the closure returned by the factory directly."""
 
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -69,7 +70,7 @@ async def test_sufficient_manager_row_passes() -> None:
         cloudflare_account_id=account_id,
         user_id=_FAKE_USER.id,
         access_level=AccessLevel.OWNER,
-        created_at=None,
+        created_at=datetime.now(UTC),
     )
     check = require_account_access(AccessLevel.EDITOR)
     grant = await check(
@@ -87,7 +88,7 @@ async def test_insufficient_manager_row_raises() -> None:
         cloudflare_account_id=account_id,
         user_id=_FAKE_USER.id,
         access_level=AccessLevel.VIEWER,
-        created_at=None,
+        created_at=datetime.now(UTC),
     )
     check = require_account_access(AccessLevel.OWNER)
     with pytest.raises(InsufficientAccountAccess):
