@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import Link from "next/link";
+import { Link } from "@/shared/lib/i18n/navigation";
 import { Plus, Pencil, Trash2, Cloud } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
 import { ROUTES } from "@/shared/constants/routes";
-import { PERMISSIONS } from "@/shared/constants/permissions";
+import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
 import { useCloudflareAccountsQuery, type CloudflareAccount } from "@/entities/cloudflare-account";
 import { useDeleteCloudflareAccount } from "../hooks/use-delete-cloudflare-account";
 import { CloudflareAccountFormDialog } from "./cloudflare-account-form-dialog";
@@ -28,7 +28,7 @@ export function CloudflareAccountsPageContent() {
           <h1 className="text-2xl font-semibold text-foreground">{t("title")}</h1>
           <p className="text-sm text-muted-foreground">{t("description")}</p>
         </div>
-        <Can I="manage" a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
+        <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
           <Button onClick={() => setFormTarget("create")}>
             <Plus className="size-4" aria-hidden="true" />
             {t("createAccount")}
@@ -69,7 +69,7 @@ export function CloudflareAccountsPageContent() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
-                      <Can I="manage" a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
+                      <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
                         <Button
                           variant="ghost"
                           size="icon-sm"

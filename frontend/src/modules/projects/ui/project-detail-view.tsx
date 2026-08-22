@@ -7,9 +7,11 @@ import { Plus, Pencil, Trash2, Server, Link2 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
+import { ACTIONS, RESOURCES } from "@/shared/constants/permissions";
 import { useProjectQuery } from "@/entities/project";
 import { useProjectEnvironmentsQuery, type Environment } from "@/entities/environment";
 import { fetchProjectLinks, type ProjectLink } from "../api/fetchers";
+import { projectLinksKeys } from "../api/query-keys";
 import { useDeleteEnvironment } from "../hooks/use-delete-environment";
 import { useDeleteProjectLink } from "../hooks/use-delete-project-link";
 import { EnvironmentFormDialog } from "./environment-form-dialog";
@@ -20,7 +22,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const { data: project } = useProjectQuery(projectId);
   const { data: environments } = useProjectEnvironmentsQuery(projectId);
   const { data: links = [] } = useQuery({
-    queryKey: ["projects", "links", projectId],
+    queryKey: projectLinksKeys.forProject(projectId),
     queryFn: () => fetchProjectLinks(projectId),
   });
 
@@ -44,7 +46,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           <h2 className="flex items-center gap-2 text-sm font-bold text-foreground">
             <Server className="size-4" /> {t("sections.environments")}
           </h2>
-          <Can I="create" a="environment">
+          <Can I={ACTIONS.CREATE} a={RESOURCES.ENVIRONMENT}>
             <Button size="sm" onClick={() => setEnvFormTarget("create")}>
               <Plus className="mr-1.5 size-3.5" /> {t("actions.addEnvironment")}
             </Button>
@@ -63,7 +65,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                 {t(`environmentTypes.${env.type}`)}
               </span>
               <span className="text-muted-foreground">{env.name}</span>
-              <Can I="update" a="environment">
+              <Can I={ACTIONS.UPDATE} a={RESOURCES.ENVIRONMENT}>
                 <button
                   type="button"
                   onClick={() => setEnvFormTarget(env)}
@@ -72,7 +74,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                   <Pencil className="size-3.5" />
                 </button>
               </Can>
-              <Can I="delete" a="environment">
+              <Can I={ACTIONS.DELETE} a={RESOURCES.ENVIRONMENT}>
                 <button
                   type="button"
                   onClick={() => setEnvDeleteTarget(env)}
@@ -91,7 +93,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           <h2 className="flex items-center gap-2 text-sm font-bold text-foreground">
             <Link2 className="size-4" /> {t("sections.links")}
           </h2>
-          <Can I="update" a="project">
+          <Can I={ACTIONS.UPDATE} a={RESOURCES.PROJECT}>
             <Button size="sm" onClick={() => setLinkFormTarget("create")}>
               <Plus className="mr-1.5 size-3.5" /> {t("actions.addLink")}
             </Button>
@@ -117,7 +119,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                   {link.url}
                 </a>
               </div>
-              <Can I="update" a="project">
+              <Can I={ACTIONS.UPDATE} a={RESOURCES.PROJECT}>
                 <div className="flex gap-2">
                   <button
                     type="button"

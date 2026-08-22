@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateProjectLink } from "../api/fetchers";
+import { projectLinksKeys } from "../api/query-keys";
 
 export function useUpdateProjectLink(projectId: string) {
   const queryClient = useQueryClient();
@@ -10,7 +11,7 @@ export function useUpdateProjectLink(projectId: string) {
     mutationFn: ({ id, data }: { id: string; data: { name?: string; url?: string } }) =>
       updateProjectLink(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects", "links", projectId] });
+      queryClient.invalidateQueries({ queryKey: projectLinksKeys.forProject(projectId) });
     },
   });
 }

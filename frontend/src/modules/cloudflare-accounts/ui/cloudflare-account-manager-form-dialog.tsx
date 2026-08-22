@@ -23,6 +23,18 @@ interface UserOption {
   name: string;
 }
 
+/**
+ * Local key for this module's own user-picker query — deliberately not
+ * `usersKeys` from `modules/users`: module-to-module imports are forbidden
+ * (cross-module reads go through `entities/`, never another module), and
+ * this picker's filters/shape aren't the same cache concern as the Users
+ * admin page's own list anyway.
+ */
+const userPickerKeys = {
+  all: ["cloudflare-accounts", "user-picker"] as const,
+  list: (limit: number) => [...userPickerKeys.all, limit] as const,
+};
+
 export function CloudflareAccountManagerFormDialog({
   accountId,
   onClose,
@@ -37,7 +49,7 @@ export function CloudflareAccountManagerFormDialog({
   // exists in shared/ui yet, so this is a small inline query rather than a
   // new shared primitive (out of scope to build one for this phase).
   const { data: users } = useQuery({
-    queryKey: ["users", "picker"],
+    queryKey: userPickerKeys.list(100),
     queryFn: () => apiFetch<{ items: UserOption[] }>(`${API_CONFIG.ENDPOINTS.USERS.ROOT}?limit=100`),
   });
 
