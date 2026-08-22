@@ -17,6 +17,7 @@ from app.modules.cloudflare.repository import (
 )
 from app.modules.cloudflare.schemas import AccountAccessGrant, CloudflareAccountRead
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
+from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 
@@ -332,3 +333,28 @@ class TestUpdateCloudflareAccount:
             await UpdateCloudflareAccount(uow, FakeCloudflareClient(), FakeAuditApi()).execute(
                 uuid4(), label="X", api_token=None, grant=_grant(AccessLevel.OWNER), actor_email=ACTOR_EMAIL
             )
+
+
+class TestDeleteCloudflareAccount:
+    async def test_deletes_account(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="Gone", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+
+        await DeleteCloudflareAccount(uow, FakeAuditApi()).execute(
+            account.id, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        assert await uow.accounts.get_by_id(account.id) is None
+        assert uow.commits == 1
+
+    async def test_rejects_unknown_account(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+
+        with pytest.raises(CloudflareAccountNotFound):
+            await DeleteCloudflareAccount(uow, FakeAuditApi()).execute(
+                uuid4(), actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
+
+        assert uow.commits == 0
