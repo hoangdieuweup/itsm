@@ -48,6 +48,7 @@ from app.modules.cloudflare.services.create_config import CreateCloudflareConfig
 from app.modules.cloudflare.services.create_dns_record import CreateDnsRecord
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
 from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
+from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
 from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
@@ -1240,4 +1241,105 @@ class TestUpdateDnsRecord:
         with pytest.raises(DnsRecordNotFound):
             await UpdateDnsRecord(uow, FakeDnsClientForUpdate(), FakeAuditApi()).execute(
                 env_id, uuid4(), "x", None, False, 1, actor=actor
+            )
+
+
+class FakeDnsClientForDelete(FakeCloudflareClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.deleted: list[str] = []
+
+    async def delete_dns_record(self, *, zone_id, cf_record_id, api_token) -> None:
+        self.deleted.append(cf_record_id)
+
+
+class FailingDeleteDnsRecordsRepo(FakeDnsRecordsRepo):
+    async def delete(self, record_id):
+        raise RuntimeError("simulated DB failure")
+
+
+class TestDeleteDnsRecord:
+    async def test_deletes_record(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+        existing = await uow.dns_records.create(
+            environment_id=env_id,
+            cf_record_id="rec1",
+            record_type=DnsRecordType.A,
+            name="app",
+            content="1.2.3.4",
+            priority=None,
+            proxied=False,
+            ttl=1,
+            created_by=ACTOR_ID,
+        )
+        client = FakeDnsClientForDelete()
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        await DeleteDnsRecord(uow, client, FakeAuditApi()).execute(env_id, existing.id, actor=actor)
+
+        assert client.deleted == ["rec1"]
+        assert await uow.dns_records.get_by_id(existing.id) is None
+
+    async def test_local_failure_after_cf_delete_succeeds_raises_sync_failed(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+        existing = await uow.dns_records.create(
+            environment_id=env_id,
+            cf_record_id="rec1",
+            record_type=DnsRecordType.A,
+            name="app",
+            content="1.2.3.4",
+            priority=None,
+            proxied=False,
+            ttl=1,
+            created_by=ACTOR_ID,
+        )
+        failing_repo = FailingDeleteDnsRecordsRepo()
+        failing_repo._rows[existing.id] = existing
+        uow.dns_records = failing_repo
+        client = FakeDnsClientForDelete()
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(DnsRecordSyncFailed):
+            await DeleteDnsRecord(uow, client, FakeAuditApi()).execute(env_id, existing.id, actor=actor)
+
+        # Cloudflare's side really is deleted — no compensating action exists.
+        assert client.deleted == ["rec1"]
+
+    async def test_rejects_unknown_record(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(DnsRecordNotFound):
+            await DeleteDnsRecord(uow, FakeDnsClientForDelete(), FakeAuditApi()).execute(
+                env_id, uuid4(), actor=actor
             )
