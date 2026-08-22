@@ -20,6 +20,7 @@ from app.modules.cloudflare.exceptions import (
     CloudflareConfigAlreadyExists,
     CloudflareConfigNotFound,
     CloudflareEnvironmentNotFound,
+    DnsRecordNotFound,
     DnsRecordsExistForConfig,
     DnsRecordSyncFailed,
     InsufficientAccountAccess,
@@ -56,6 +57,7 @@ from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccount
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
 from app.modules.cloudflare.services.update_config import UpdateCloudflareConfig
+from app.modules.cloudflare.services.update_dns_record import UpdateDnsRecord
 from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 from app.modules.users.public import UserRead
@@ -1127,4 +1129,115 @@ class TestCreateDnsRecord:
         with pytest.raises(CloudflareConfigNotFound):
             await CreateDnsRecord(uow, FakeDnsClient(), FakeAuditApi()).execute(
                 uuid4(), DnsRecordType.A, "app", "1.2.3.4", None, False, 1, actor=actor
+            )
+
+
+class FakeDnsClientForUpdate(FakeCloudflareClient):
+    def __init__(self, update_raises: Exception | None = None) -> None:
+        super().__init__()
+        self._update_raises = update_raises
+        self.update_calls: list[dict] = []
+
+    async def update_dns_record(self, **kwargs) -> None:
+        if self._update_raises is not None:
+            raise self._update_raises
+        self.update_calls.append(kwargs)
+
+
+class FailingUpdateDnsRecordsRepo(FakeDnsRecordsRepo):
+    async def update(self, record_id, **kwargs):
+        raise RuntimeError("simulated DB failure")
+
+
+class TestUpdateDnsRecord:
+    async def test_updates_content_and_ttl(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+        existing = await uow.dns_records.create(
+            environment_id=env_id,
+            cf_record_id="rec1",
+            record_type=DnsRecordType.A,
+            name="app",
+            content="1.2.3.4",
+            priority=None,
+            proxied=False,
+            ttl=1,
+            created_by=ACTOR_ID,
+        )
+        client = FakeDnsClientForUpdate()
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        updated = await UpdateDnsRecord(uow, client, FakeAuditApi()).execute(
+            env_id, existing.id, "5.6.7.8", None, True, 300, actor=actor
+        )
+
+        assert updated.content == "5.6.7.8"
+        assert updated.ttl == 300
+
+    async def test_local_failure_after_cf_success_attempts_compensating_revert(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+        existing = await uow.dns_records.create(
+            environment_id=env_id,
+            cf_record_id="rec1",
+            record_type=DnsRecordType.A,
+            name="app",
+            content="1.2.3.4",
+            priority=None,
+            proxied=False,
+            ttl=1,
+            created_by=ACTOR_ID,
+        )
+        failing_repo = FailingUpdateDnsRecordsRepo()
+        failing_repo._rows[existing.id] = existing
+        uow.dns_records = failing_repo
+        client = FakeDnsClientForUpdate()
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(DnsRecordSyncFailed):
+            await UpdateDnsRecord(uow, client, FakeAuditApi()).execute(
+                env_id, existing.id, "9.9.9.9", None, True, 600, actor=actor
+            )
+
+        # First call = the real update; second call = the compensating
+        # revert back to the original content/ttl.
+        assert len(client.update_calls) == 2
+        assert client.update_calls[1]["content"] == "1.2.3.4"
+        assert client.update_calls[1]["ttl"] == 1
+
+    async def test_rejects_unknown_record(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(DnsRecordNotFound):
+            await UpdateDnsRecord(uow, FakeDnsClientForUpdate(), FakeAuditApi()).execute(
+                env_id, uuid4(), "x", None, False, 1, actor=actor
             )
