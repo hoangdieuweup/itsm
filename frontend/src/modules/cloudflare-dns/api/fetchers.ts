@@ -1,0 +1,101 @@
+import { apiFetch, ApiRequestError } from "@/shared/lib/api-client";
+import { API_CONFIG } from "@/shared/constants/api";
+import {
+  cloudflareConfigSchema,
+  dnsRecordSchema,
+  zoneOptionSchema,
+  type CloudflareConfig,
+  type DnsRecord,
+  type DnsRecordType,
+  type ZoneOption,
+} from "../model/schema";
+
+/**
+ * Fetches every zone available on a Cloudflare account, for the bind-time
+ * zone picker (GET /cloudflare-accounts/{accountId}/zones).
+ */
+export async function fetchZones(accountId: string): Promise<ZoneOption[]> {
+  const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_DNS.ZONES(accountId));
+  return zoneOptionSchema.array().parse(raw);
+}
+
+/**
+ * Fetches one environment's Cloudflare binding, or null if unbound
+ * (GET returns 404 `cloudflare_config_not_found`, which this normalizes to
+ * null rather than throwing — "not yet bound" is expected UI state, not an error).
+ */
+export async function fetchCloudflareConfigOrNull(environmentId: string): Promise<CloudflareConfig | null> {
+  try {
+    const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_DNS.CONFIG(environmentId));
+    return cloudflareConfigSchema.parse(raw);
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.code === "cloudflare_config_not_found") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function createCloudflareConfig(data: {
+  environmentId: string;
+  cloudflareAccountId: string;
+  zoneId: string;
+}): Promise<CloudflareConfig> {
+  const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_DNS.CONFIGS_ROOT, {
+    method: "POST",
+    data,
+  });
+  return cloudflareConfigSchema.parse(raw);
+}
+
+export async function updateCloudflareConfig(environmentId: string, zoneId: string): Promise<CloudflareConfig> {
+  const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_DNS.CONFIG(environmentId), {
+    method: "PATCH",
+    data: { zoneId },
+  });
+  return cloudflareConfigSchema.parse(raw);
+}
+
+export async function deleteCloudflareConfig(environmentId: string): Promise<void> {
+  await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_DNS.CONFIG(environmentId), { method: "DELETE" });
+}
+
+export async function fetchDnsRecords(environmentId: string): Promise<DnsRecord[]> {
+  const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_DNS.RECORDS(environmentId));
+  return dnsRecordSchema.array().parse(raw);
+}
+
+export interface DnsRecordFormValues {
+  recordType: DnsRecordType;
+  name: string;
+  content: string;
+  priority?: number | null;
+  proxied: boolean;
+  ttl: number;
+}
+
+export async function createDnsRecord(environmentId: string, data: DnsRecordFormValues): Promise<DnsRecord> {
+  const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_DNS.RECORDS(environmentId), {
+    method: "POST",
+    data,
+  });
+  return dnsRecordSchema.parse(raw);
+}
+
+export async function updateDnsRecord(
+  environmentId: string,
+  recordId: string,
+  data: Omit<DnsRecordFormValues, "recordType">,
+): Promise<DnsRecord> {
+  const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_DNS.RECORD_DETAIL(environmentId, recordId), {
+    method: "PATCH",
+    data,
+  });
+  return dnsRecordSchema.parse(raw);
+}
+
+export async function deleteDnsRecord(environmentId: string, recordId: string): Promise<void> {
+  await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_DNS.RECORD_DETAIL(environmentId, recordId), {
+    method: "DELETE",
+  });
+}
