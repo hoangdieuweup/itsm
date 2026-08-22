@@ -9,6 +9,7 @@ import { Can } from "@/entities/permission";
 import { useProjectsQuery, type Project } from "@/entities/project";
 import { Link } from "@/shared/lib/i18n/navigation";
 import { ROUTES } from "@/shared/constants/routes";
+import { ACTIONS, RESOURCES } from "@/shared/constants/permissions";
 import { useDeleteProject } from "../hooks/use-delete-project";
 import { ProjectFormDialog } from "./project-form-dialog";
 
@@ -27,7 +28,7 @@ export function ProjectsPageContent() {
           <h1 className="text-xl font-bold text-foreground">{t("title")}</h1>
           <p className="text-sm text-muted-foreground">{t("description")}</p>
         </div>
-        <Can I="create" a="project">
+        <Can I={ACTIONS.CREATE} a={RESOURCES.PROJECT}>
           <Button onClick={() => setFormTarget("create")}>
             <Plus className="mr-2 size-4" />
             {t("actions.create")}
@@ -69,7 +70,7 @@ export function ProjectsPageContent() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
-                      <Can I="update" a="project">
+                      <Can I={ACTIONS.UPDATE} a={RESOURCES.PROJECT}>
                         <Button
                           variant="outline"
                           size="sm"
@@ -78,7 +79,7 @@ export function ProjectsPageContent() {
                           <Pencil className="size-3.5" />
                         </Button>
                       </Can>
-                      <Can I="delete" a="project">
+                      <Can I={ACTIONS.DELETE} a={RESOURCES.PROJECT}>
                         <Button
                           variant="outline"
                           size="sm"

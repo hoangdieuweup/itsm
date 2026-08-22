@@ -9,11 +9,11 @@ import { useCan } from "@/entities/permission";
 import type { User } from "@/entities/user";
 import {
   useRolesQuery,
-  useAssignUserRoles,
   isProtectedAdminRole,
   SYSTEM_ROLE_NAMES,
   type Role,
 } from "@/entities/role";
+import { useAssignUserRoles } from "../hooks/use-assign-user-roles";
 
 interface UserRoleAssignmentDialogProps {
   isOpen: boolean;

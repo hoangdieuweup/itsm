@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { userSchema, userStatusSchema, type UserStatus } from "@/entities/user";
+import { userSchema } from "@/entities/user";
 
 /**
  * Zod schema for paginated users list response from GET /users.
@@ -13,5 +13,3 @@ export const usersPageSchema = z.object({
 });
 
 export type UsersPage = z.infer<typeof usersPageSchema>;
-
-export { userStatusSchema, type UserStatus };

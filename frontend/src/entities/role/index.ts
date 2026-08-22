@@ -1,12 +1,10 @@
 export {
   fetchRoles,
   fetchPermissions,
-  assignUserRoles,
   fetchUserRoles,
 } from "./api/fetchers";
 export { rolesKeys } from "./api/query-keys";
 export { useRoles, useRolesQuery, usePermissions } from "./hooks/use-roles";
-export { useAssignUserRoles } from "./hooks/use-assign-user-roles";
 export {
   roleSchema,
   rolesPageSchema,

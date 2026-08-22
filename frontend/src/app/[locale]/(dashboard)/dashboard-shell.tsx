@@ -22,6 +22,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
     if (pathname === ROUTES.adminRoles) return t("roles");
     if (pathname.startsWith(ROUTES.adminProjects)) return t("projects");
     if (pathname === ROUTES.adminAuditLog) return t("auditLog");
+    if (pathname.startsWith(ROUTES.adminCloudflareAccounts)) return t("cloudflareAccounts");
     return t("dashboard");
   };
 

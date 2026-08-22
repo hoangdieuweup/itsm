@@ -4,7 +4,7 @@ import { createQueryClient } from "@/shared/lib/query-client";
 import { RequirePermission, NoPermission, hasPermission } from "@/entities/permission";
 import { fetchAuthSession } from "@/modules/auth";
 import { RESOURCES, ACTIONS } from "@/shared/constants/permissions";
-import { fetchAuditLogs, AuditLogPageContent } from "@/modules/audit-log";
+import { fetchAuditLogs, auditLogsKeys, AuditLogPageContent } from "@/modules/audit-log";
 
 export default async function AdminAuditLogPage({
   params,
@@ -20,7 +20,7 @@ export default async function AdminAuditLogPage({
   const queryClient = createQueryClient();
   if (canRead) {
     await queryClient.prefetchQuery({
-      queryKey: ["audit-logs", "list", { limit: 50, offset: 0 }],
+      queryKey: auditLogsKeys.list({ limit: 50, offset: 0 }),
       queryFn: () => fetchAuditLogs({ limit: 50, offset: 0 }),
     });
   }

@@ -1,7 +1,7 @@
 import { apiFetch } from "@/shared/lib/api-client";
 import { API_CONFIG } from "@/shared/constants/api";
-import { userSchema, type User } from "@/entities/user";
-import { usersPageSchema, type UsersPage, type UserStatus } from "../model/schema";
+import { userSchema, type User, type UserStatus } from "@/entities/user";
+import { usersPageSchema, type UsersPage } from "../model/schema";
 
 /**
  * Fetches a paginated list of users from GET /users.
@@ -27,4 +27,14 @@ export async function updateUserStatus(
     data: { status },
   });
   return userSchema.parse(raw);
+}
+
+/**
+ * Assigns multiple roles to a user via PUT /rbac/users/{userId}/roles.
+ */
+export async function assignUserRoles(userId: string, roleIds: string[]): Promise<void> {
+  await apiFetch<unknown>(API_CONFIG.ENDPOINTS.RBAC.USER_ROLES(userId), {
+    method: "PUT",
+    data: { roleIds },
+  });
 }

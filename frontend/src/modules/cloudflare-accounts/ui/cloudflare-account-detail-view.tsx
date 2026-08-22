@@ -6,7 +6,7 @@ import { Cloud, ShieldCheck, ShieldAlert, Eye, EyeOff, UserPlus, Trash2, Copy } 
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
-import { PERMISSIONS } from "@/shared/constants/permissions";
+import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useCloudflareAccountQuery } from "@/entities/cloudflare-account";
 import { useTestCloudflareAccountConnection } from "../hooks/use-test-cloudflare-account-connection";
@@ -47,7 +47,7 @@ export function CloudflareAccountDetailView({ accountId }: CloudflareAccountDeta
           </div>
         </dl>
         <div className="flex flex-wrap gap-2">
-          <Can I="view" a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
+          <Can I={ACTIONS.VIEW} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
             <Button
               variant="outline"
               size="sm"
@@ -58,7 +58,7 @@ export function CloudflareAccountDetailView({ accountId }: CloudflareAccountDeta
               {t("actions.testConnection")}
             </Button>
           </Can>
-          <Can I="manage" a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
+          <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
             <Button
               variant="outline"
               size="sm"
@@ -117,7 +117,7 @@ export function CloudflareAccountDetailView({ accountId }: CloudflareAccountDeta
       <section className="rounded-lg border border-border p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold">{t("managers.title")}</h3>
-          <Can I="manage" a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
+          <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
             <Button variant="outline" size="sm" onClick={() => setAssignOpen(true)}>
               <UserPlus className="size-4" aria-hidden="true" />
               {t("managers.assign")}
@@ -139,7 +139,7 @@ export function CloudflareAccountDetailView({ accountId }: CloudflareAccountDeta
                   <span className="text-xs uppercase text-muted-foreground">
                     {t(`managers.levels.${manager.accessLevel}`)}
                   </span>
-                  <Can I="manage" a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
+                  <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
                     <Button
                       variant="ghost"
                       size="icon-xs"
