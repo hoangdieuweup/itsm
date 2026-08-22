@@ -11,18 +11,22 @@ class CloudflareAccountLimits:
 
 
 class AccessLevel(StrEnum):
-    """Per-account access level, ranked VIEWER < EDITOR < OWNER. See ACCESS_LEVEL_RANK."""
+    """Per-account access level, ranked VIEWER < EDITOR < OWNER. See AccessLevelRanking.RANK."""
 
     VIEWER = "viewer"
     EDITOR = "editor"
     OWNER = "owner"
 
 
-ACCESS_LEVEL_RANK: dict[AccessLevel, int] = {
-    AccessLevel.VIEWER: 0,
-    AccessLevel.EDITOR: 1,
-    AccessLevel.OWNER: 2,
-}
+class AccessLevelRanking:
+    """Numeric rank per AccessLevel, owned by the cloudflare module. Used by
+    CloudflareAccountRules.satisfies_level for >= comparisons."""
+
+    RANK: dict[AccessLevel, int] = {
+        AccessLevel.VIEWER: 0,
+        AccessLevel.EDITOR: 1,
+        AccessLevel.OWNER: 2,
+    }
 
 
 class CloudflareAccountsCacheKeys:

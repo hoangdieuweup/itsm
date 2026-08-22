@@ -4,7 +4,7 @@ Everything here is a pure decision: no I/O, no framework, no database.
 """
 
 from app.core.base.markers import rule
-from app.modules.cloudflare.constants import ACCESS_LEVEL_RANK, AccessLevel
+from app.modules.cloudflare.constants import AccessLevel, AccessLevelRanking
 
 
 class CloudflareAccountRules:
@@ -18,7 +18,7 @@ class CloudflareAccountRules:
         since manage_all is a strictly higher grant than any per-account row."""
         if held is None:
             return True
-        return ACCESS_LEVEL_RANK[held] >= ACCESS_LEVEL_RANK[required]
+        return AccessLevelRanking.RANK[held] >= AccessLevelRanking.RANK[required]
 
     @staticmethod
     @rule
