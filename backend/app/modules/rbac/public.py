@@ -76,6 +76,14 @@ class RbacApi:
         admin_grants = await self._uow.roles.count_users_with_role(admin_role.id)
         return RbacRules.blocks_last_admin_removal(admin_role.name, admin_grants)
 
+    @facade
+    async def has_permission(self, user_id: UUID, resource: str, action: str) -> bool:
+        """Direct boolean permission check for a module that needs to compose
+        it with a SECOND, module-owned authorization check (e.g. cloudflare's
+        manage_all bypass inside require_account_access) — require_permission
+        is a 403-raising route dependency, not reusable as a plain boolean."""
+        return await self._uow.user_roles.user_has_permission(user_id, resource, action)
+
 
 async def get_rbac_api(uow: AbstractRbacUnitOfWork = Depends(get_uow)) -> RbacApi:
     """Provide the facade to other modules."""
