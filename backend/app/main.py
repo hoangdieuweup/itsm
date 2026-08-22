@@ -17,6 +17,7 @@ from app.core.models import ApiResponse, ErrorPayload
 from app.lifespan import lifespan
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.router import router as auth_router
+from app.modules.cloudflare.router import router as cloudflare_router
 from app.modules.projects.router import router as projects_router
 from app.modules.rbac.router import router as rbac_router
 from app.modules.users.router import router as users_router
@@ -102,3 +103,4 @@ app.include_router(rbac_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
+app.include_router(cloudflare_router, prefix="/api/v1")

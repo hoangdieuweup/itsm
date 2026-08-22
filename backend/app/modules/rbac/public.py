@@ -141,4 +141,3 @@ def require_any_permission(*permissions: tuple[str, str]):
         raise PermissionDenied(resource=first_res, action=first_act)
 
     return check
-

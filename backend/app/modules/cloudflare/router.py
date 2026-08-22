@@ -28,9 +28,9 @@ from app.modules.cloudflare.dependencies import (
     get_remove_manager,
     get_reveal_token,
     get_test_connection,
+    get_uow,
     get_update_account,
     get_update_manager,
-    get_uow,
     require_account_access,
 )
 from app.modules.cloudflare.exceptions import CloudflareAccountNotFound

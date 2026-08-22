@@ -23,6 +23,7 @@ source_modules =
     app.modules.auth
     app.modules.users
     app.modules.common
+    app.modules.cloudflare
 forbidden_modules =
     app.modules.rbac.repository
     app.modules.rbac.models
@@ -37,6 +38,7 @@ source_modules =
     app.modules.auth
     app.modules.rbac
     app.modules.common
+    app.modules.cloudflare
 forbidden_modules =
     app.modules.users.repository
     app.modules.users.models
@@ -69,8 +71,27 @@ source_modules =
     app.modules.users
     app.modules.projects
     app.modules.common
+    app.modules.cloudflare
 forbidden_modules =
     app.modules.audit.repository
+allow_indirect_imports = True
+
+[importlinter:contract:cloudflare-facade]
+name = Other modules reach cloudflare only through public.py
+type = forbidden
+source_modules =
+    app.modules.auth
+    app.modules.rbac
+    app.modules.users
+    app.modules.projects
+    app.modules.audit
+    app.modules.common
+forbidden_modules =
+    app.modules.cloudflare.repository
+    app.modules.cloudflare.models
+    app.modules.cloudflare.uow
+    app.modules.cloudflare.services
+    app.modules.cloudflare.client
 allow_indirect_imports = True
 
 [importlinter:contract:common-is-a-leaf-module]

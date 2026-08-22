@@ -52,8 +52,7 @@ class UpdateCloudflareAccountManager(AbstractUseCase):
             action=CloudflareAccountAuditActions.MANAGER_UPDATED,
             severity=AuditSeverity.INFO,
             message=(
-                f"User {target_user_id}'s access on account {account_id} "
-                f"changed to {new_access_level.value}"
+                f"User {target_user_id}'s access on account {account_id} changed to {new_access_level.value}"
             ),
             actor=AuditActor(user_id=actor_id, email=actor_email),
         )
