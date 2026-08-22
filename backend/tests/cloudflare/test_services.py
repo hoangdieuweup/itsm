@@ -8,7 +8,12 @@ import pytest
 
 from app.core.crypto import FernetCodec
 from app.modules.cloudflare.config import cloudflare_settings
-from app.modules.cloudflare.constants import AccessLevel, CloudflareAccountAuditActions, ManagedBy
+from app.modules.cloudflare.constants import (
+    AccessLevel,
+    CloudflareAccountAuditActions,
+    DnsRecordType,
+    ManagedBy,
+)
 from app.modules.cloudflare.exceptions import (
     CloudflareAccountManagerNotFound,
     CloudflareAccountNotFound,
@@ -40,7 +45,9 @@ from app.modules.cloudflare.services.create_config import CreateCloudflareConfig
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
 from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
+from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
+from app.modules.cloudflare.services.list_zones import ListZones
 from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
@@ -953,3 +960,57 @@ class TestDeleteCloudflareConfig:
             )
 
         assert await uow.configs.get_by_environment_id(env_id) is not None
+
+
+class TestListZones:
+    async def test_returns_zones_for_account(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        ciphertext = FernetCodec.encrypt("plain-token", key=TEST_FERNET_KEY)
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token=ciphertext, created_by=ACTOR_ID
+        )
+        client = FakeClientWithZones([ZoneOption(id="z1", name="a.com")])
+
+        zones = await ListZones(uow, client).execute(account.id)
+
+        assert zones == [ZoneOption(id="z1", name="a.com")]
+
+    async def test_rejects_unknown_account(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+
+        with pytest.raises(CloudflareAccountNotFound):
+            await ListZones(uow, FakeClientWithZones([])).execute(uuid4())
+
+
+class TestListDnsRecords:
+    async def test_returns_records_for_bound_environment(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+        await uow.dns_records.create(
+            environment_id=env_id,
+            cf_record_id="rec1",
+            record_type=DnsRecordType.A,
+            name="app",
+            content="1.2.3.4",
+            priority=None,
+            proxied=True,
+            ttl=1,
+            created_by=ACTOR_ID,
+        )
+
+        records = await ListDnsRecords(uow).execute(env_id)
+
+        assert len(records) == 1
+        assert records[0].cf_record_id == "rec1"
+
+    async def test_rejects_unbound_environment(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+
+        with pytest.raises(CloudflareConfigNotFound):
+            await ListDnsRecords(uow).execute(uuid4())
