@@ -27,6 +27,7 @@
     "roles": "Roles",
     "projects": "Projects",
     "auditLog": "Audit Log",
+    "cloudflareAccounts": "Cloudflare Accounts",
     "mainMenu": "Main Menu",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
