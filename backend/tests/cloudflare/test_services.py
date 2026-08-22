@@ -13,7 +13,9 @@ from app.modules.cloudflare.exceptions import (
     CloudflareAccountManagerNotFound,
     CloudflareAccountNotFound,
     CloudflareConfigAlreadyExists,
+    CloudflareConfigNotFound,
     CloudflareEnvironmentNotFound,
+    DnsRecordsExistForConfig,
     InsufficientAccountAccess,
     InvalidCloudflareToken,
     LastOwnerRemovalBlocked,
@@ -36,12 +38,14 @@ from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccou
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
 from app.modules.cloudflare.services.create_config import CreateCloudflareConfig
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
+from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
 from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
+from app.modules.cloudflare.services.update_config import UpdateCloudflareConfig
 from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 from app.modules.users.public import UserRead
@@ -852,3 +856,100 @@ class TestCreateCloudflareConfig:
             await CreateCloudflareConfig(
                 uow, FakeClientWithZones([]), FakeRbacApi(manage_all=False), projects_api, FakeAuditApi()
             ).execute(env_id, account.id, "z1", actor=actor)
+
+
+class TestUpdateCloudflareConfig:
+    async def test_rebinds_to_a_different_zone(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="old-zone", zone_name="old.com"
+        )
+        client = FakeClientWithZones([ZoneOption(id="new-zone", name="new.com")])
+
+        updated = await UpdateCloudflareConfig(uow, client, FakeAuditApi()).execute(
+            env_id, "new-zone", actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        assert updated.zone_id == "new-zone"
+        assert updated.zone_name == "new.com"
+
+    async def test_rejects_zone_not_owned_by_account(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="old-zone", zone_name="old.com"
+        )
+        client = FakeClientWithZones([ZoneOption(id="other-zone", name="other.com")])
+
+        with pytest.raises(ZoneNotOwnedByAccount):
+            await UpdateCloudflareConfig(uow, client, FakeAuditApi()).execute(
+                env_id, "spoofed", actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
+
+    async def test_rejects_unbound_environment(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+
+        with pytest.raises(CloudflareConfigNotFound):
+            await UpdateCloudflareConfig(uow, FakeClientWithZones([]), FakeAuditApi()).execute(
+                uuid4(), "z1", actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
+
+
+class FakeDnsRecordsRepoEmpty:
+    async def list_for_environment(self, environment_id):
+        return []
+
+
+class FakeDnsRecordsRepoNonEmpty:
+    async def list_for_environment(self, environment_id):
+        return [object()]
+
+
+class TestDeleteCloudflareConfig:
+    async def test_deletes_when_no_dns_records_exist(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        uow.dns_records = FakeDnsRecordsRepoEmpty()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+
+        await DeleteCloudflareConfig(uow, FakeAuditApi()).execute(
+            env_id, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        assert await uow.configs.get_by_environment_id(env_id) is None
+
+    async def test_blocks_delete_when_dns_records_exist(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        uow.dns_records = FakeDnsRecordsRepoNonEmpty()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+
+        with pytest.raises(DnsRecordsExistForConfig):
+            await DeleteCloudflareConfig(uow, FakeAuditApi()).execute(
+                env_id, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
+
+        assert await uow.configs.get_by_environment_id(env_id) is not None
