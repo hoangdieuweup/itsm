@@ -8,13 +8,16 @@ import pytest
 
 from app.core.crypto import FernetCodec
 from app.modules.cloudflare.config import cloudflare_settings
-from app.modules.cloudflare.constants import AccessLevel, CloudflareAccountAuditActions
+from app.modules.cloudflare.constants import AccessLevel, CloudflareAccountAuditActions, ManagedBy
 from app.modules.cloudflare.exceptions import (
     CloudflareAccountManagerNotFound,
     CloudflareAccountNotFound,
+    CloudflareConfigAlreadyExists,
+    CloudflareEnvironmentNotFound,
     InsufficientAccountAccess,
     InvalidCloudflareToken,
     LastOwnerRemovalBlocked,
+    ZoneNotOwnedByAccount,
 )
 from app.modules.cloudflare.exceptions import CloudflareApiUnavailable as CfUnavailable
 from app.modules.cloudflare.repository import (
@@ -22,9 +25,16 @@ from app.modules.cloudflare.repository import (
     AbstractCloudflareAccountRepository,
     CloudflareAccountManagerRow,
 )
-from app.modules.cloudflare.schemas import AccountAccessGrant, CloudflareAccountRead
+from app.modules.cloudflare.schemas import (
+    AccountAccessGrant,
+    CloudflareAccountRead,
+    CloudflareConfigRead,
+    DnsRecordRead,
+    ZoneOption,
+)
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
+from app.modules.cloudflare.services.create_config import CreateCloudflareConfig
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
@@ -128,12 +138,93 @@ class FakeCloudflareAccountManagerRepository(AbstractCloudflareAccountManagerRep
         self._rows.pop((account_id, user_id), None)
 
 
+class FakeConfigsRepo:
+    def __init__(self) -> None:
+        self._rows: dict = {}
+
+    async def get_by_environment_id(self, environment_id):
+        return self._rows.get(environment_id)
+
+    async def create(self, *, environment_id, cloudflare_account_id, zone_id, zone_name):
+        row = CloudflareConfigRead(
+            id=uuid4(),
+            environment_id=environment_id,
+            cloudflare_account_id=cloudflare_account_id,
+            zone_id=zone_id,
+            zone_name=zone_name,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        self._rows[environment_id] = row
+        return row
+
+    async def update_by_environment_id(self, environment_id, *, cloudflare_account_id, zone_id, zone_name):
+        existing = self._rows[environment_id]
+        updated = existing.model_copy(
+            update={
+                "cloudflare_account_id": cloudflare_account_id,
+                "zone_id": zone_id,
+                "zone_name": zone_name,
+            }
+        )
+        self._rows[environment_id] = updated
+        return updated
+
+    async def delete_by_environment_id(self, environment_id):
+        self._rows.pop(environment_id, None)
+
+
+class FakeDnsRecordsRepo:
+    def __init__(self) -> None:
+        self._rows: dict = {}
+
+    async def list_for_environment(self, environment_id):
+        return [r for r in self._rows.values() if r.environment_id == environment_id]
+
+    async def get_by_id(self, record_id):
+        return self._rows.get(record_id)
+
+    async def create(
+        self, *, environment_id, cf_record_id, record_type, name, content, priority, proxied, ttl, created_by
+    ):
+        row = DnsRecordRead(
+            id=uuid4(),
+            environment_id=environment_id,
+            cf_record_id=cf_record_id,
+            record_type=record_type,
+            name=name,
+            content=content,
+            priority=priority,
+            proxied=proxied,
+            ttl=ttl,
+            managed_by=ManagedBy.SYSTEM,
+            created_by=created_by,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        self._rows[row.id] = row
+        return row
+
+    async def update(self, record_id, *, content, priority, proxied, ttl):
+        existing = self._rows[record_id]
+        updated = existing.model_copy(
+            update={"content": content, "priority": priority, "proxied": proxied, "ttl": ttl}
+        )
+        self._rows[record_id] = updated
+        return updated
+
+    async def delete(self, record_id):
+        self._rows.pop(record_id, None)
+
+
 class FakeCloudflareUnitOfWork(AbstractCloudflareUnitOfWork):
     """In-memory unit of work. commit/rollback are no-ops that just count calls."""
 
     def __init__(self) -> None:
         self.accounts = FakeCloudflareAccountRepository()
         self.account_managers = FakeCloudflareAccountManagerRepository()
+        self.configs = FakeConfigsRepo()
+        self.dns_records = FakeDnsRecordsRepo()
         self.commits = 0
         self.rollbacks = 0
         self.stale: list[tuple[str, UUID]] = []
@@ -159,6 +250,25 @@ class FakeCloudflareClient:
         self.calls.append((cf_account_id, api_token))
         if self._raises is not None:
             raise self._raises
+
+
+class FakeClientWithZones(FakeCloudflareClient):
+    def __init__(self, zones: list, raises: Exception | None = None) -> None:
+        super().__init__(raises=raises)
+        self._zones = zones
+
+    async def list_zones(self, *, cf_account_id, api_token):
+        if self._raises is not None:
+            raise self._raises
+        return self._zones
+
+
+class FakeProjectsApi:
+    def __init__(self, environments: dict) -> None:
+        self._environments = environments
+
+    async def get_environment_by_id(self, environment_id):
+        return self._environments.get(environment_id)
 
 
 class FakeAuditApi:
@@ -644,3 +754,101 @@ class TestListVisibleCloudflareAccounts:
         accounts = await ListVisibleCloudflareAccounts(uow, FakeRbacApi(manage_all=False)).execute(uuid4())
 
         assert accounts == []
+
+
+class TestCreateCloudflareConfig:
+    async def test_binds_environment_to_verified_zone(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
+        env_id = uuid4()
+        projects_api = FakeProjectsApi({env_id: object()})
+        client = FakeClientWithZones([ZoneOption(id="z1", name="verified-name.com")])
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        config = await CreateCloudflareConfig(
+            uow, client, FakeRbacApi(manage_all=False), projects_api, FakeAuditApi()
+        ).execute(env_id, account.id, "z1", actor=actor)
+
+        assert config.zone_name == "verified-name.com"
+        assert config.zone_id == "z1"
+
+    async def test_rejects_zone_not_owned_by_account(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
+        env_id = uuid4()
+        projects_api = FakeProjectsApi({env_id: object()})
+        client = FakeClientWithZones([ZoneOption(id="other-zone", name="not-this.com")])
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(ZoneNotOwnedByAccount):
+            await CreateCloudflareConfig(
+                uow, client, FakeRbacApi(manage_all=False), projects_api, FakeAuditApi()
+            ).execute(env_id, account.id, "spoofed-zone-id", actor=actor)
+
+        assert uow.commits == 0
+
+    async def test_rejects_unknown_environment(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+        await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(CloudflareEnvironmentNotFound):
+            await CreateCloudflareConfig(
+                uow,
+                FakeClientWithZones([]),
+                FakeRbacApi(manage_all=False),
+                FakeProjectsApi({}),
+                FakeAuditApi(),
+            ).execute(uuid4(), account.id, "z1", actor=actor)
+
+    async def test_rejects_double_binding(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
+        env_id = uuid4()
+        projects_api = FakeProjectsApi({env_id: object()})
+        client = FakeClientWithZones([ZoneOption(id="z1", name="a.com")])
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+        await CreateCloudflareConfig(
+            uow, client, FakeRbacApi(manage_all=False), projects_api, FakeAuditApi()
+        ).execute(env_id, account.id, "z1", actor=actor)
+
+        with pytest.raises(CloudflareConfigAlreadyExists):
+            await CreateCloudflareConfig(
+                uow, client, FakeRbacApi(manage_all=False), projects_api, FakeAuditApi()
+            ).execute(env_id, account.id, "z1", actor=actor)
+
+    async def test_rejects_insufficient_access(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+        )
+        # No manager row for ACTOR_ID on this account, and no manage_all.
+        env_id = uuid4()
+        projects_api = FakeProjectsApi({env_id: object()})
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(InsufficientAccountAccess):
+            await CreateCloudflareConfig(
+                uow, FakeClientWithZones([]), FakeRbacApi(manage_all=False), projects_api, FakeAuditApi()
+            ).execute(env_id, account.id, "z1", actor=actor)
