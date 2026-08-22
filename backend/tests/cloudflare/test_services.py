@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from app.core.crypto import FernetCodec
 from app.modules.cloudflare.constants import AccessLevel, CloudflareAccountAuditActions
 from app.modules.cloudflare.exceptions import CloudflareAccountNotFound, InsufficientAccountAccess
 from app.modules.cloudflare.exceptions import CloudflareApiUnavailable as CfUnavailable
@@ -18,6 +19,8 @@ from app.modules.cloudflare.repository import (
 from app.modules.cloudflare.schemas import AccountAccessGrant, CloudflareAccountRead
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
+from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
+from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 
@@ -358,3 +361,50 @@ class TestDeleteCloudflareAccount:
             )
 
         assert uow.commits == 0
+
+
+class TestTestCloudflareAccountConnection:
+    async def test_calls_client_with_decrypted_token(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        ciphertext = FernetCodec.encrypt("plain-token", key=TEST_FERNET_KEY)
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token=ciphertext, created_by=ACTOR_ID
+        )
+        client = FakeCloudflareClient()
+
+        await TestCloudflareAccountConnection(uow, client).execute(account.id)
+
+        assert client.calls == [("cf-1", "plain-token")]
+
+    async def test_rejects_unknown_account(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+
+        with pytest.raises(CloudflareAccountNotFound):
+            await TestCloudflareAccountConnection(uow, FakeCloudflareClient()).execute(uuid4())
+
+
+class TestRevealCloudflareAccountToken:
+    async def test_returns_decrypted_token_and_audits_without_leaking_it(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        ciphertext = FernetCodec.encrypt("super-secret", key=TEST_FERNET_KEY)
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token=ciphertext, created_by=ACTOR_ID
+        )
+        audit_api = FakeAuditApi()
+
+        revealed = await RevealCloudflareAccountToken(uow, audit_api).execute(
+            account.id, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        assert revealed == "super-secret"
+        event = audit_api.events[0]
+        assert event["action"] == CloudflareAccountAuditActions.TOKEN_REVEALED
+        assert "super-secret" not in str(event)
+
+    async def test_rejects_unknown_account(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+
+        with pytest.raises(CloudflareAccountNotFound):
+            await RevealCloudflareAccountToken(uow, FakeAuditApi()).execute(
+                uuid4(), actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
