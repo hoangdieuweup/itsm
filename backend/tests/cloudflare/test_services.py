@@ -26,6 +26,7 @@ from app.modules.cloudflare.services.create_account import CreateCloudflareAccou
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
+from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
 from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
 from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
@@ -605,3 +606,45 @@ class TestRemoveCloudflareAccountManager:
             await RemoveCloudflareAccountManager(uow, FakeAuditApi()).execute(
                 account.id, uuid4(), actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
             )
+
+
+class FakeRbacApi:
+    """Duck-typed stand-in for app.modules.rbac.public.RbacApi — only the one
+    method this module's services actually call."""
+
+    def __init__(self, *, manage_all: bool) -> None:
+        self._manage_all = manage_all
+
+    async def has_permission(self, user_id, resource, action) -> bool:
+        return self._manage_all
+
+
+class TestListVisibleCloudflareAccounts:
+    async def test_manage_all_sees_every_account(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        await uow.accounts.create(label="A", cf_account_id="cf-1", api_token="x", created_by=ACTOR_ID)
+        await uow.accounts.create(label="B", cf_account_id="cf-2", api_token="x", created_by=ACTOR_ID)
+
+        accounts = await ListVisibleCloudflareAccounts(uow, FakeRbacApi(manage_all=True)).execute(uuid4())
+
+        assert {a.label for a in accounts} == {"A", "B"}
+
+    async def test_regular_user_sees_only_managed_accounts(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        visible = await uow.accounts.create(
+            label="Visible", cf_account_id="cf-1", api_token="x", created_by=ACTOR_ID
+        )
+        await uow.accounts.create(label="Hidden", cf_account_id="cf-2", api_token="x", created_by=ACTOR_ID)
+        await uow.account_managers.upsert(visible.id, ACTOR_ID, AccessLevel.VIEWER)
+
+        accounts = await ListVisibleCloudflareAccounts(uow, FakeRbacApi(manage_all=False)).execute(ACTOR_ID)
+
+        assert [a.label for a in accounts] == ["Visible"]
+
+    async def test_user_with_no_relationship_sees_nothing(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        await uow.accounts.create(label="A", cf_account_id="cf-1", api_token="x", created_by=ACTOR_ID)
+
+        accounts = await ListVisibleCloudflareAccounts(uow, FakeRbacApi(manage_all=False)).execute(uuid4())
+
+        assert accounts == []
