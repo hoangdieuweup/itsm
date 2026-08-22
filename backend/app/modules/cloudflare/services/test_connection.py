@@ -27,5 +27,7 @@ class TestCloudflareAccountConnection(AbstractUseCase):
         if account is None:
             raise CloudflareAccountNotFound()
         ciphertext = await self._uow.accounts.get_token_ciphertext(account_id)
+        if ciphertext is None:
+            raise CloudflareAccountNotFound()
         plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
         await self._client.test_connection(cf_account_id=account.cf_account_id, api_token=plaintext)

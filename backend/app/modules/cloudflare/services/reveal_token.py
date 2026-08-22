@@ -29,6 +29,8 @@ class RevealCloudflareAccountToken(AbstractUseCase):
         if account is None:
             raise CloudflareAccountNotFound()
         ciphertext = await self._uow.accounts.get_token_ciphertext(account_id)
+        if ciphertext is None:
+            raise CloudflareAccountNotFound()
         plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
 
         await self._audit_api.log_event(
