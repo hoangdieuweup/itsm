@@ -1,5 +1,5 @@
 /**
- * Hierarchical query key factory for the users module.
+ * Hierarchical query key factory for the user entity.
  * Never inline query key strings — always use this factory.
  */
 export const usersKeys = {

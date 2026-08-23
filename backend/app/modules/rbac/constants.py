@@ -43,6 +43,38 @@ class RbacPermissionCatalog:
     ]
 
 
+class RbacResources:
+    """Every resource string CATALOG defines. Routers pass these to
+    require_permission/require_any_permission instead of a raw string
+    literal, so a typo fails at import time (AttributeError) instead of
+    silently creating an unsatisfiable permission requirement. Mirrors the
+    frontend's shared/constants/permissions.ts RESOURCES object 1:1."""
+
+    ROLE = "role"
+    PERMISSION = "permission"
+    USER = "user"
+    PROJECT = "project"
+    ENVIRONMENT = "environment"
+    AUDIT_LOG = "audit_log"
+    CLOUDFLARE_ACCOUNT = "cloudflare_account"
+
+
+class RbacActions:
+    """Every action string CATALOG defines. See RbacResources' docstring —
+    mirrors the frontend's ACTIONS object 1:1 (plus MANAGE_ALL, which the
+    frontend has no UI-gating use for)."""
+
+    CREATE = "create"
+    READ = "read"
+    UPDATE = "update"
+    DELETE = "delete"
+    UPDATE_STATUS = "update_status"
+    ASSIGN_ROLE = "assign_role"
+    VIEW = "view"
+    MANAGE = "manage"
+    MANAGE_ALL = "manage_all"
+
+
 class RbacDefaults:
     """Seeded role names. See seeds/seed_rbac.py.
 

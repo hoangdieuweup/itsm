@@ -1,5 +1,4 @@
 export { UsersPageContent } from "./ui/users-page-content";
-export { useUsers } from "./api/use-users";
-export { fetchUsers, updateUserStatus } from "./api/fetchers";
-export { usersKeys } from "./api/query-keys";
-export type { UsersPage } from "./model/schema";
+export { updateUserStatus, assignUserRoles } from "./api/fetchers";
+export { useUpdateUserStatus } from "./hooks/use-update-user-status";
+export { useAssignUserRoles } from "./hooks/use-assign-user-roles";

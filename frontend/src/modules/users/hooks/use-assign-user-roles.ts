@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { assignUserRoles } from "../api/fetchers";
-import { usersKeys } from "../api/query-keys";
+import { usersKeys } from "@/entities/user";
 import { rolesKeys } from "@/entities/role";
 
 export function useAssignUserRoles() {

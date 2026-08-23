@@ -12,7 +12,7 @@ from app.core.models import ApiResponse
 from app.core.pagination import Page, PaginationParams, pagination_params
 from app.modules.audit.constants import AuditEventType
 from app.modules.audit.public import AuditApi, AuditLogEntry, get_audit_api
-from app.modules.rbac.public import require_permission
+from app.modules.rbac.public import RbacActions, RbacResources, require_permission
 from app.modules.users.public import UserRead
 
 router = APIRouter(tags=["audit"])
@@ -27,7 +27,7 @@ async def list_audit_logs(
     until: datetime | None = Query(None),
     pagination: PaginationParams = Depends(pagination_params),
     audit_api: AuditApi = Depends(get_audit_api),
-    _user: UserRead = Depends(require_permission("audit_log", "read")),
+    _user: UserRead = Depends(require_permission(RbacResources.AUDIT_LOG, RbacActions.READ)),
 ) -> ApiResponse[Page[AuditLogEntry]]:
     """List audit log entries, newest first, optionally filtered."""
     items, total = await audit_api.list_logs(

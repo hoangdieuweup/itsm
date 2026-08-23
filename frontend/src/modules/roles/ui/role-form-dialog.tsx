@@ -2,10 +2,11 @@
 
 import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { X, Shield, AlertCircle, Check } from "lucide-react";
+import { Shield, Check } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
+import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import {
   usePermissions,
@@ -26,19 +27,7 @@ interface RoleFormDialogProps {
 export function RoleFormDialog({ isOpen, onClose, role }: RoleFormDialogProps) {
   if (!isOpen) return null;
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in-0"
-      role="dialog"
-      aria-modal="true"
-    >
-      <RoleFormInner
-        key={role ? `edit-${role.id}` : "create-new"}
-        role={role}
-        onClose={onClose}
-      />
-    </div>
-  );
+  return <RoleFormInner key={role ? `edit-${role.id}` : "create-new"} role={role} onClose={onClose} />;
 }
 
 function RoleFormInner({
@@ -127,45 +116,26 @@ function RoleFormInner({
   const isSubmitDisabled = isPending || !name.trim();
 
   return (
-    <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border bg-card shadow-2xl animate-in zoom-in-95">
-      {/* Modal Header */}
-      <div className="flex items-center justify-between border-b px-6 py-4">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Shield className="size-4" />
-          </div>
-          <h2 className="text-lg font-bold text-foreground">
-            {isAdminRole
-              ? `${t("actions.view")} - ${role?.name}`
-              : isEditing
-                ? t("editRole")
-                : t("createRole")}
-          </h2>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <X className="size-5" />
-        </button>
-      </div>
-
+    <Dialog
+      icon={Shield}
+      title={
+        isAdminRole
+          ? `${t("actions.view")} - ${role?.name}`
+          : isEditing
+            ? t("editRole")
+            : t("createRole")
+      }
+      onClose={onClose}
+      closeLabel={t("form.cancel")}
+      size="xl"
+    >
       {/* Modal Body / Form */}
       <form
         onSubmit={handleSubmit}
         className="flex flex-1 flex-col overflow-hidden"
       >
         <div className="flex-1 space-y-6 overflow-y-auto p-6">
-          {errorMessage && (
-            <div
-              role="alert"
-              className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
-            >
-              <AlertCircle className="size-4 shrink-0" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
+          {errorMessage && <DialogErrorAlert message={errorMessage} />}
 
           {isAdminRole && (
             <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-50/80 p-3.5 text-xs text-amber-900 dark:border-amber-500/20 dark:bg-amber-950/40 dark:text-amber-200">
@@ -236,7 +206,7 @@ function RoleFormInner({
           )}
         </div>
       </form>
-    </div>
+    </Dialog>
   );
 }
 

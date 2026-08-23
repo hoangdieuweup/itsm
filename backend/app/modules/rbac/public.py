@@ -8,7 +8,7 @@ from fastapi import Depends
 
 from app.core.base.markers import facade
 from app.modules.auth.public import AuthApi, get_auth_api
-from app.modules.rbac.constants import RbacDefaults
+from app.modules.rbac.constants import RbacActions, RbacDefaults, RbacResources
 from app.modules.rbac.dependencies import get_uow
 from app.modules.rbac.exceptions import PermissionDenied
 from app.modules.rbac.models import Permission, Role, UserRole
@@ -25,6 +25,8 @@ __all__ = [
     "Role",
     "UserRole",
     "RbacDefaults",
+    "RbacResources",
+    "RbacActions",
     "RbacApi",
     "get_rbac_api",
     "get_assign_role",

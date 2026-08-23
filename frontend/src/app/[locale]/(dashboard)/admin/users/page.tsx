@@ -8,11 +8,8 @@ import {
 } from "@/entities/permission";
 import { fetchAuthSession } from "@/modules/auth";
 import { RESOURCES, ACTIONS } from "@/shared/constants/permissions";
-import {
-  UsersPageContent,
-  fetchUsers,
-  usersKeys,
-} from "@/modules/users";
+import { fetchUsers, usersKeys } from "@/entities/user";
+import { UsersPageContent } from "@/modules/users";
 
 export default async function AdminUsersPage({
   params,

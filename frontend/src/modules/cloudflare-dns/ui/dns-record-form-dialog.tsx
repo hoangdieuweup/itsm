@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { X, Plus } from "lucide-react";
+import { Globe, Plus } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
+import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { DNS_RECORD_TYPES, type DnsRecord, type DnsRecordType } from "../model/schema";
 import { useCreateDnsRecord, useUpdateDnsRecord } from "../hooks/use-dns-records";
@@ -132,96 +133,75 @@ export function DnsRecordFormDialog({ environmentId, record, onClose }: DnsRecor
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in-0"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="dns-record-form-title"
+    <Dialog
+      icon={Globe}
+      title={isEditing ? t("records.editRecord") : t("records.createRecord")}
+      onClose={onClose}
+      closeLabel={t("form.cancel")}
     >
-      <div className="w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-lg animate-in zoom-in-95">
-        <div className="flex items-center justify-between mb-4">
-          <h2 id="dns-record-form-title" className="text-lg font-semibold">
-            {isEditing ? t("records.editRecord") : t("records.createRecord")}
-          </h2>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onClose}
-            aria-label={t("form.cancel")}
-            className="focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            <X className="size-4" aria-hidden="true" />
-          </Button>
+      <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto p-6">
+        {errorMessage && <DialogErrorAlert message={errorMessage} />}
+
+        <RecordTypeField recordType={recordType} onChange={setRecordType} isEditing={isEditing} />
+
+        <div className="space-y-1.5">
+          <Label htmlFor="record-name">{t("records.name")}</Label>
+          <Input
+            id="record-name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            disabled={isEditing}
+            required
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {errorMessage && (
-            <div role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {errorMessage}
-            </div>
-          )}
+        <div className="space-y-1.5">
+          <Label htmlFor="record-content">{t("records.content")}</Label>
+          <Input
+            id="record-content"
+            value={content}
+            onChange={(event) => setContent(event.target.value)}
+            required
+          />
+        </div>
 
-          <RecordTypeField recordType={recordType} onChange={setRecordType} isEditing={isEditing} />
+        {requiresPriority ? <RecordPriorityField priority={priority} onChange={setPriority} /> : null}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="record-name">{t("records.name")}</Label>
-            <Input
-              id="record-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              disabled={isEditing}
-              required
-            />
-          </div>
+        <div className="flex items-center gap-2">
+          <input
+            id="record-proxied"
+            type="checkbox"
+            checked={proxied}
+            onChange={(event) => setProxied(event.target.checked)}
+            className="size-4 rounded border-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          />
+          <Label htmlFor="record-proxied" className="cursor-pointer">
+            {t("records.proxied")}
+          </Label>
+        </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="record-content">{t("records.content")}</Label>
-            <Input
-              id="record-content"
-              value={content}
-              onChange={(event) => setContent(event.target.value)}
-              required
-            />
-          </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="record-ttl">{t("records.ttl")}</Label>
+          <Input
+            id="record-ttl"
+            type="number"
+            min={1}
+            value={ttl}
+            onChange={(event) => setTtl(Number(event.target.value))}
+            required
+          />
+        </div>
 
-          {requiresPriority ? <RecordPriorityField priority={priority} onChange={setPriority} /> : null}
-
-          <div className="flex items-center gap-2">
-            <input
-              id="record-proxied"
-              type="checkbox"
-              checked={proxied}
-              onChange={(event) => setProxied(event.target.checked)}
-              className="size-4 rounded border-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            />
-            <Label htmlFor="record-proxied" className="cursor-pointer">
-              {t("records.proxied")}
-            </Label>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="record-ttl">{t("records.ttl")}</Label>
-            <Input
-              id="record-ttl"
-              type="number"
-              min={1}
-              value={ttl}
-              onChange={(event) => setTtl(Number(event.target.value))}
-              required
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              {t("form.cancel")}
-            </Button>
-            <Button type="submit" disabled={isSaving}>
-              <Plus className="mr-1 size-3.5" aria-hidden="true" />
-              {submitLabel(t, isSaving, isEditing)}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            {t("form.cancel")}
+          </Button>
+          <Button type="submit" disabled={isSaving}>
+            <Plus className="mr-1 size-3.5" aria-hidden="true" />
+            {submitLabel(t, isSaving, isEditing)}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }

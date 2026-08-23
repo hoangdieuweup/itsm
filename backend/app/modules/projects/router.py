@@ -43,7 +43,7 @@ from app.modules.projects.services.update_environment import UpdateEnvironment
 from app.modules.projects.services.update_project import UpdateProject
 from app.modules.projects.services.update_project_link import UpdateProjectLink
 from app.modules.projects.uow import AbstractProjectsUnitOfWork
-from app.modules.rbac.public import require_permission
+from app.modules.rbac.public import RbacActions, RbacResources, require_permission
 from app.modules.users.public import UserRead
 
 router = APIRouter(tags=["projects"])
@@ -53,7 +53,7 @@ router = APIRouter(tags=["projects"])
 async def create_project(
     body: ProjectCreate,
     use_case: CreateProject = Depends(get_create_project),
-    user: UserRead = Depends(require_permission("project", "create")),
+    user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.CREATE)),
 ) -> ApiResponse[ProjectRead]:
     """Create a new project — auto-attaches the configured default Jira/Git links."""
     project = await use_case.execute(body.name, body.description, actor_id=user.id, actor_email=user.email)
@@ -64,7 +64,7 @@ async def create_project(
 async def list_projects(
     pagination: PaginationParams = Depends(pagination_params),
     uow: AbstractProjectsUnitOfWork = Depends(get_uow),
-    _user: UserRead = Depends(require_permission("project", "read")),
+    _user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.READ)),
 ) -> ApiResponse[Page[ProjectRead]]:
     """List projects."""
     items, total = await uow.projects.list_page(pagination.limit, pagination.offset)
@@ -76,7 +76,7 @@ async def list_projects(
 async def get_project(
     project_id: UUID,
     uow: AbstractProjectsUnitOfWork = Depends(get_uow),
-    _user: UserRead = Depends(require_permission("project", "read")),
+    _user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.READ)),
 ) -> ApiResponse[ProjectRead]:
     """Return one project, 404 if it doesn't exist."""
     project = await uow.projects.get_by_id(project_id)
@@ -90,7 +90,7 @@ async def update_project(
     project_id: UUID,
     body: ProjectUpdate,
     use_case: UpdateProject = Depends(get_update_project),
-    user: UserRead = Depends(require_permission("project", "update")),
+    user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.UPDATE)),
 ) -> ApiResponse[ProjectRead]:
     """Rename and/or redescribe a project."""
     project = await use_case.execute(
@@ -103,7 +103,7 @@ async def update_project(
 async def delete_project(
     project_id: UUID,
     use_case: DeleteProject = Depends(get_delete_project),
-    user: UserRead = Depends(require_permission("project", "delete")),
+    user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.DELETE)),
 ) -> ApiResponse[None]:
     """Delete a project. Its environments and links cascade at the DB level."""
     await use_case.execute(project_id, actor_id=user.id, actor_email=user.email)
@@ -114,7 +114,7 @@ async def delete_project(
 async def list_environments(
     project_id: UUID,
     uow: AbstractProjectsUnitOfWork = Depends(get_uow),
-    _user: UserRead = Depends(require_permission("environment", "read")),
+    _user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.READ)),
 ) -> ApiResponse[list[EnvironmentRead]]:
     """List a project's environments."""
     environments = await uow.environments.list_for_project(project_id)
@@ -126,7 +126,7 @@ async def create_environment(
     project_id: UUID,
     body: EnvironmentCreate,
     use_case: CreateEnvironment = Depends(get_create_environment),
-    user: UserRead = Depends(require_permission("environment", "create")),
+    user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.CREATE)),
 ) -> ApiResponse[EnvironmentRead]:
     """Create an environment. Rejected if the project already has one of this type."""
     env = await use_case.execute(
@@ -139,7 +139,7 @@ async def create_environment(
 async def get_environment(
     environment_id: UUID,
     uow: AbstractProjectsUnitOfWork = Depends(get_uow),
-    _user: UserRead = Depends(require_permission("environment", "read")),
+    _user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.READ)),
 ) -> ApiResponse[EnvironmentRead]:
     """Return one environment, 404 if it doesn't exist."""
     environment = await uow.environments.get_by_id(environment_id)
@@ -153,7 +153,7 @@ async def update_environment(
     environment_id: UUID,
     body: EnvironmentUpdate,
     use_case: UpdateEnvironment = Depends(get_update_environment),
-    user: UserRead = Depends(require_permission("environment", "update")),
+    user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.UPDATE)),
 ) -> ApiResponse[EnvironmentRead]:
     """Rename and/or re-point an environment."""
     env = await use_case.execute(
@@ -166,7 +166,7 @@ async def update_environment(
 async def delete_environment(
     environment_id: UUID,
     use_case: DeleteEnvironment = Depends(get_delete_environment),
-    user: UserRead = Depends(require_permission("environment", "delete")),
+    user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.DELETE)),
 ) -> ApiResponse[None]:
     """Delete an environment."""
     await use_case.execute(environment_id, actor_id=user.id, actor_email=user.email)
@@ -177,7 +177,7 @@ async def delete_environment(
 async def list_project_links(
     project_id: UUID,
     uow: AbstractProjectsUnitOfWork = Depends(get_uow),
-    _user: UserRead = Depends(require_permission("project", "read")),
+    _user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.READ)),
 ) -> ApiResponse[list[ProjectLinkRead]]:
     """List a project's external links."""
     links = await uow.project_links.list_for_project(project_id)
@@ -189,7 +189,7 @@ async def create_project_link(
     project_id: UUID,
     body: ProjectLinkCreate,
     use_case: CreateProjectLink = Depends(get_create_project_link),
-    _user: UserRead = Depends(require_permission("project", "update")),
+    _user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.UPDATE)),
 ) -> ApiResponse[ProjectLinkRead]:
     """Add an external link to a project."""
     link = await use_case.execute(project_id, body.type, body.name, body.url)
@@ -201,7 +201,7 @@ async def update_project_link(
     link_id: UUID,
     body: ProjectLinkUpdate,
     use_case: UpdateProjectLink = Depends(get_update_project_link),
-    _user: UserRead = Depends(require_permission("project", "update")),
+    _user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.UPDATE)),
 ) -> ApiResponse[ProjectLinkRead]:
     """Rename and/or re-point a project link."""
     link = await use_case.execute(link_id, name=body.name, url=body.url)
@@ -212,7 +212,7 @@ async def update_project_link(
 async def delete_project_link(
     link_id: UUID,
     use_case: DeleteProjectLink = Depends(get_delete_project_link),
-    _user: UserRead = Depends(require_permission("project", "update")),
+    _user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.UPDATE)),
 ) -> ApiResponse[None]:
     """Remove a project link."""
     await use_case.execute(link_id)
