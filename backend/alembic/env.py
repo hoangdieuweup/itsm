@@ -12,11 +12,14 @@ from app.core.database import Base
 from app.integrations.dx_core import (
     models as dx_core_models,  # noqa: F401 -- registers dx_tokens on Base.metadata for autogenerate
 )
-from app.modules.users import (
-    models as users_models,  # noqa: F401 -- registers users table on Base.metadata for autogenerate
+from app.modules.observability import (
+    models as observability_models,  # noqa: F401 -- registers loki_configs on Base.metadata for autogenerate
 )
 from app.modules.rbac import (
     models as rbac_models,  # noqa: F401 -- registers rbac tables on Base.metadata for autogenerate
+)
+from app.modules.users import (
+    models as users_models,  # noqa: F401 -- registers users table on Base.metadata for autogenerate
 )
 
 config = context.config

@@ -2,6 +2,7 @@
 a fake httpx transport stands in for Cloudflare's API."""
 
 import json
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -376,3 +377,66 @@ class TestDeleteTunnel:
         client = CloudflareClient(transport=httpx.MockTransport(handler))
         with pytest.raises(CloudflareApiUnavailable):
             await client.delete_tunnel(cf_account_id="acc-1", cf_tunnel_id="tun-1", api_token="tok")
+
+
+class TestGetAccountAuditLogs:
+    async def test_filters_by_zone_and_maps_fields(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.url.path == "/client/v4/accounts/acc-1/audit_logs"
+            assert request.url.params["zone.name"] == "example.com"
+            assert request.url.params["since"] == "2026-01-01T00:00:00+00:00"
+            return httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "result": [
+                        {
+                            "id": "log-1",
+                            "when": "2026-01-01T00:05:00Z",
+                            "actor": {"email": "a@b.com", "ip": "1.2.3.4"},
+                            "action": {"type": "update"},
+                            "resource": {"type": "dns_record", "product": "dns"},
+                            "newValue": "1.2.3.4",
+                        }
+                    ],
+                },
+            )
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        entries = await client.get_account_audit_logs(
+            cf_account_id="acc-1",
+            api_token="tok",
+            zone_name="example.com",
+            since=datetime(2026, 1, 1, tzinfo=UTC),
+            before=None,
+        )
+        assert len(entries) == 1
+        assert entries[0].id == "log-1"
+        assert entries[0].actor_email == "a@b.com"
+        assert entries[0].actor_ip == "1.2.3.4"
+        assert entries[0].action_type == "update"
+        assert entries[0].resource_type == "dns_record"
+        assert entries[0].resource_product == "dns"
+        assert entries[0].new_value == "1.2.3.4"
+
+    async def test_omits_since_before_when_not_given(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert "since" not in request.url.params
+            assert "before" not in request.url.params
+            return httpx.Response(200, json={"success": True, "result": []})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        entries = await client.get_account_audit_logs(
+            cf_account_id="acc-1", api_token="tok", zone_name="example.com", since=None, before=None
+        )
+        assert entries == []
+
+    async def test_raises_rejected_on_error(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(403, json={"success": False, "errors": [{"message": "forbidden"}]})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        with pytest.raises(CloudflareDnsOperationRejected):
+            await client.get_account_audit_logs(
+                cf_account_id="acc-1", api_token="tok", zone_name="example.com", since=None, before=None
+            )

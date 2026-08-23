@@ -1,0 +1,74 @@
+{
+  "environmentTypes": {
+    "dev": "Development",
+    "staging": "Staging",
+    "production": "Production"
+  },
+  "config": {
+    "title": "Loki Configuration",
+    "description": "Configure a Loki connection for this environment to run LogQL queries here.",
+    "endpointUrl": "Endpoint URL",
+    "tenantId": "Tenant ID",
+    "tenantIdHint": "Only needed for a multi-tenant Loki cluster shared across projects.",
+    "authType": "Authentication",
+    "authTypeNone": "None",
+    "authTypeBasic": "Basic",
+    "authTypeBearer": "Bearer token",
+    "credential": "Credential",
+    "credentialHintBasic": "Enter as username:password.",
+    "credentialHintBearer": "Enter the bearer token.",
+    "credentialKeepHint": "Leave blank to keep the current credential.",
+    "defaultQuery": "Default query",
+    "defaultRangeMinutes": "Default range (minutes)",
+    "configure": "Configure",
+    "edit": "Edit configuration",
+    "delete": "Delete configuration",
+    "deleteConfirm": {
+      "title": "Delete this Loki configuration?",
+      "description": "This removes the connection details for this environment. You can reconfigure it later."
+    }
+  },
+  "form": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving...",
+    "create": "Configure",
+    "showCredential": "Show credential",
+    "hideCredential": "Hide credential"
+  },
+  "tabs": {
+    "loki": "Loki",
+    "cloudflareAuditLog": "Cloudflare Audit Log"
+  },
+  "query": {
+    "queryLabel": "LogQL query",
+    "start": "Start",
+    "end": "End",
+    "run": "Run query",
+    "running": "Running...",
+    "empty": "No log lines for this query and range.",
+    "timestamp": "Timestamp",
+    "line": "Line",
+    "labels": "Labels"
+  },
+  "auditLog": {
+    "since": "Since",
+    "before": "Before",
+    "refresh": "Refresh",
+    "empty": "No audit log entries for this range.",
+    "notBound": "This environment has no Cloudflare zone bound yet — audit log entries need a bound zone.",
+    "when": "When",
+    "actor": "Actor",
+    "action": "Action",
+    "resource": "Resource",
+    "newValue": "New value"
+  },
+  "errors": {
+    "loki_config_not_found": "This environment has no Loki configuration yet.",
+    "loki_config_already_exists": "This environment already has a Loki configuration.",
+    "loki_invalid_credential": "Loki rejected the provided credential.",
+    "loki_query_rejected": "Loki rejected this query.",
+    "loki_unavailable": "Loki could not be reached.",
+    "cloudflare_config_not_found": "This environment is not bound to a Cloudflare account/zone."
+  }
+}

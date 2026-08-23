@@ -1,0 +1,74 @@
+{
+  "environmentTypes": {
+    "dev": "Phát triển",
+    "staging": "Staging",
+    "production": "Sản xuất"
+  },
+  "config": {
+    "title": "Cấu hình Loki",
+    "description": "Cấu hình kết nối Loki cho môi trường này để chạy truy vấn LogQL tại đây.",
+    "endpointUrl": "Endpoint URL",
+    "tenantId": "Tenant ID",
+    "tenantIdHint": "Chỉ cần thiết khi dùng chung 1 cụm Loki đa tenant cho nhiều dự án.",
+    "authType": "Xác thực",
+    "authTypeNone": "Không",
+    "authTypeBasic": "Basic",
+    "authTypeBearer": "Bearer token",
+    "credential": "Thông tin xác thực",
+    "credentialHintBasic": "Nhập theo định dạng username:password.",
+    "credentialHintBearer": "Nhập bearer token.",
+    "credentialKeepHint": "Để trống nếu muốn giữ nguyên thông tin xác thực hiện tại.",
+    "defaultQuery": "Truy vấn mặc định",
+    "defaultRangeMinutes": "Khoảng thời gian mặc định (phút)",
+    "configure": "Cấu hình",
+    "edit": "Sửa cấu hình",
+    "delete": "Xóa cấu hình",
+    "deleteConfirm": {
+      "title": "Xóa cấu hình Loki này?",
+      "description": "Thao tác này sẽ xóa thông tin kết nối của môi trường này. Bạn có thể cấu hình lại sau."
+    }
+  },
+  "form": {
+    "cancel": "Hủy",
+    "save": "Lưu",
+    "saving": "Đang lưu...",
+    "create": "Cấu hình",
+    "showCredential": "Hiện thông tin xác thực",
+    "hideCredential": "Ẩn thông tin xác thực"
+  },
+  "tabs": {
+    "loki": "Loki",
+    "cloudflareAuditLog": "Audit Log Cloudflare"
+  },
+  "query": {
+    "queryLabel": "Truy vấn LogQL",
+    "start": "Bắt đầu",
+    "end": "Kết thúc",
+    "run": "Chạy truy vấn",
+    "running": "Đang chạy...",
+    "empty": "Không có dòng log nào cho truy vấn và khoảng thời gian này.",
+    "timestamp": "Thời gian",
+    "line": "Nội dung",
+    "labels": "Nhãn"
+  },
+  "auditLog": {
+    "since": "Từ",
+    "before": "Đến",
+    "refresh": "Làm mới",
+    "empty": "Không có mục audit log nào trong khoảng thời gian này.",
+    "notBound": "Môi trường này chưa liên kết zone Cloudflare — cần liên kết zone để xem audit log.",
+    "when": "Thời điểm",
+    "actor": "Người thực hiện",
+    "action": "Hành động",
+    "resource": "Đối tượng",
+    "newValue": "Giá trị mới"
+  },
+  "errors": {
+    "loki_config_not_found": "Môi trường này chưa có cấu hình Loki.",
+    "loki_config_already_exists": "Môi trường này đã có cấu hình Loki.",
+    "loki_invalid_credential": "Loki từ chối thông tin xác thực đã cung cấp.",
+    "loki_query_rejected": "Loki từ chối truy vấn này.",
+    "loki_unavailable": "Không thể kết nối tới Loki.",
+    "cloudflare_config_not_found": "Môi trường này chưa liên kết tài khoản/zone Cloudflare."
+  }
+}

@@ -62,5 +62,12 @@ export const API_CONFIG = {
       HOSTNAME_DETAIL: (environmentId: string, tunnelId: string, hostnameId: string) =>
         `/environments/${environmentId}/cloudflare-tunnels/${tunnelId}/hostnames/${hostnameId}`,
     },
+    CLOUDFLARE_AUDIT_LOGS: {
+      ROOT: (environmentId: string) => `/environments/${environmentId}/cloudflare-audit-logs`,
+    },
+    OBSERVABILITY: {
+      LOKI_CONFIG: (environmentId: string) => `/environments/${environmentId}/loki-config`,
+      LOKI_QUERY: (environmentId: string) => `/environments/${environmentId}/loki-config/query`,
+    },
   },
 } as const;
