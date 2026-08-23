@@ -2,8 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateUserStatus } from "../api/fetchers";
-import { usersKeys } from "../api/query-keys";
-import type { UserStatus } from "@/entities/user";
+import { usersKeys, type UserStatus } from "@/entities/user";
 
 /**
  * Mutation hook for updating a user's status (active / blocked).

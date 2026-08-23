@@ -1,8 +1,8 @@
 "use client";
 
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { fetchUsers } from "./fetchers";
-import { usersKeys } from "./query-keys";
+import { fetchUsers } from "../api/fetchers";
+import { usersKeys } from "../api/query-keys";
 import type { UsersPage } from "../model/schema";
 
 /**

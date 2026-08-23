@@ -25,10 +25,8 @@ interface UserOption {
 
 /**
  * Local key for this module's own user-picker query — deliberately not
- * `usersKeys` from `modules/users`: module-to-module imports are forbidden
- * (cross-module reads go through `entities/`, never another module), and
- * this picker's filters/shape aren't the same cache concern as the Users
- * admin page's own list anyway.
+ * `usersKeys` from `@/entities/user`: this picker's filters/shape aren't
+ * the same cache concern as the Users admin page's own list.
  */
 const userPickerKeys = {
   all: ["cloudflare-accounts", "user-picker"] as const,

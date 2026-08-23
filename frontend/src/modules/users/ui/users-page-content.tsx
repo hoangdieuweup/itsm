@@ -8,10 +8,9 @@ import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { Can, RESOURCES, ACTIONS } from "@/entities/permission";
-import { USER_STATUS, type User } from "@/entities/user";
+import { USER_STATUS, useUsers, type User } from "@/entities/user";
 
 import { isProtectedAdminRole, SYSTEM_ROLE_NAMES } from "@/shared/constants/roles";
-import { useUsers } from "../api/use-users";
 import { useUpdateUserStatus } from "../hooks/use-update-user-status";
 import { UserRoleAssignmentDialog } from "./user-role-assignment-dialog";
 
