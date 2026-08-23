@@ -12,6 +12,7 @@ from app.modules.observability.services.create_loki_config import CreateLokiConf
 from app.modules.observability.services.delete_loki_config import DeleteLokiConfig
 from app.modules.observability.services.get_loki_config import GetLokiConfig
 from app.modules.observability.services.run_log_query import RunLogQuery
+from app.modules.observability.services.stream_log_tail import StreamLogTail
 from app.modules.observability.services.update_loki_config import UpdateLokiConfig
 from app.modules.observability.uow import AbstractObservabilityUnitOfWork, ObservabilityUnitOfWork
 from app.modules.projects.public import ProjectsApi, get_projects_api
@@ -55,3 +56,10 @@ async def get_run_log_query(
     client: LokiClient = Depends(get_loki_client),
 ) -> RunLogQuery:
     return RunLogQuery(uow, client)
+
+
+async def get_stream_log_tail(
+    uow: AbstractObservabilityUnitOfWork = Depends(get_uow),
+    client: LokiClient = Depends(get_loki_client),
+) -> StreamLogTail:
+    return StreamLogTail(uow, client)

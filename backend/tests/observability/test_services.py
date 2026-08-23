@@ -24,6 +24,7 @@ from app.modules.observability.services.create_loki_config import CreateLokiConf
 from app.modules.observability.services.delete_loki_config import DeleteLokiConfig
 from app.modules.observability.services.get_loki_config import GetLokiConfig
 from app.modules.observability.services.run_log_query import RunLogQuery
+from app.modules.observability.services.stream_log_tail import StreamLogTail
 from app.modules.observability.services.update_loki_config import UpdateLokiConfig
 from app.modules.observability.uow import AbstractObservabilityUnitOfWork
 from app.modules.users.public import UserRead
@@ -146,16 +147,32 @@ class FakeAuditApi:
 
 
 class FakeLokiClient:
-    def __init__(self, result: LokiQueryResult | None = None, raises: Exception | None = None) -> None:
+    def __init__(
+        self,
+        result: LokiQueryResult | None = None,
+        raises: Exception | None = None,
+        tail_entries: list[LokiLogEntry] | None = None,
+        tail_raises: Exception | None = None,
+    ) -> None:
         self._result = result or LokiQueryResult(entries=[])
         self._raises = raises
+        self._tail_entries = tail_entries or []
+        self._tail_raises = tail_raises
         self.calls: list[dict] = []
+        self.tail_calls: list[dict] = []
 
     async def query_range(self, **kwargs) -> LokiQueryResult:
         self.calls.append(kwargs)
         if self._raises is not None:
             raise self._raises
         return self._result
+
+    async def tail(self, **kwargs):
+        self.tail_calls.append(kwargs)
+        if self._tail_raises is not None:
+            raise self._tail_raises
+        for entry in self._tail_entries:
+            yield entry
 
 
 def _actor() -> UserRead:
@@ -572,3 +589,53 @@ class TestResolveLokiAuthHeader:
             updated_at=datetime.now(UTC),
         )
         assert resolve_loki_auth_header(config, None) is None
+
+
+class TestStreamLogTail:
+    async def test_raises_not_found_when_unconfigured(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        use_case = StreamLogTail(uow, FakeLokiClient())
+        with pytest.raises(LokiConfigNotFound):
+            async for _ in use_case.execute(environment_id=uuid4(), query="{}", limit=100):
+                pass
+
+    async def test_streams_entries_through(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        env_id = uuid4()
+        await uow.loki_configs.create(
+            environment_id=env_id,
+            endpoint_url="http://loki:3100",
+            tenant_id="tenant-a",
+            auth_type=LokiAuthType.BEARER,
+            credential=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            default_query="",
+            default_range_minutes=60,
+        )
+        entries = [LokiLogEntry(timestamp="1", line="hello", labels={})]
+        client = FakeLokiClient(tail_entries=entries)
+        use_case = StreamLogTail(uow, client)
+
+        received = [entry async for entry in use_case.execute(environment_id=env_id, query="{}", limit=100)]
+
+        assert received == entries
+        assert client.tail_calls[0]["auth_header"] == "Bearer tok"
+        assert client.tail_calls[0]["tenant_id"] == "tenant-a"
+
+    async def test_propagates_client_errors(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        env_id = uuid4()
+        await uow.loki_configs.create(
+            environment_id=env_id,
+            endpoint_url="http://loki:3100",
+            tenant_id=None,
+            auth_type=LokiAuthType.NONE,
+            credential=None,
+            default_query="",
+            default_range_minutes=60,
+        )
+        client = FakeLokiClient(tail_raises=LokiApiUnavailable())
+        use_case = StreamLogTail(uow, client)
+
+        with pytest.raises(LokiApiUnavailable):
+            async for _ in use_case.execute(environment_id=env_id, query="{}", limit=100):
+                pass
