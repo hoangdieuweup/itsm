@@ -68,6 +68,7 @@ export const API_CONFIG = {
     OBSERVABILITY: {
       LOKI_CONFIG: (environmentId: string) => `/environments/${environmentId}/loki-config`,
       LOKI_QUERY: (environmentId: string) => `/environments/${environmentId}/loki-config/query`,
+      LOKI_TAIL: (environmentId: string) => `/environments/${environmentId}/loki-config/tail`,
     },
   },
 } as const;
