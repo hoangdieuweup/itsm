@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { assignUserRoles } from "../api/fetchers";
 import { usersKeys } from "@/entities/user";
 import { rolesKeys } from "@/entities/role";
+import { authKeys } from "@/entities/auth";
 
 export function useAssignUserRoles() {
   const queryClient = useQueryClient();
@@ -15,7 +16,7 @@ export function useAssignUserRoles() {
       queryClient.invalidateQueries({ queryKey: rolesKeys.userRoles(userId) });
       queryClient.invalidateQueries({ queryKey: rolesKeys.all });
       queryClient.invalidateQueries({ queryKey: usersKeys.all });
-      queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
+      queryClient.invalidateQueries({ queryKey: authKeys.session() });
     },
   });
 }

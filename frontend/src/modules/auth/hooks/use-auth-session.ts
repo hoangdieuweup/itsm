@@ -2,7 +2,7 @@
 
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { fetchAuthSession } from "../api/session";
-import { authKeys } from "../api/query-keys";
+import { authKeys } from "@/entities/auth";
 import type { AuthSession } from "../model/session";
 
 export function useAuthSession() {

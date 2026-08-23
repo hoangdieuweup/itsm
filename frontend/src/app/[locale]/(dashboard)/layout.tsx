@@ -1,7 +1,8 @@
 import { setRequestLocale } from "next-intl/server";
 import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { createQueryClient } from "@/shared/lib/query-client";
-import { AuthGuard, authKeys, fetchAuthSession } from "@/modules/auth";
+import { AuthGuard, fetchAuthSession } from "@/modules/auth";
+import { authKeys } from "@/entities/auth";
 import { DashboardShell } from "./dashboard-shell";
 
 /**
