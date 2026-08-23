@@ -19,6 +19,8 @@ dependencies = [
     "cryptography>=43.0",
     "pyjwt>=2.9",
     "motor>=3.7.1",
+    "sse-starlette>=3.4.8",
+    "websockets>=17.0.1",
 ]
 
 [dependency-groups]
