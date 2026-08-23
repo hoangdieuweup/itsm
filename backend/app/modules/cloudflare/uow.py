@@ -13,11 +13,15 @@ from app.modules.cloudflare.repository import (
     AbstractCloudflareAccountManagerRepository,
     AbstractCloudflareAccountRepository,
     AbstractCloudflareConfigRepository,
+    AbstractCloudflareTunnelRepository,
     AbstractDnsRecordRepository,
+    AbstractTunnelHostnameRepository,
     CloudflareAccountManagerRepository,
     CloudflareAccountRepository,
     CloudflareConfigRepository,
+    CloudflareTunnelRepository,
     DnsRecordRepository,
+    TunnelHostnameRepository,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,6 +34,8 @@ class AbstractCloudflareUnitOfWork(AbstractUnitOfWork):
     account_managers: AbstractCloudflareAccountManagerRepository
     configs: AbstractCloudflareConfigRepository
     dns_records: AbstractDnsRecordRepository
+    tunnels: AbstractCloudflareTunnelRepository
+    tunnel_hostnames: AbstractTunnelHostnameRepository
 
     @abstractmethod
     def mark_stale(self, entity: str, entity_id: UUID) -> None:
@@ -48,6 +54,8 @@ class CloudflareUnitOfWork(AbstractCloudflareUnitOfWork):
         self.account_managers = CloudflareAccountManagerRepository(session)
         self.configs = CloudflareConfigRepository(session)
         self.dns_records = DnsRecordRepository(session)
+        self.tunnels = CloudflareTunnelRepository(session)
+        self.tunnel_hostnames = TunnelHostnameRepository(session)
 
     def mark_stale(self, entity: str, entity_id: UUID) -> None:
         """Queue a cache entity for invalidation once this transaction commits."""
