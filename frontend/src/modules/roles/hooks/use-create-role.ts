@@ -18,8 +18,6 @@ export function useCreateRole() {
     }) => createRole(name, permissionIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: rolesKeys.all });
-      queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
-      queryClient.invalidateQueries({ queryKey: ["users"] });
     },
   });
 }

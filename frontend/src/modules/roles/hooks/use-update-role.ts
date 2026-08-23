@@ -3,6 +3,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateRole } from "../api/fetchers";
 import { rolesKeys } from "@/entities/role";
+import { usersKeys } from "@/entities/user";
+import { authKeys } from "@/entities/auth";
 
 
 export function useUpdateRole() {
@@ -20,8 +22,8 @@ export function useUpdateRole() {
     }) => updateRole(roleId, { name, permissionIds }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: rolesKeys.all });
-      queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
-      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: authKeys.session() });
+      queryClient.invalidateQueries({ queryKey: usersKeys.all });
     },
   });
 }
