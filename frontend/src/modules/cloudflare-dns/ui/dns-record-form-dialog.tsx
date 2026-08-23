@@ -16,17 +16,96 @@ interface DnsRecordFormDialogProps {
   onClose: () => void;
 }
 
+function initialFormState(record: DnsRecord | null) {
+  return {
+    recordType: (record?.recordType ?? "A") as DnsRecordType,
+    name: record?.name ?? "",
+    content: record?.content ?? "",
+    priority: record?.priority?.toString() ?? "",
+    proxied: record?.proxied ?? false,
+    ttl: record?.ttl ?? 1,
+  };
+}
+
+function submitLabel(t: ReturnType<typeof useTranslations>, isSaving: boolean, isEditing: boolean): string {
+  if (isSaving) return t("form.saving");
+  return isEditing ? t("form.save") : t("form.create");
+}
+
+function RecordTypeField({
+  recordType,
+  onChange,
+  isEditing,
+}: {
+  recordType: DnsRecordType;
+  onChange: (type: DnsRecordType) => void;
+  isEditing: boolean;
+}) {
+  const t = useTranslations("cloudflareDns");
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor="record-type">{t("records.type")}</Label>
+      <select
+        id="record-type"
+        value={recordType}
+        onChange={(event) => onChange(event.target.value as DnsRecordType)}
+        disabled={isEditing}
+        aria-describedby={isEditing ? "record-type-hint" : undefined}
+        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        {DNS_RECORD_TYPES.map((type) => (
+          <option key={type} value={type}>
+            {type}
+          </option>
+        ))}
+      </select>
+      {isEditing ? (
+        <p id="record-type-hint" className="text-xs text-muted-foreground">
+          {t("records.typeImmutableHint")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function RecordPriorityField({
+  priority,
+  onChange,
+}: {
+  priority: string;
+  onChange: (value: string) => void;
+}) {
+  const t = useTranslations("cloudflareDns");
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor="record-priority">{t("records.priority")}</Label>
+      <Input
+        id="record-priority"
+        type="number"
+        value={priority}
+        onChange={(event) => onChange(event.target.value)}
+        required
+        aria-describedby="record-priority-hint"
+      />
+      <p id="record-priority-hint" className="text-xs text-muted-foreground">
+        {t("records.priorityHint")}
+      </p>
+    </div>
+  );
+}
+
 export function DnsRecordFormDialog({ environmentId, record, onClose }: DnsRecordFormDialogProps) {
   const t = useTranslations("cloudflareDns");
   const getErrorMessage = useApiErrorMessage("cloudflareDns");
   const isEditing = Boolean(record);
+  const initial = initialFormState(record);
 
-  const [recordType, setRecordType] = useState<DnsRecordType>(record?.recordType ?? "A");
-  const [name, setName] = useState(record?.name ?? "");
-  const [content, setContent] = useState(record?.content ?? "");
-  const [priority, setPriority] = useState<string>(record?.priority?.toString() ?? "");
-  const [proxied, setProxied] = useState(record?.proxied ?? false);
-  const [ttl, setTtl] = useState(record?.ttl ?? 1);
+  const [recordType, setRecordType] = useState<DnsRecordType>(initial.recordType);
+  const [name, setName] = useState(initial.name);
+  const [content, setContent] = useState(initial.content);
+  const [priority, setPriority] = useState<string>(initial.priority);
+  const [proxied, setProxied] = useState(initial.proxied);
+  const [ttl, setTtl] = useState(initial.ttl);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const create = useCreateDnsRecord(environmentId);
@@ -82,28 +161,7 @@ export function DnsRecordFormDialog({ environmentId, record, onClose }: DnsRecor
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="record-type">{t("records.type")}</Label>
-            <select
-              id="record-type"
-              value={recordType}
-              onChange={(event) => setRecordType(event.target.value as DnsRecordType)}
-              disabled={isEditing}
-              aria-describedby={isEditing ? "record-type-hint" : undefined}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              {DNS_RECORD_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-            {isEditing && (
-              <p id="record-type-hint" className="text-xs text-muted-foreground">
-                {t("records.typeImmutableHint")}
-              </p>
-            )}
-          </div>
+          <RecordTypeField recordType={recordType} onChange={setRecordType} isEditing={isEditing} />
 
           <div className="space-y-1.5">
             <Label htmlFor="record-name">{t("records.name")}</Label>
@@ -126,22 +184,7 @@ export function DnsRecordFormDialog({ environmentId, record, onClose }: DnsRecor
             />
           </div>
 
-          {requiresPriority && (
-            <div className="space-y-1.5">
-              <Label htmlFor="record-priority">{t("records.priority")}</Label>
-              <Input
-                id="record-priority"
-                type="number"
-                value={priority}
-                onChange={(event) => setPriority(event.target.value)}
-                required
-                aria-describedby="record-priority-hint"
-              />
-              <p id="record-priority-hint" className="text-xs text-muted-foreground">
-                {t("records.priorityHint")}
-              </p>
-            </div>
-          )}
+          {requiresPriority ? <RecordPriorityField priority={priority} onChange={setPriority} /> : null}
 
           <div className="flex items-center gap-2">
             <input
@@ -174,7 +217,7 @@ export function DnsRecordFormDialog({ environmentId, record, onClose }: DnsRecor
             </Button>
             <Button type="submit" disabled={isSaving}>
               <Plus className="mr-1 size-3.5" aria-hidden="true" />
-              {isSaving ? t("form.saving") : isEditing ? t("form.save") : t("form.create")}
+              {submitLabel(t, isSaving, isEditing)}
             </Button>
           </div>
         </form>
