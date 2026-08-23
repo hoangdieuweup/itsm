@@ -8,6 +8,8 @@ owns the business domain (accounts, 2-layer ACL, DNS records, configs) and
 reaches this client only through modules/cloudflare/dependencies.py.
 """
 
+from datetime import datetime
+
 import httpx
 
 from app.core.base.markers import helper, integration
@@ -17,7 +19,7 @@ from app.integrations.cloudflare.exceptions import (
     CloudflareDnsOperationRejected,
     InvalidCloudflareToken,
 )
-from app.integrations.cloudflare.schemas import ZoneOption
+from app.integrations.cloudflare.schemas import CloudflareAuditLogEntry, ZoneOption
 
 
 class CloudflareClient:
@@ -93,11 +95,21 @@ class CloudflareClient:
         return zones
 
     @helper
-    async def _write(self, path: str, method: str, api_token: str, *, json: dict | None = None) -> dict:
-        """Shared envelope-check for the 3 DNS write methods below — a
-        rejected write here means Cloudflare itself rejected the payload
-        (bad record data, name conflict), which is a DIFFERENT failure mode
-        than InvalidCloudflareToken (an auth problem)."""
+    async def _write(
+        self,
+        path: str,
+        method: str,
+        api_token: str,
+        *,
+        json: dict | None = None,
+        params: dict | None = None,
+    ) -> dict:
+        """Shared envelope-check for every write/authenticated-GET method
+        below — a rejected call here means Cloudflare itself rejected the
+        request (bad payload, name conflict, insufficient scope), which is a
+        DIFFERENT failure mode than InvalidCloudflareToken (an auth problem
+        detected before this helper is even reached, in test_connection/
+        list_zones)."""
         try:
             async with httpx.AsyncClient(
                 base_url=str(cloudflare_settings.API_BASE_URL), transport=self._transport
@@ -106,6 +118,7 @@ class CloudflareClient:
                     method,
                     path,
                     json=json,
+                    params=params,
                     headers={"Authorization": f"Bearer {api_token}"},
                     timeout=cloudflare_settings.HTTP_TIMEOUT_SECONDS,
                 )
@@ -228,3 +241,41 @@ class CloudflareClient:
     async def delete_tunnel(self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str) -> None:
         """DELETE /accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}."""
         await self._write(f"/accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}", "DELETE", api_token)
+
+    @integration
+    async def get_account_audit_logs(
+        self,
+        *,
+        cf_account_id: str,
+        api_token: str,
+        zone_name: str,
+        since: datetime | None,
+        before: datetime | None,
+    ) -> list[CloudflareAuditLogEntry]:
+        """GET /accounts/{cf_account_id}/audit_logs?zone.name=<zone_name>.
+        zone.name filters to just this environment's bound zone per the
+        reference doc's own recommendation — never returns account-wide
+        entries for other zones this environment doesn't own. Reuses _write
+        (the de-facto generic "authenticated call + envelope check" helper —
+        3 existing Tunnel GET methods already reuse it too) rather than a
+        new helper; failures surface as CloudflareDnsOperationRejected,
+        consistent with that existing precedent, not a scope-creeping rename."""
+        params: dict[str, str] = {"zone.name": zone_name}
+        if since is not None:
+            params["since"] = since.isoformat()
+        if before is not None:
+            params["before"] = before.isoformat()
+        body = await self._write(f"/accounts/{cf_account_id}/audit_logs", "GET", api_token, params=params)
+        return [
+            CloudflareAuditLogEntry(
+                id=entry["id"],
+                when=entry["when"],
+                actor_email=entry.get("actor", {}).get("email"),
+                actor_ip=entry.get("actor", {}).get("ip"),
+                action_type=entry.get("action", {}).get("type", ""),
+                resource_type=entry.get("resource", {}).get("type"),
+                resource_product=entry.get("resource", {}).get("product"),
+                new_value=entry.get("newValue"),
+            )
+            for entry in body.get("result", [])
+        ]
