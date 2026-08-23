@@ -17,9 +17,6 @@ export function useCreateRole() {
       permissionIds: string[];
     }) => createRole(name, permissionIds),
     onSuccess: () => {
-      // A newly created role isn't assigned to anyone yet, so unlike
-      // update/delete, nothing about any user's displayed data or the
-      // current session's own permission set can have gone stale.
       queryClient.invalidateQueries({ queryKey: rolesKeys.all });
     },
   });
