@@ -14,6 +14,7 @@ from app.modules.cloudflare.constants import (
     DnsRecordType,
     LogSource,
     ManagedBy,
+    TunnelStatus,
 )
 
 
@@ -90,6 +91,54 @@ class DnsRecord(Base):
     priority: Mapped[int | None] = mapped_column(Integer, nullable=True)
     proxied: Mapped[bool] = mapped_column(Boolean, default=False)
     ttl: Mapped[int] = mapped_column(Integer, default=1)
+    managed_by: Mapped[ManagedBy] = mapped_column(
+        Enum(ManagedBy, native_enum=False), default=ManagedBy.SYSTEM
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CloudflareTunnel(Base):
+    """A Cloudflare Tunnel bound to an environment. One environment may have
+    many tunnels (1:N, unlike CloudflareConfig's 1:1 binding)."""
+
+    __tablename__ = "cloudflare_tunnels"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    environment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("environments.id", ondelete="CASCADE"), index=True
+    )
+    cf_tunnel_id: Mapped[str] = mapped_column(String(64), unique=True)
+    name: Mapped[str] = mapped_column(String(255))
+    status: Mapped[TunnelStatus] = mapped_column(
+        Enum(TunnelStatus, native_enum=False), default=TunnelStatus.UNKNOWN
+    )
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class TunnelPublicHostname(Base):
+    """One public hostname (ingress rule) published through a Tunnel. Only
+    hostname+service are persisted (Decision #2) — path/originRequest live
+    only in Cloudflare's own ingress array, never modeled here."""
+
+    __tablename__ = "tunnel_public_hostnames"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tunnel_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cloudflare_tunnels.id", ondelete="CASCADE"), index=True
+    )
+    hostname: Mapped[str] = mapped_column(String(255), unique=True)
+    service: Mapped[str] = mapped_column(String(255))
     managed_by: Mapped[ManagedBy] = mapped_column(
         Enum(ManagedBy, native_enum=False), default=ManagedBy.SYSTEM
     )

@@ -51,6 +51,11 @@ class ErrorCode(StrEnum):
     MISSING_DNS_PRIORITY = "cloudflare_missing_dns_priority"
     DNS_SYNC_FAILED = "cloudflare_dns_sync_failed"
     DNS_RECORDS_EXIST_FOR_CONFIG = "cloudflare_dns_records_exist_for_config"
+    TUNNEL_NOT_FOUND = "cloudflare_tunnel_not_found"
+    TUNNEL_HOSTNAME_NOT_FOUND = "cloudflare_tunnel_hostname_not_found"
+    TUNNEL_CONFIG_LOCKED = "cloudflare_tunnel_config_locked"
+    TUNNEL_HOSTNAME_ALREADY_EXISTS = "cloudflare_tunnel_hostname_already_exists"
+    TUNNEL_INGRESS_SYNC_FAILED = "cloudflare_tunnel_ingress_sync_failed"
 
 
 class CloudflareAccountAuditActions(StrEnum):
@@ -107,3 +112,32 @@ class CloudflareDnsAuditActions(StrEnum):
     DNS_RECORD_CREATED = "CLOUDFLARE_DNS_RECORD_CREATED"
     DNS_RECORD_UPDATED = "CLOUDFLARE_DNS_RECORD_UPDATED"
     DNS_RECORD_DELETED = "CLOUDFLARE_DNS_RECORD_DELETED"
+
+
+class TunnelStatus(StrEnum):
+    """Connection health of a Cloudflare Tunnel, synced on demand from
+    GET .../connections (Decision #10) — DEGRADED is never auto-set, no
+    documented threshold exists for it."""
+
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    DOWN = "down"
+    UNKNOWN = "unknown"
+
+
+class CloudflareTunnelAuditActions(StrEnum):
+    """Action identifiers this phase writes via audit.log_event."""
+
+    TUNNEL_CREATED = "CLOUDFLARE_TUNNEL_CREATED"
+    TUNNEL_DELETED = "CLOUDFLARE_TUNNEL_DELETED"
+    TUNNEL_TOKEN_REVEALED = "CLOUDFLARE_TUNNEL_TOKEN_REVEALED"
+    TUNNEL_HOSTNAME_CREATED = "CLOUDFLARE_TUNNEL_HOSTNAME_CREATED"
+    TUNNEL_HOSTNAME_UPDATED = "CLOUDFLARE_TUNNEL_HOSTNAME_UPDATED"
+    TUNNEL_HOSTNAME_DELETED = "CLOUDFLARE_TUNNEL_HOSTNAME_DELETED"
+
+
+class CloudflareTunnelLockDefaults:
+    """Lock TTL for the 3 hostname-mutation services — matches the master
+    plan's `SET lock:tunnel:<id> NX PX 5000` (5 seconds)."""
+
+    INGRESS_LOCK_TTL_SECONDS = 5

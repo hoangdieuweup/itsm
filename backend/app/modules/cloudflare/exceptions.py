@@ -105,3 +105,41 @@ class DnsRecordsExistForConfig(ConflictError):
 
     code = ErrorCode.DNS_RECORDS_EXIST_FOR_CONFIG
     message = "Delete this environment's DNS records before removing its Cloudflare binding"
+
+
+class CloudflareTunnelNotFound(NotFoundError):
+    """Raised when no cloudflare_tunnels row matches the requested id for this environment."""
+
+    code = ErrorCode.TUNNEL_NOT_FOUND
+    message = "Cloudflare Tunnel not found"
+
+
+class TunnelPublicHostnameNotFound(NotFoundError):
+    """Raised when no tunnel_public_hostnames row matches the requested id for this tunnel."""
+
+    code = ErrorCode.TUNNEL_HOSTNAME_NOT_FOUND
+    message = "Tunnel public hostname not found"
+
+
+class TunnelConfigLocked(ConflictError):
+    """Raised when another request already holds the per-tunnel ingress lock
+    (Decision #1 — reject immediately, never poll-and-wait)."""
+
+    code = ErrorCode.TUNNEL_CONFIG_LOCKED
+    message = "Another request is currently editing this tunnel's configuration — try again shortly"
+
+
+class TunnelHostnameAlreadyExists(ConflictError):
+    """Raised when the submitted hostname already exists in the tunnel's ingress array."""
+
+    code = ErrorCode.TUNNEL_HOSTNAME_ALREADY_EXISTS
+    message = "This hostname is already published on this tunnel"
+
+
+class TunnelIngressSyncFailed(IntegrationError):
+    """Raised when Cloudflare's side of an ingress PUT succeeded but the
+    local Postgres write then failed. Decision #5: a compensating PUT-back
+    is attempted first; this must never degrade silently."""
+
+    code = ErrorCode.TUNNEL_INGRESS_SYNC_FAILED
+    message = "Cloudflare was updated but the local record failed to save — check logs for details"
