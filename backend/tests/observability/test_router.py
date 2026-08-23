@@ -10,7 +10,6 @@ from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.security import JwtCodec
-from app.main import app
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCookies
 from app.modules.observability.config import observability_settings
@@ -71,18 +70,26 @@ async def _make_environment(client: AsyncClient, engine: AsyncEngine) -> str:
     """Login with enough permissions to create a project + environment via
     the real HTTP API, mirroring _bind_environment's setup half."""
     await _login_with_permissions(
-        client, engine, permissions=[("project", "create"), ("environment", "create"), ("environment", "read")]
+        client,
+        engine,
+        permissions=[("project", "create"), ("environment", "create"), ("environment", "read")],
     )
     project_resp = await client.post("/api/v1/projects", json={"name": "Site"})
     project_id = project_resp.json()["data"]["id"]
-    env_resp = await client.post(f"/api/v1/projects/{project_id}/environments", json={"type": "dev", "name": "Dev"})
+    env_resp = await client.post(
+        f"/api/v1/projects/{project_id}/environments", json={"type": "dev", "name": "Dev"}
+    )
     return env_resp.json()["data"]["id"]
 
 
 class TestCreateLokiConfig:
-    async def test_requires_environment_update_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
+    async def test_requires_environment_update_permission(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
         environment_id = await _make_environment(client, engine)
-        await _login_with_permissions(client, engine, permissions=[("environment", "read")], email="viewer@x.com")
+        await _login_with_permissions(
+            client, engine, permissions=[("environment", "read")], email="viewer@x.com"
+        )
 
         response = await client.post(
             f"/api/v1/environments/{environment_id}/loki-config",
@@ -100,7 +107,10 @@ class TestCreateLokiConfig:
     async def test_create_then_get(self, client: AsyncClient, engine: AsyncEngine) -> None:
         environment_id = await _make_environment(client, engine)
         await _login_with_permissions(
-            client, engine, permissions=[("environment", "update"), ("environment", "read")], email="admin@x.com"
+            client,
+            engine,
+            permissions=[("environment", "update"), ("environment", "read")],
+            email="admin@x.com",
         )
 
         create_response = await client.post(
@@ -125,7 +135,9 @@ class TestCreateLokiConfig:
 
     async def test_get_404s_when_unconfigured(self, client: AsyncClient, engine: AsyncEngine) -> None:
         environment_id = await _make_environment(client, engine)
-        await _login_with_permissions(client, engine, permissions=[("environment", "read")], email="viewer2@x.com")
+        await _login_with_permissions(
+            client, engine, permissions=[("environment", "read")], email="viewer2@x.com"
+        )
 
         response = await client.get(f"/api/v1/environments/{environment_id}/loki-config")
         assert response.status_code == 404
@@ -134,7 +146,10 @@ class TestCreateLokiConfig:
     async def test_rejects_duplicate_config(self, client: AsyncClient, engine: AsyncEngine) -> None:
         environment_id = await _make_environment(client, engine)
         await _login_with_permissions(
-            client, engine, permissions=[("environment", "update"), ("environment", "read")], email="admin2@x.com"
+            client,
+            engine,
+            permissions=[("environment", "update"), ("environment", "read")],
+            email="admin2@x.com",
         )
         payload = {
             "endpointUrl": "http://loki:3100",
@@ -156,7 +171,10 @@ class TestUpdateAndDeleteLokiConfig:
     async def test_update_requires_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
         environment_id = await _make_environment(client, engine)
         await _login_with_permissions(
-            client, engine, permissions=[("environment", "update"), ("environment", "read")], email="admin3@x.com"
+            client,
+            engine,
+            permissions=[("environment", "update"), ("environment", "read")],
+            email="admin3@x.com",
         )
         await client.post(
             f"/api/v1/environments/{environment_id}/loki-config",
@@ -170,7 +188,9 @@ class TestUpdateAndDeleteLokiConfig:
             },
         )
 
-        await _login_with_permissions(client, engine, permissions=[("environment", "read")], email="viewer3@x.com")
+        await _login_with_permissions(
+            client, engine, permissions=[("environment", "read")], email="viewer3@x.com"
+        )
         response = await client.patch(
             f"/api/v1/environments/{environment_id}/loki-config", json={"defaultRangeMinutes": 120}
         )
@@ -179,7 +199,10 @@ class TestUpdateAndDeleteLokiConfig:
     async def test_update_then_delete(self, client: AsyncClient, engine: AsyncEngine) -> None:
         environment_id = await _make_environment(client, engine)
         await _login_with_permissions(
-            client, engine, permissions=[("environment", "update"), ("environment", "read")], email="admin4@x.com"
+            client,
+            engine,
+            permissions=[("environment", "update"), ("environment", "read")],
+            email="admin4@x.com",
         )
         await client.post(
             f"/api/v1/environments/{environment_id}/loki-config",
@@ -207,22 +230,36 @@ class TestUpdateAndDeleteLokiConfig:
 
 
 class TestRunLogQuery:
-    async def test_requires_environment_read_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
+    async def test_requires_environment_read_permission(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
         environment_id = await _make_environment(client, engine)
         await _login_with_permissions(client, engine, permissions=[], email="noperm@x.com")
 
         response = await client.post(
             f"/api/v1/environments/{environment_id}/loki-config/query",
-            json={"query": "{}", "start": "2026-01-01T00:00:00Z", "end": "2026-01-01T01:00:00Z", "limit": 100},
+            json={
+                "query": "{}",
+                "start": "2026-01-01T00:00:00Z",
+                "end": "2026-01-01T01:00:00Z",
+                "limit": 100,
+            },
         )
         assert response.status_code == 403
 
     async def test_404s_when_unconfigured(self, client: AsyncClient, engine: AsyncEngine) -> None:
         environment_id = await _make_environment(client, engine)
-        await _login_with_permissions(client, engine, permissions=[("environment", "read")], email="reader@x.com")
+        await _login_with_permissions(
+            client, engine, permissions=[("environment", "read")], email="reader@x.com"
+        )
 
         response = await client.post(
             f"/api/v1/environments/{environment_id}/loki-config/query",
-            json={"query": "{}", "start": "2026-01-01T00:00:00Z", "end": "2026-01-01T01:00:00Z", "limit": 100},
+            json={
+                "query": "{}",
+                "start": "2026-01-01T00:00:00Z",
+                "end": "2026-01-01T01:00:00Z",
+                "limit": 100,
+            },
         )
         assert response.status_code == 404

@@ -25,7 +25,9 @@ class LokiConfig(Base):
         UUID(as_uuid=True), ForeignKey("environments.id", ondelete="CASCADE"), unique=True
     )
     endpoint_url: Mapped[str] = mapped_column(Text)
-    tenant_id: Mapped[str | None] = mapped_column(String(ObservabilityLimits.MAX_TENANT_ID_LENGTH), nullable=True)
+    tenant_id: Mapped[str | None] = mapped_column(
+        String(ObservabilityLimits.MAX_TENANT_ID_LENGTH), nullable=True
+    )
     auth_type: Mapped[LokiAuthType] = mapped_column(Enum(LokiAuthType, native_enum=False))
     credential: Mapped[str | None] = mapped_column(Text, nullable=True)
     default_query: Mapped[str] = mapped_column(Text, default="")

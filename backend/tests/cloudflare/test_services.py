@@ -10,7 +10,7 @@ from app.core.crypto import FernetCodec
 from app.integrations.cache.exceptions import CacheUnavailable
 from app.integrations.cloudflare.exceptions import CloudflareApiUnavailable as CfUnavailable
 from app.integrations.cloudflare.exceptions import InvalidCloudflareToken
-from app.integrations.cloudflare.schemas import ZoneOption
+from app.integrations.cloudflare.schemas import CloudflareAuditLogEntry, ZoneOption
 from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import (
     AccessLevel,
@@ -61,6 +61,7 @@ from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
 from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
 from app.modules.cloudflare.services.delete_tunnel import DeleteCloudflareTunnel
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
+from app.modules.cloudflare.services.list_cloudflare_audit_logs import ListCloudflareAuditLogs
 from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
 from app.modules.cloudflare.services.list_tunnel_hostnames import ListTunnelHostnames
 from app.modules.cloudflare.services.list_tunnels import ListTunnels
@@ -1954,3 +1955,63 @@ class TestRemoveTunnelHostname:
 
         assert client.put_calls[0] == [catch_all]
         assert client.put_calls[-1] == starting_ingress
+
+
+class FakeAuditLogClient(FakeCloudflareClient):
+    def __init__(self, entries: list | None = None, raises: Exception | None = None) -> None:
+        super().__init__(raises=raises)
+        self._entries = entries if entries is not None else []
+        self.calls: list[dict] = []
+
+    async def get_account_audit_logs(self, *, cf_account_id, api_token, zone_name, since, before):
+        self.calls.append(
+            {"cf_account_id": cf_account_id, "zone_name": zone_name, "since": since, "before": before}
+        )
+        if self._raises is not None:
+            raise self._raises
+        return self._entries
+
+
+class TestListCloudflareAuditLogs:
+    async def _setup(self, uow: "FakeCloudflareUnitOfWork"):
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        env_id = uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
+        )
+        return env_id
+
+    async def test_raises_config_not_found_for_unbound_environment(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        client = FakeAuditLogClient()
+        use_case = ListCloudflareAuditLogs(uow, client)
+        with pytest.raises(CloudflareConfigNotFound):
+            await use_case.execute(environment_id=uuid4(), since=None, before=None)
+
+    async def test_calls_client_with_bound_zone_name(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        env_id = await self._setup(uow)
+        entries = [
+            CloudflareAuditLogEntry(
+                id="log-1",
+                when="2026-01-01T00:00:00Z",
+                actor_email="a@b.com",
+                actor_ip="1.2.3.4",
+                action_type="update",
+                resource_type="dns_record",
+                resource_product="dns",
+                new_value="x",
+            )
+        ]
+        client = FakeAuditLogClient(entries=entries)
+        use_case = ListCloudflareAuditLogs(uow, client)
+
+        result = await use_case.execute(environment_id=env_id, since=None, before=None)
+
+        assert result == entries
+        assert client.calls[0]["zone_name"] == "example.com"

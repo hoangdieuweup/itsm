@@ -99,19 +99,25 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[LokiConfigRead], int]:
         """Required by AbstractRepository; configs are looked up per-environment in practice."""
-        rows = await self._session.scalars(select(LokiConfig).order_by(LokiConfig.id).limit(limit).offset(offset))
+        rows = await self._session.scalars(
+            select(LokiConfig).order_by(LokiConfig.id).limit(limit).offset(offset)
+        )
         items = [_to_read(row) for row in rows]
         total = await self._session.scalar(select(func.count()).select_from(LokiConfig))
         return items, total or 0
 
     @database
     async def get_by_environment_id(self, environment_id: UUID) -> LokiConfigRead | None:
-        row = await self._session.scalar(select(LokiConfig).where(LokiConfig.environment_id == environment_id))
+        row = await self._session.scalar(
+            select(LokiConfig).where(LokiConfig.environment_id == environment_id)
+        )
         return _to_read(row) if row else None
 
     @database
     async def get_credential_ciphertext(self, environment_id: UUID) -> str | None:
-        row = await self._session.scalar(select(LokiConfig).where(LokiConfig.environment_id == environment_id))
+        row = await self._session.scalar(
+            select(LokiConfig).where(LokiConfig.environment_id == environment_id)
+        )
         return row.credential if row is not None else None
 
     @database
@@ -152,7 +158,9 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
         default_query: str,
         default_range_minutes: int,
     ) -> LokiConfigRead:
-        row = await self._session.scalar(select(LokiConfig).where(LokiConfig.environment_id == environment_id))
+        row = await self._session.scalar(
+            select(LokiConfig).where(LokiConfig.environment_id == environment_id)
+        )
         if row is None:
             raise ValueError(f"loki config for environment {environment_id} does not exist")
         row.endpoint_url = endpoint_url
@@ -167,7 +175,9 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
 
     @database
     async def delete_by_environment_id(self, environment_id: UUID) -> None:
-        row = await self._session.scalar(select(LokiConfig).where(LokiConfig.environment_id == environment_id))
+        row = await self._session.scalar(
+            select(LokiConfig).where(LokiConfig.environment_id == environment_id)
+        )
         if row is not None:
             await self._session.delete(row)
             await self._session.flush()

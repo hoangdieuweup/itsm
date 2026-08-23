@@ -58,7 +58,15 @@ class FakeLokiConfigRepo(AbstractLokiConfigRepository):
         return self._ciphertexts.get(environment_id)
 
     async def create(
-        self, *, environment_id, endpoint_url, tenant_id, auth_type, credential, default_query, default_range_minutes
+        self,
+        *,
+        environment_id,
+        endpoint_url,
+        tenant_id,
+        auth_type,
+        credential,
+        default_query,
+        default_range_minutes,
     ):
         row = LokiConfigRead(
             id=uuid4(),
@@ -77,7 +85,15 @@ class FakeLokiConfigRepo(AbstractLokiConfigRepository):
         return row
 
     async def update_by_environment_id(
-        self, environment_id, *, endpoint_url, tenant_id, auth_type, credential, default_query, default_range_minutes
+        self,
+        environment_id,
+        *,
+        endpoint_url,
+        tenant_id,
+        auth_type,
+        credential,
+        default_query,
+        default_range_minutes,
     ):
         existing = self._rows[environment_id]
         updated = existing.model_copy(

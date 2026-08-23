@@ -28,6 +28,7 @@ from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
 from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
 from app.modules.cloudflare.services.delete_tunnel import DeleteCloudflareTunnel
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
+from app.modules.cloudflare.services.list_cloudflare_audit_logs import ListCloudflareAuditLogs
 from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
 from app.modules.cloudflare.services.list_tunnel_hostnames import ListTunnelHostnames
 from app.modules.cloudflare.services.list_tunnels import ListTunnels
@@ -216,6 +217,14 @@ async def get_list_zones(
 ) -> ListZones:
     """Provide the list-zones use case."""
     return ListZones(uow, client)
+
+
+async def get_list_cloudflare_audit_logs(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+) -> ListCloudflareAuditLogs:
+    """Provide the list-audit-logs use case."""
+    return ListCloudflareAuditLogs(uow, client)
 
 
 async def get_list_dns_records(uow: AbstractCloudflareUnitOfWork = Depends(get_uow)) -> ListDnsRecords:

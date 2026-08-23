@@ -13,12 +13,13 @@ require_account_access(EDITOR) below is only the floor a static Depends
 factory can express; see that use case's own docstring.
 """
 
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
 from app.core.models import ApiResponse
-from app.integrations.cloudflare.schemas import ZoneOption
+from app.integrations.cloudflare.schemas import CloudflareAuditLogEntry, ZoneOption
 from app.modules.cloudflare.constants import AccessLevel
 from app.modules.cloudflare.dependencies import (
     get_add_tunnel_hostname,
@@ -32,6 +33,7 @@ from app.modules.cloudflare.dependencies import (
     get_delete_dns_record,
     get_delete_tunnel,
     get_list_account_managers,
+    get_list_cloudflare_audit_logs,
     get_list_dns_records,
     get_list_tunnel_hostnames,
     get_list_tunnels,
@@ -87,6 +89,7 @@ from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
 from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
 from app.modules.cloudflare.services.delete_tunnel import DeleteCloudflareTunnel
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
+from app.modules.cloudflare.services.list_cloudflare_audit_logs import ListCloudflareAuditLogs
 from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
 from app.modules.cloudflare.services.list_tunnel_hostnames import ListTunnelHostnames
 from app.modules.cloudflare.services.list_tunnels import ListTunnels
@@ -337,6 +340,22 @@ async def list_environment_dns_records(
     """List an environment's DNS records."""
     records = await use_case.execute(environment_id)
     return ApiResponse[list[DnsRecordRead]](success=True, data=records)
+
+
+@router.get("/environments/{environment_id}/cloudflare-audit-logs")
+async def list_cloudflare_audit_logs(
+    environment_id: UUID,
+    since: datetime | None = None,
+    before: datetime | None = None,
+    use_case: ListCloudflareAuditLogs = Depends(get_list_cloudflare_audit_logs),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
+) -> ApiResponse[list[CloudflareAuditLogEntry]]:
+    """List this environment's Cloudflare Audit Log entries, filtered to its
+    bound zone. Logpull (raw traffic) was dropped from Phase 6 — Enterprise
+    plan only; this is config-change history, not HTTP request logs."""
+    entries = await use_case.execute(environment_id=environment_id, since=since, before=before)
+    return ApiResponse[list[CloudflareAuditLogEntry]](success=True, data=entries)
 
 
 @router.post("/environments/{environment_id}/dns-records")

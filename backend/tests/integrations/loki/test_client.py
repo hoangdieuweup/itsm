@@ -47,11 +47,18 @@ class TestQueryRange:
 
     async def test_empty_result(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(200, json={"status": "success", "data": {"resultType": "streams", "result": []}})
+            return httpx.Response(
+                200, json={"status": "success", "data": {"resultType": "streams", "result": []}}
+            )
 
         client = LokiClient(transport=httpx.MockTransport(handler))
         result = await client.query_range(
-            endpoint_url="http://loki:3100", query="{}", start=START, end=END, tenant_id=None, auth_header=None
+            endpoint_url="http://loki:3100",
+            query="{}",
+            start=START,
+            end=END,
+            tenant_id=None,
+            auth_header=None,
         )
         assert result.entries == []
 
@@ -59,11 +66,18 @@ class TestQueryRange:
         def handler(request: httpx.Request) -> httpx.Response:
             assert "authorization" not in request.headers
             assert "x-scope-orgid" not in request.headers
-            return httpx.Response(200, json={"status": "success", "data": {"resultType": "streams", "result": []}})
+            return httpx.Response(
+                200, json={"status": "success", "data": {"resultType": "streams", "result": []}}
+            )
 
         client = LokiClient(transport=httpx.MockTransport(handler))
         await client.query_range(
-            endpoint_url="http://loki:3100", query="{}", start=START, end=END, tenant_id=None, auth_header=None
+            endpoint_url="http://loki:3100",
+            query="{}",
+            start=START,
+            end=END,
+            tenant_id=None,
+            auth_header=None,
         )
 
     async def test_401_raises_invalid_credential(self) -> None:
@@ -73,7 +87,12 @@ class TestQueryRange:
         client = LokiClient(transport=httpx.MockTransport(handler))
         with pytest.raises(InvalidLokiCredential):
             await client.query_range(
-                endpoint_url="http://loki:3100", query="{}", start=START, end=END, tenant_id=None, auth_header=None
+                endpoint_url="http://loki:3100",
+                query="{}",
+                start=START,
+                end=END,
+                tenant_id=None,
+                auth_header=None,
             )
 
     async def test_403_raises_invalid_credential(self) -> None:
@@ -83,17 +102,29 @@ class TestQueryRange:
         client = LokiClient(transport=httpx.MockTransport(handler))
         with pytest.raises(InvalidLokiCredential):
             await client.query_range(
-                endpoint_url="http://loki:3100", query="{}", start=START, end=END, tenant_id=None, auth_header=None
+                endpoint_url="http://loki:3100",
+                query="{}",
+                start=START,
+                end=END,
+                tenant_id=None,
+                auth_header=None,
             )
 
     async def test_400_raises_rejected_with_loki_message(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(400, json={"status": "error", "error": "parse error: unexpected IDENTIFIER"})
+            return httpx.Response(
+                400, json={"status": "error", "error": "parse error: unexpected IDENTIFIER"}
+            )
 
         client = LokiClient(transport=httpx.MockTransport(handler))
         with pytest.raises(LokiQueryRejected, match="parse error: unexpected IDENTIFIER"):
             await client.query_range(
-                endpoint_url="http://loki:3100", query="{bad", start=START, end=END, tenant_id=None, auth_header=None
+                endpoint_url="http://loki:3100",
+                query="{bad",
+                start=START,
+                end=END,
+                tenant_id=None,
+                auth_header=None,
             )
 
     async def test_500_raises_unavailable(self) -> None:
@@ -103,7 +134,12 @@ class TestQueryRange:
         client = LokiClient(transport=httpx.MockTransport(handler))
         with pytest.raises(LokiApiUnavailable):
             await client.query_range(
-                endpoint_url="http://loki:3100", query="{}", start=START, end=END, tenant_id=None, auth_header=None
+                endpoint_url="http://loki:3100",
+                query="{}",
+                start=START,
+                end=END,
+                tenant_id=None,
+                auth_header=None,
             )
 
     async def test_transport_failure_raises_unavailable(self) -> None:
@@ -113,5 +149,10 @@ class TestQueryRange:
         client = LokiClient(transport=httpx.MockTransport(handler))
         with pytest.raises(LokiApiUnavailable):
             await client.query_range(
-                endpoint_url="http://loki:3100", query="{}", start=START, end=END, tenant_id=None, auth_header=None
+                endpoint_url="http://loki:3100",
+                query="{}",
+                start=START,
+                end=END,
+                tenant_id=None,
+                auth_header=None,
             )
