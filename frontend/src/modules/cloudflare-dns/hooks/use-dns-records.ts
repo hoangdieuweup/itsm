@@ -7,6 +7,7 @@ import {
   fetchDnsRecords,
   updateDnsRecord,
   type DnsRecordFormValues,
+  type DnsRecordUpdateValues,
 } from "../api/fetchers";
 import { cloudflareDnsKeys } from "../api/query-keys";
 
@@ -31,7 +32,7 @@ export function useCreateDnsRecord(environmentId: string) {
 export function useUpdateDnsRecord(environmentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ recordId, data }: { recordId: string; data: Omit<DnsRecordFormValues, "recordType"> }) =>
+    mutationFn: ({ recordId, data }: { recordId: string; data: DnsRecordUpdateValues }) =>
       updateDnsRecord(environmentId, recordId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: cloudflareDnsKeys.records(environmentId) });

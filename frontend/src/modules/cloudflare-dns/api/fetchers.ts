@@ -74,6 +74,18 @@ export interface DnsRecordFormValues {
   ttl: number;
 }
 
+/**
+ * record_type and name are immutable after creation (matches the backend's
+ * DnsRecordUpdate schema, which accepts neither) — changing either means
+ * delete + recreate, not an update.
+ */
+export interface DnsRecordUpdateValues {
+  content: string;
+  priority?: number | null;
+  proxied: boolean;
+  ttl: number;
+}
+
 export async function createDnsRecord(environmentId: string, data: DnsRecordFormValues): Promise<DnsRecord> {
   const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_DNS.RECORDS(environmentId), {
     method: "POST",
@@ -85,7 +97,7 @@ export async function createDnsRecord(environmentId: string, data: DnsRecordForm
 export async function updateDnsRecord(
   environmentId: string,
   recordId: string,
-  data: Omit<DnsRecordFormValues, "recordType">,
+  data: DnsRecordUpdateValues,
 ): Promise<DnsRecord> {
   const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_DNS.RECORD_DETAIL(environmentId, recordId), {
     method: "PATCH",
