@@ -12,6 +12,8 @@ from app.modules.rbac.dependencies import get_create_role, get_delete_role, get_
 from app.modules.rbac.dependencies import get_uow as get_rbac_uow
 from app.modules.rbac.exceptions import RoleNotFound
 from app.modules.rbac.public import (
+    RbacActions,
+    RbacResources,
     get_assign_role,
     get_assign_roles,
     require_any_permission,
@@ -40,7 +42,7 @@ router = APIRouter(prefix="/rbac", tags=["rbac"])
 async def create_role(
     body: RoleCreate,
     use_case: CreateRole = Depends(get_create_role),
-    _user: UserRead = Depends(require_permission("role", "create")),
+    _user: UserRead = Depends(require_permission(RbacResources.ROLE, RbacActions.CREATE)),
 ) -> ApiResponse[RoleRead]:
     """Create a new custom role."""
     role = await use_case.execute(body.name, body.permission_ids)
@@ -51,7 +53,11 @@ async def create_role(
 async def list_roles(
     pagination: PaginationParams = Depends(pagination_params),
     uow: AbstractRbacUnitOfWork = Depends(get_rbac_uow),
-    _user: UserRead = Depends(require_any_permission(("role", "read"), ("user", "assign_role"))),
+    _user: UserRead = Depends(
+        require_any_permission(
+            (RbacResources.ROLE, RbacActions.READ), (RbacResources.USER, RbacActions.ASSIGN_ROLE)
+        )
+    ),
 ) -> ApiResponse[Page[RoleRead]]:
     """List roles with their permissions."""
     items, total = await uow.roles.list_page(pagination.limit, pagination.offset)
@@ -63,7 +69,7 @@ async def list_roles(
 async def get_role(
     role_id: UUID,
     uow: AbstractRbacUnitOfWork = Depends(get_rbac_uow),
-    _user: UserRead = Depends(require_permission("role", "read")),
+    _user: UserRead = Depends(require_permission(RbacResources.ROLE, RbacActions.READ)),
 ) -> ApiResponse[RoleRead]:
     """Return one role, 404 if it doesn't exist."""
     role = await uow.roles.get_by_id(role_id)
@@ -77,7 +83,7 @@ async def update_role(
     role_id: UUID,
     body: RoleUpdate,
     use_case: UpdateRole = Depends(get_update_role),
-    _user: UserRead = Depends(require_permission("role", "update")),
+    _user: UserRead = Depends(require_permission(RbacResources.ROLE, RbacActions.UPDATE)),
 ) -> ApiResponse[RoleRead]:
     """Rename a role and/or replace its permission set."""
     role = await use_case.execute(role_id, name=body.name, permission_ids=body.permission_ids)
@@ -88,7 +94,7 @@ async def update_role(
 async def delete_role(
     role_id: UUID,
     use_case: DeleteRole = Depends(get_delete_role),
-    _user: UserRead = Depends(require_permission("role", "delete")),
+    _user: UserRead = Depends(require_permission(RbacResources.ROLE, RbacActions.DELETE)),
 ) -> ApiResponse[None]:
     """Delete a custom role."""
     await use_case.execute(role_id)
@@ -98,7 +104,7 @@ async def delete_role(
 @router.get("/permissions")
 async def list_permissions(
     uow: AbstractRbacUnitOfWork = Depends(get_rbac_uow),
-    _user: UserRead = Depends(require_permission("permission", "read")),
+    _user: UserRead = Depends(require_permission(RbacResources.PERMISSION, RbacActions.READ)),
 ) -> ApiResponse[list[PermissionRead]]:
     """Return the fixed permission catalog, for building the role-edit checkbox UI."""
     permissions = await uow.permissions.list_all()
@@ -110,7 +116,7 @@ async def assign_user_roles(
     user_id: UUID,
     body: UserRolesAssignment,
     use_case: AssignRoles = Depends(get_assign_roles),
-    _user: UserRead = Depends(require_permission("user", "assign_role")),
+    _user: UserRead = Depends(require_permission(RbacResources.USER, RbacActions.ASSIGN_ROLE)),
 ) -> ApiResponse[None]:
     """Assign multiple roles to an existing user."""
     await use_case.execute(user_id, body.role_ids)
@@ -121,7 +127,7 @@ async def assign_user_roles(
 async def get_user_roles(
     user_id: UUID,
     uow: AbstractRbacUnitOfWork = Depends(get_rbac_uow),
-    _user: UserRead = Depends(require_permission("user", "read")),
+    _user: UserRead = Depends(require_permission(RbacResources.USER, RbacActions.READ)),
 ) -> ApiResponse[list[RoleRead]]:
     """Return all roles assigned to a user."""
     roles = await uow.user_roles.get_roles_for_user(user_id)
@@ -133,7 +139,7 @@ async def assign_user_role(
     user_id: UUID,
     body: RoleAssignment,
     use_case: AssignRole = Depends(get_assign_role),
-    _user: UserRead = Depends(require_permission("user", "assign_role")),
+    _user: UserRead = Depends(require_permission(RbacResources.USER, RbacActions.ASSIGN_ROLE)),
 ) -> ApiResponse[None]:
     """Assign a single role to an existing user (backwards compatible)."""
     if body.role_id is not None:

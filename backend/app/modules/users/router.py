@@ -9,7 +9,14 @@ from fastapi import APIRouter, Depends
 
 from app.core.models import ApiResponse
 from app.core.pagination import Page, PaginationParams, pagination_params
-from app.modules.rbac.public import RbacApi, RbacDefaults, get_rbac_api, require_permission
+from app.modules.rbac.public import (
+    RbacActions,
+    RbacApi,
+    RbacDefaults,
+    RbacResources,
+    get_rbac_api,
+    require_permission,
+)
 from app.modules.users.dependencies import get_uow
 from app.modules.users.schemas import UserRead, UserStatusUpdate
 from app.modules.users.services.update_user_status import UpdateUserStatus
@@ -24,7 +31,7 @@ async def list_users(
     pagination: PaginationParams = Depends(pagination_params),
     uow: AbstractUsersUnitOfWork = Depends(get_uow),
     rbac: RbacApi = Depends(get_rbac_api),
-    _user: UserRead = Depends(require_permission("user", "read")),
+    _user: UserRead = Depends(require_permission(RbacResources.USER, RbacActions.READ)),
 ) -> ApiResponse[Page[UserRead]]:
     """List users for the admin user-management page."""
     items, total = await uow.users.list_page(pagination.limit, pagination.offset)
@@ -50,7 +57,7 @@ async def update_user_status(
     body: UserStatusUpdate,
     use_case: UpdateUserStatus = Depends(get_update_user_status),
     rbac: RbacApi = Depends(get_rbac_api),
-    _user: UserRead = Depends(require_permission("user", "update_status")),
+    _user: UserRead = Depends(require_permission(RbacResources.USER, RbacActions.UPDATE_STATUS)),
 ) -> ApiResponse[UserRead]:
     """Block or unblock a user. Blocking the last admin is rejected — see rbac's bus-factor rule."""
     updated = await use_case.execute(user_id, body.status)
