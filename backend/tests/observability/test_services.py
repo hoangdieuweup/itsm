@@ -19,6 +19,7 @@ from app.modules.observability.exceptions import (
 )
 from app.modules.observability.repository import AbstractLokiConfigRepository
 from app.modules.observability.schemas import LokiConfigRead
+from app.modules.observability.services._auth import resolve_loki_auth_header
 from app.modules.observability.services.create_loki_config import CreateLokiConfig
 from app.modules.observability.services.delete_loki_config import DeleteLokiConfig
 from app.modules.observability.services.get_loki_config import GetLokiConfig
@@ -506,3 +507,68 @@ class TestRunLogQuery:
         )
 
         assert result.entries == entries
+
+
+class TestResolveLokiAuthHeader:
+    def test_none_auth_type_returns_none(self) -> None:
+        config = LokiConfigRead(
+            id=uuid4(),
+            environment_id=uuid4(),
+            endpoint_url="http://loki:3100",
+            tenant_id=None,
+            auth_type=LokiAuthType.NONE,
+            has_credential=False,
+            default_query="",
+            default_range_minutes=60,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        assert resolve_loki_auth_header(config, None) is None
+
+    def test_bearer_builds_header(self) -> None:
+        config = LokiConfigRead(
+            id=uuid4(),
+            environment_id=uuid4(),
+            endpoint_url="http://loki:3100",
+            tenant_id=None,
+            auth_type=LokiAuthType.BEARER,
+            has_credential=True,
+            default_query="",
+            default_range_minutes=60,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        ciphertext = FernetCodec.encrypt("tok", key=TEST_FERNET_KEY)
+        assert resolve_loki_auth_header(config, ciphertext) == "Bearer tok"
+
+    def test_basic_builds_base64_header(self) -> None:
+        config = LokiConfigRead(
+            id=uuid4(),
+            environment_id=uuid4(),
+            endpoint_url="http://loki:3100",
+            tenant_id=None,
+            auth_type=LokiAuthType.BASIC,
+            has_credential=True,
+            default_query="",
+            default_range_minutes=60,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        ciphertext = FernetCodec.encrypt("user:pass", key=TEST_FERNET_KEY)
+        header = resolve_loki_auth_header(config, ciphertext)
+        assert header is not None and header.startswith("Basic ")
+
+    def test_missing_ciphertext_returns_none_even_if_auth_type_set(self) -> None:
+        config = LokiConfigRead(
+            id=uuid4(),
+            environment_id=uuid4(),
+            endpoint_url="http://loki:3100",
+            tenant_id=None,
+            auth_type=LokiAuthType.BEARER,
+            has_credential=False,
+            default_query="",
+            default_range_minutes=60,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        assert resolve_loki_auth_header(config, None) is None
