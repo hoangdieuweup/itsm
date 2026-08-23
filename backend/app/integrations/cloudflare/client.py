@@ -163,3 +163,68 @@ class CloudflareClient:
     async def delete_dns_record(self, *, zone_id: str, cf_record_id: str, api_token: str) -> None:
         """DELETE /zones/{zone_id}/dns_records/{cf_record_id}."""
         await self._write(f"/zones/{zone_id}/dns_records/{cf_record_id}", "DELETE", api_token)
+
+    @integration
+    async def create_tunnel(self, *, cf_account_id: str, api_token: str, name: str) -> str:
+        """POST /accounts/{cf_account_id}/cfd_tunnel. config_src is hardcoded
+        to "cloudflare" (Decision #9) — never a caller-supplied field, since
+        this app must control ingress via the API, and Cloudflare's own
+        reference calls "cloudflare" mandatory for that. Returns cf_tunnel_id."""
+        body = await self._write(
+            f"/accounts/{cf_account_id}/cfd_tunnel",
+            "POST",
+            api_token,
+            json={"name": name, "config_src": "cloudflare"},
+        )
+        return body["result"]["id"]
+
+    @integration
+    async def get_tunnel_token(self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str) -> str:
+        """GET /accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}/token. Never
+        cached or persisted by any caller (Decision #8) — fetched live every time."""
+        body = await self._write(
+            f"/accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}/token", "GET", api_token
+        )
+        return body["result"]
+
+    @integration
+    async def list_tunnel_connections(
+        self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str
+    ) -> list[dict]:
+        """GET /accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}/connections.
+        Caller only needs len() of the result — 0 connections means DOWN."""
+        body = await self._write(
+            f"/accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}/connections", "GET", api_token
+        )
+        return body["result"]
+
+    @integration
+    async def get_tunnel_configuration(
+        self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str
+    ) -> list[dict]:
+        """GET /accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}/configurations.
+        Returns the raw ingress array — Decision #2: this is the only source
+        of truth for fields this app doesn't model (path, originRequest)."""
+        body = await self._write(
+            f"/accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}/configurations", "GET", api_token
+        )
+        return body["result"].get("config", {}).get("ingress", [])
+
+    @integration
+    async def put_tunnel_configuration(
+        self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str, ingress: list[dict]
+    ) -> None:
+        """PUT /accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}/configurations.
+        Overwrites the ENTIRE ingress array — no per-rule endpoint exists.
+        Caller must have already reconstructed the full array (Decision #2)."""
+        await self._write(
+            f"/accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}/configurations",
+            "PUT",
+            api_token,
+            json={"config": {"ingress": ingress}},
+        )
+
+    @integration
+    async def delete_tunnel(self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str) -> None:
+        """DELETE /accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}."""
+        await self._write(f"/accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}", "DELETE", api_token)
