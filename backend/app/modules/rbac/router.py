@@ -8,12 +8,11 @@ from fastapi import APIRouter, Depends
 
 from app.core.models import ApiResponse
 from app.core.pagination import Page, PaginationParams, pagination_params
+from app.modules.rbac.constants import RbacActions, RbacResources
 from app.modules.rbac.dependencies import get_create_role, get_delete_role, get_update_role
 from app.modules.rbac.dependencies import get_uow as get_rbac_uow
 from app.modules.rbac.exceptions import RoleNotFound
 from app.modules.rbac.public import (
-    RbacActions,
-    RbacResources,
     get_assign_role,
     get_assign_roles,
     require_any_permission,
