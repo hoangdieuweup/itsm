@@ -10,7 +10,8 @@
   "actions": {
     "create": "Dự án mới",
     "addEnvironment": "Thêm",
-    "addLink": "Thêm"
+    "addLink": "Thêm",
+    "manageDns": "Quản lý DNS"
   },
   "table": {
     "name": "Tên",

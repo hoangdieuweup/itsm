@@ -55,6 +55,7 @@ source_modules =
     app.modules.rbac
     app.modules.users
     app.modules.common
+    app.modules.cloudflare
 forbidden_modules =
     app.modules.projects.repository
     app.modules.projects.models
@@ -91,7 +92,6 @@ forbidden_modules =
     app.modules.cloudflare.models
     app.modules.cloudflare.uow
     app.modules.cloudflare.services
-    app.modules.cloudflare.client
 allow_indirect_imports = True
 
 [importlinter:contract:common-is-a-leaf-module]
@@ -119,6 +119,7 @@ forbidden_modules =
     app.integrations.storage
     app.integrations.dx_core
     app.integrations.mongo
+    app.integrations.cloudflare
 
 [importlinter:contract:integrations-are-leaves]
 name = Integrations never import a domain module
@@ -129,5 +130,6 @@ source_modules =
     app.integrations.storage
     app.integrations.dx_core
     app.integrations.mongo
+    app.integrations.cloudflare
 forbidden_modules =
     app.modules

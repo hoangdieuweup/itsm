@@ -9,12 +9,13 @@ from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.security import JwtCodec
+from app.integrations.cloudflare.dependencies import get_cloudflare_client
+from app.integrations.cloudflare.exceptions import InvalidCloudflareToken
+from app.integrations.cloudflare.schemas import ZoneOption
 from app.main import app
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCookies
 from app.modules.cloudflare.config import cloudflare_settings
-from app.modules.cloudflare.dependencies import get_cloudflare_client
-from app.modules.cloudflare.exceptions import InvalidCloudflareToken
 from app.modules.rbac.models import Permission, Role, RolePermission, UserRole
 from app.modules.users.models import User
 
@@ -31,12 +32,32 @@ class FakeCloudflareClient:
     """Overrides the real CloudflareClient for the duration of one test —
     no test in this file makes a real network call."""
 
-    def __init__(self, raises: Exception | None = None) -> None:
+    def __init__(
+        self,
+        raises: Exception | None = None,
+        zones: list | None = None,
+        create_record_id: str = "rec-fake",
+    ) -> None:
         self._raises = raises
+        self._zones = zones or []
+        self._create_record_id = create_record_id
+        self.deleted_record_ids: list[str] = []
 
     async def test_connection(self, *, cf_account_id: str, api_token: str) -> None:
         if self._raises is not None:
             raise self._raises
+
+    async def list_zones(self, *, cf_account_id: str, api_token: str):
+        return self._zones
+
+    async def create_dns_record(self, **kwargs) -> str:
+        return self._create_record_id
+
+    async def update_dns_record(self, **kwargs) -> None:
+        pass
+
+    async def delete_dns_record(self, *, zone_id, cf_record_id, api_token) -> None:
+        self.deleted_record_ids.append(cf_record_id)
 
 
 async def _login_with_permissions(
@@ -251,5 +272,222 @@ class TestLastOwnerGuardViaRouter:
 
         assert response.status_code == 409
         assert response.json()["error"]["code"] == "cloudflare_last_owner_removal_blocked"
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+
+async def _bind_environment(
+    client: AsyncClient, engine: AsyncEngine, *, cf_client: FakeCloudflareClient
+) -> tuple[str, str, UUID]:
+    """Full setup: login with manage+view, create an account (creator becomes
+    its OWNER), create a project + environment, bind them.
+    Returns (environment_id, account_id, owner_user_id)."""
+    app.dependency_overrides[get_cloudflare_client] = lambda: cf_client
+    owner_id = await _login_with_permissions(
+        client,
+        engine,
+        permissions=[
+            ("cloudflare_account", "manage"),
+            ("cloudflare_account", "view"),
+            ("project", "create"),
+            ("environment", "create"),
+            ("environment", "read"),
+        ],
+    )
+    account_resp = await client.post(
+        "/api/v1/cloudflare-accounts", json={"label": "CF - A", "cfAccountId": "cf-1", "apiToken": "x"}
+    )
+    account_id = account_resp.json()["data"]["id"]
+    project_resp = await client.post("/api/v1/projects", json={"name": "Site"})
+    project_id = project_resp.json()["data"]["id"]
+    env_resp = await client.post(
+        f"/api/v1/projects/{project_id}/environments", json={"type": "dev", "name": "Dev"}
+    )
+    environment_id = env_resp.json()["data"]["id"]
+
+    bind_resp = await client.post(
+        "/api/v1/cloudflare-configs",
+        json={"environmentId": environment_id, "cloudflareAccountId": account_id, "zoneId": "z1"},
+    )
+    assert bind_resp.status_code == 200, bind_resp.text
+    return environment_id, account_id, owner_id
+
+
+class TestCreateCloudflareConfig:
+    async def test_reads_account_id_from_body_not_query_param(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        """Decision #1's regression test: if cloudflare_account_id were
+        accidentally resolved as a query param (the FastAPI misresolution
+        bug the Phase 4 pressure-test caught), this POST — sent with only a
+        JSON body, no query string — would either 422 (FastAPI treating
+        account_id as a required query param) or silently check access
+        against nothing. A 200 with the config's cloudflare_account_id
+        matching the body proves the fix."""
+        cf_client = FakeCloudflareClient(zones=[ZoneOption(id="z1", name="example.com")])
+        app.dependency_overrides[get_cloudflare_client] = lambda: cf_client
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[
+                ("cloudflare_account", "manage"),
+                ("cloudflare_account", "view"),
+                ("project", "create"),
+                ("environment", "create"),
+            ],
+        )
+        account_resp = await client.post(
+            "/api/v1/cloudflare-accounts", json={"label": "CF - A", "cfAccountId": "cf-1", "apiToken": "x"}
+        )
+        account_id = account_resp.json()["data"]["id"]
+        project_resp = await client.post("/api/v1/projects", json={"name": "Site"})
+        project_id = project_resp.json()["data"]["id"]
+        env_resp = await client.post(
+            f"/api/v1/projects/{project_id}/environments", json={"type": "dev", "name": "Dev"}
+        )
+        environment_id = env_resp.json()["data"]["id"]
+
+        response = await client.post(
+            "/api/v1/cloudflare-configs",
+            json={"environmentId": environment_id, "cloudflareAccountId": account_id, "zoneId": "z1"},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["data"]["cloudflareAccountId"] == account_id
+        assert response.json()["data"]["zoneName"] == "example.com"
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+    async def test_rejects_cross_account_zone_spoofing(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        """Decision #5's regression test: a zone_id that only belongs to a
+        DIFFERENT account than the one named in the request body must be
+        rejected — this is what blocks a real cross-account spoofing vector,
+        not just staleness."""
+        cf_client = FakeCloudflareClient(zones=[ZoneOption(id="owned-by-account-a", name="a.com")])
+        app.dependency_overrides[get_cloudflare_client] = lambda: cf_client
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[
+                ("cloudflare_account", "manage"),
+                ("cloudflare_account", "view"),
+                ("project", "create"),
+                ("environment", "create"),
+            ],
+        )
+        account_resp = await client.post(
+            "/api/v1/cloudflare-accounts", json={"label": "CF - A", "cfAccountId": "cf-1", "apiToken": "x"}
+        )
+        account_id = account_resp.json()["data"]["id"]
+        project_resp = await client.post("/api/v1/projects", json={"name": "Site"})
+        project_id = project_resp.json()["data"]["id"]
+        env_resp = await client.post(
+            f"/api/v1/projects/{project_id}/environments", json={"type": "dev", "name": "Dev"}
+        )
+        environment_id = env_resp.json()["data"]["id"]
+
+        response = await client.post(
+            "/api/v1/cloudflare-configs",
+            json={
+                "environmentId": environment_id,
+                "cloudflareAccountId": account_id,
+                "zoneId": "belongs-to-a-different-account",
+            },
+        )
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "cloudflare_zone_not_owned_by_account"
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+
+class TestDnsRecordFullDemoScript:
+    async def test_bind_create_delete_and_permission_boundary(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        """The Phase 4 acceptance demo, verbatim: bind an environment to an
+        account+zone -> create an A record -> row has managed_by=SYSTEM and a
+        real cf_record_id -> delete it -> a sub-EDITOR user gets 403, no
+        partial state either side."""
+        cf_client = FakeCloudflareClient(
+            zones=[ZoneOption(id="z1", name="example.com")], create_record_id="rec-real-123"
+        )
+        environment_id, account_id, owner_id = await _bind_environment(client, engine, cf_client=cf_client)
+
+        create_resp = await client.post(
+            f"/api/v1/environments/{environment_id}/dns-records",
+            json={"recordType": "A", "name": "app", "content": "1.2.3.4", "proxied": True, "ttl": 1},
+        )
+        assert create_resp.status_code == 200, create_resp.text
+        record = create_resp.json()["data"]
+        assert record["managedBy"] == "system"
+        assert record["cfRecordId"] == "rec-real-123"
+
+        delete_resp = await client.delete(f"/api/v1/environments/{environment_id}/dns-records/{record['id']}")
+        assert delete_resp.status_code == 200
+        assert cf_client.deleted_record_ids == ["rec-real-123"]
+
+        list_resp = await client.get(f"/api/v1/environments/{environment_id}/dns-records")
+        assert list_resp.json()["data"] == []
+
+        # A user who is only an EDITOR-below level (VIEWER) on the account
+        # must be blocked from writing DNS records, with no partial state.
+        viewer_id = await _login_with_permissions(
+            client,
+            engine,
+            permissions=[("cloudflare_account", "manage"), ("cloudflare_account", "view")],
+            email="viewer@example.com",
+        )
+        # Switch back to the account's OWNER (its creator) to assign the viewer.
+        owner_token = JwtCodec.encode(
+            {"sub": str(owner_id), "type": "access", "jti": "owner-reassign"},
+            secret=auth_settings.JWT_SECRET,
+            ttl_seconds=3600,
+        )
+        client.cookies.set(AuthCookies.ACCESS_TOKEN, owner_token)
+        assign_resp = await client.post(
+            f"/api/v1/cloudflare-accounts/{account_id}/managers",
+            json={"userId": str(viewer_id), "accessLevel": "viewer"},
+        )
+        assert assign_resp.status_code == 200, assign_resp.text
+
+        viewer_token = JwtCodec.encode(
+            {"sub": str(viewer_id), "type": "access", "jti": "viewer-write-attempt"},
+            secret=auth_settings.JWT_SECRET,
+            ttl_seconds=3600,
+        )
+        client.cookies.set(AuthCookies.ACCESS_TOKEN, viewer_token)
+
+        blocked_resp = await client.post(
+            f"/api/v1/environments/{environment_id}/dns-records",
+            json={"recordType": "A", "name": "blocked", "content": "9.9.9.9", "proxied": False, "ttl": 1},
+        )
+        assert blocked_resp.status_code == 403
+
+        remaining_resp = await client.get(f"/api/v1/environments/{environment_id}/dns-records")
+        assert remaining_resp.status_code == 200
+        assert remaining_resp.json()["data"] == []
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+    async def test_mx_record_requires_priority(self, client: AsyncClient, engine: AsyncEngine) -> None:
+        cf_client = FakeCloudflareClient(zones=[ZoneOption(id="z1", name="example.com")])
+        environment_id, _account_id, _owner_id = await _bind_environment(client, engine, cf_client=cf_client)
+
+        response = await client.post(
+            f"/api/v1/environments/{environment_id}/dns-records",
+            json={
+                "recordType": "MX",
+                "name": "app",
+                "content": "mail.example.com",
+                "proxied": False,
+                "ttl": 1,
+            },
+        )
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "cloudflare_missing_dns_priority"
 
         del app.dependency_overrides[get_cloudflare_client]

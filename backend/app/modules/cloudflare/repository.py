@@ -11,9 +11,19 @@ from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
 from app.core.models import FrozenModel
 from app.integrations.cache.client import CacheClient
-from app.modules.cloudflare.constants import AccessLevel, CloudflareAccountsCacheKeys
-from app.modules.cloudflare.models import CloudflareAccount, CloudflareAccountManager
-from app.modules.cloudflare.schemas import CloudflareAccountRead
+from app.modules.cloudflare.constants import (
+    AccessLevel,
+    CloudflareAccountsCacheKeys,
+    DnsRecordType,
+    ManagedBy,
+)
+from app.modules.cloudflare.models import (
+    CloudflareAccount,
+    CloudflareAccountManager,
+    CloudflareConfig,
+    DnsRecord,
+)
+from app.modules.cloudflare.schemas import CloudflareAccountRead, CloudflareConfigRead, DnsRecordRead
 
 
 class CloudflareAccountManagerRow(FrozenModel):
@@ -264,6 +274,225 @@ class CloudflareAccountManagerRepository(AbstractCloudflareAccountManagerReposit
     async def remove(self, account_id: UUID, user_id: UUID) -> None:
         """Delete a manager row. No-op if it doesn't exist."""
         row = await self._session.get(CloudflareAccountManager, (account_id, user_id))
+        if row is not None:
+            await self._session.delete(row)
+            await self._session.flush()
+
+
+class AbstractCloudflareConfigRepository(AbstractRepository[CloudflareConfigRead, UUID]):
+    """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
+
+    @abstractmethod
+    async def get_by_environment_id(self, environment_id: UUID) -> CloudflareConfigRead | None:
+        """Look up the binding for one environment, or None if unbound."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def create(
+        self, *, environment_id: UUID, cloudflare_account_id: UUID, zone_id: str, zone_name: str
+    ) -> CloudflareConfigRead:
+        """Create a new binding. Caller must confirm no existing binding for this environment first."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update_by_environment_id(
+        self, environment_id: UUID, *, cloudflare_account_id: UUID, zone_id: str, zone_name: str
+    ) -> CloudflareConfigRead:
+        """Rebind an environment to a (possibly different) account + zone."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete_by_environment_id(self, environment_id: UUID) -> None:
+        """Remove an environment's binding."""
+        raise NotImplementedError
+
+
+class CloudflareConfigRepository(AbstractCloudflareConfigRepository):
+    """SQLAlchemy implementation. No cache-aside — Decision #8: low-traffic,
+    high-mutation table, premature caching adds complexity with no measured
+    benefit."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    @database
+    async def get_by_id(self, entity_id: UUID) -> CloudflareConfigRead | None:
+        row = await self._session.get(CloudflareConfig, entity_id)
+        return CloudflareConfigRead.model_validate(row) if row else None
+
+    @database
+    async def list_page(self, limit: int, offset: int) -> tuple[list[CloudflareConfigRead], int]:
+        """Required by AbstractRepository; bindings are looked up per-environment in practice."""
+        rows = await self._session.scalars(
+            select(CloudflareConfig).order_by(CloudflareConfig.id).limit(limit).offset(offset)
+        )
+        items = [CloudflareConfigRead.model_validate(row) for row in rows]
+        total = await self._session.scalar(select(func.count()).select_from(CloudflareConfig))
+        return items, total or 0
+
+    @database
+    async def get_by_environment_id(self, environment_id: UUID) -> CloudflareConfigRead | None:
+        row = await self._session.scalar(
+            select(CloudflareConfig).where(CloudflareConfig.environment_id == environment_id)
+        )
+        return CloudflareConfigRead.model_validate(row) if row else None
+
+    @database
+    async def create(
+        self, *, environment_id: UUID, cloudflare_account_id: UUID, zone_id: str, zone_name: str
+    ) -> CloudflareConfigRead:
+        row = CloudflareConfig(
+            environment_id=environment_id,
+            cloudflare_account_id=cloudflare_account_id,
+            zone_id=zone_id,
+            zone_name=zone_name,
+        )
+        self._session.add(row)
+        await self._session.flush()
+        await self._session.refresh(row)
+        return CloudflareConfigRead.model_validate(row)
+
+    @database
+    async def update_by_environment_id(
+        self, environment_id: UUID, *, cloudflare_account_id: UUID, zone_id: str, zone_name: str
+    ) -> CloudflareConfigRead:
+        row = await self._session.scalar(
+            select(CloudflareConfig).where(CloudflareConfig.environment_id == environment_id)
+        )
+        if row is None:
+            raise ValueError(f"cloudflare config for environment {environment_id} does not exist")
+        row.cloudflare_account_id = cloudflare_account_id
+        row.zone_id = zone_id
+        row.zone_name = zone_name
+        await self._session.flush()
+        await self._session.refresh(row)
+        return CloudflareConfigRead.model_validate(row)
+
+    @database
+    async def delete_by_environment_id(self, environment_id: UUID) -> None:
+        row = await self._session.scalar(
+            select(CloudflareConfig).where(CloudflareConfig.environment_id == environment_id)
+        )
+        if row is not None:
+            await self._session.delete(row)
+            await self._session.flush()
+
+
+class AbstractDnsRecordRepository(AbstractRepository[DnsRecordRead, UUID]):
+    """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
+
+    @abstractmethod
+    async def list_for_environment(self, environment_id: UUID) -> list[DnsRecordRead]:
+        """Return every DNS record belonging to an environment."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def create(
+        self,
+        *,
+        environment_id: UUID,
+        cf_record_id: str,
+        record_type: DnsRecordType,
+        name: str,
+        content: str,
+        priority: int | None,
+        proxied: bool,
+        ttl: int,
+        created_by: UUID | None,
+    ) -> DnsRecordRead:
+        """Create a new DNS record row. Caller must have already confirmed the Cloudflare write succeeded."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update(
+        self, record_id: UUID, *, content: str, priority: int | None, proxied: bool, ttl: int
+    ) -> DnsRecordRead:
+        """Update a record's mutable fields. record_type/name are immutable after creation."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete(self, record_id: UUID) -> None:
+        """Delete a DNS record row."""
+        raise NotImplementedError
+
+
+class DnsRecordRepository(AbstractDnsRecordRepository):
+    """SQLAlchemy implementation. No cache-aside — Decision #8."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    @database
+    async def get_by_id(self, entity_id: UUID) -> DnsRecordRead | None:
+        row = await self._session.get(DnsRecord, entity_id)
+        return DnsRecordRead.model_validate(row) if row else None
+
+    @database
+    async def list_page(self, limit: int, offset: int) -> tuple[list[DnsRecordRead], int]:
+        """Required by AbstractRepository; records are listed per-environment in practice."""
+        rows = await self._session.scalars(
+            select(DnsRecord).order_by(DnsRecord.id).limit(limit).offset(offset)
+        )
+        items = [DnsRecordRead.model_validate(row) for row in rows]
+        total = await self._session.scalar(select(func.count()).select_from(DnsRecord))
+        return items, total or 0
+
+    @database
+    async def list_for_environment(self, environment_id: UUID) -> list[DnsRecordRead]:
+        rows = await self._session.scalars(
+            select(DnsRecord).where(DnsRecord.environment_id == environment_id).order_by(DnsRecord.created_at)
+        )
+        return [DnsRecordRead.model_validate(row) for row in rows]
+
+    @database
+    async def create(
+        self,
+        *,
+        environment_id: UUID,
+        cf_record_id: str,
+        record_type: DnsRecordType,
+        name: str,
+        content: str,
+        priority: int | None,
+        proxied: bool,
+        ttl: int,
+        created_by: UUID | None,
+    ) -> DnsRecordRead:
+        row = DnsRecord(
+            environment_id=environment_id,
+            cf_record_id=cf_record_id,
+            record_type=record_type,
+            name=name,
+            content=content,
+            priority=priority,
+            proxied=proxied,
+            ttl=ttl,
+            managed_by=ManagedBy.SYSTEM,
+            created_by=created_by,
+        )
+        self._session.add(row)
+        await self._session.flush()
+        await self._session.refresh(row)
+        return DnsRecordRead.model_validate(row)
+
+    @database
+    async def update(
+        self, record_id: UUID, *, content: str, priority: int | None, proxied: bool, ttl: int
+    ) -> DnsRecordRead:
+        row = await self._session.get(DnsRecord, record_id)
+        if row is None:
+            raise ValueError(f"dns record {record_id} does not exist")
+        row.content = content
+        row.priority = priority
+        row.proxied = proxied
+        row.ttl = ttl
+        await self._session.flush()
+        await self._session.refresh(row)
+        return DnsRecordRead.model_validate(row)
+
+    @database
+    async def delete(self, record_id: UUID) -> None:
+        row = await self._session.get(DnsRecord, record_id)
         if row is not None:
             await self._session.delete(row)
             await self._session.flush()

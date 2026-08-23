@@ -4,7 +4,8 @@ Everything here is a pure decision: no I/O, no framework, no database.
 """
 
 from app.core.base.markers import rule
-from app.modules.cloudflare.constants import AccessLevel, AccessLevelRanking
+from app.modules.cloudflare.constants import AccessLevel, AccessLevelRanking, DnsRecordType
+from app.modules.cloudflare.exceptions import MissingDnsRecordPriority
 
 
 class CloudflareAccountRules:
@@ -38,3 +39,24 @@ class CloudflareAccountRules:
         them would let a superuser strip the last OWNER and permanently
         escalate routine account admin into a superuser-only workflow."""
         return access_level == AccessLevel.OWNER and remaining_owner_grants <= 1
+
+
+class CloudflareDnsRules:
+    """Pure decision rules for DNS record validation. No I/O."""
+
+    @staticmethod
+    @rule
+    def requires_priority(record_type: DnsRecordType) -> bool:
+        """Only MX records carry a priority field in Cloudflare's API."""
+        return record_type == DnsRecordType.MX
+
+    @staticmethod
+    @rule
+    def normalize_priority(record_type: DnsRecordType, priority: int | None) -> int | None:
+        """Enforce 'required for MX, ignored otherwise' — never string-encode
+        this into content; Cloudflare's API wants it as a sibling field."""
+        if CloudflareDnsRules.requires_priority(record_type):
+            if priority is None:
+                raise MissingDnsRecordPriority()
+            return priority
+        return None

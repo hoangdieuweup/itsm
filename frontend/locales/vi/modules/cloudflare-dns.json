@@ -1,0 +1,62 @@
+{
+  "environmentTypes": {
+    "dev": "Phát triển",
+    "staging": "Staging",
+    "production": "Sản xuất"
+  },
+  "binding": {
+    "title": "Liên kết Cloudflare",
+    "description": "Liên kết môi trường này với một tài khoản và zone Cloudflare để quản lý bản ghi DNS tại đây.",
+    "accountLabel": "Tài khoản Cloudflare",
+    "selectAccount": "Chọn tài khoản",
+    "zoneLabel": "Zone",
+    "selectAccountFirst": "Vui lòng chọn tài khoản trước",
+    "loadingZones": "Đang tải danh sách zone...",
+    "selectZone": "Chọn zone",
+    "zoneHint": "Danh sách zone được lấy trực tiếp từ tài khoản Cloudflare đã chọn.",
+    "bind": "Liên kết",
+    "binding": "Đang liên kết...",
+    "unbind": "Hủy liên kết",
+    "unbindConfirm": {
+      "title": "Hủy liên kết môi trường này?",
+      "description": "Thao tác này sẽ gỡ bỏ liên kết Cloudflare. Hãy xóa toàn bộ bản ghi DNS trước."
+    }
+  },
+  "records": {
+    "title": "Bản ghi DNS",
+    "addRecord": "Thêm bản ghi",
+    "editRecord": "Sửa bản ghi",
+    "createRecord": "Tạo bản ghi",
+    "deleteRecord": "Xóa bản ghi",
+    "empty": "Chưa có bản ghi DNS nào.",
+    "type": "Loại",
+    "typeImmutableHint": "Không thể đổi loại sau khi tạo — hãy xóa và tạo lại.",
+    "name": "Tên",
+    "content": "Nội dung",
+    "priority": "Độ ưu tiên",
+    "priorityHint": "Giá trị nhỏ hơn được ưu tiên trước.",
+    "proxied": "Proxy qua Cloudflare",
+    "ttl": "TTL (giây)",
+    "managedBy": "Quản lý bởi",
+    "system": "Hệ thống",
+    "external": "Bên ngoài",
+    "deleteConfirm": {
+      "title": "Xóa bản ghi DNS này?",
+      "description": "Thao tác này sẽ xóa \"{name}\" khỏi Cloudflare và không thể hoàn tác."
+    }
+  },
+  "form": {
+    "cancel": "Hủy",
+    "save": "Lưu",
+    "saving": "Đang lưu...",
+    "create": "Tạo"
+  },
+  "errors": {
+    "cloudflare_config_not_found": "Môi trường này chưa được liên kết với tài khoản/zone Cloudflare.",
+    "cloudflare_config_already_exists": "Môi trường này đã được liên kết.",
+    "cloudflare_zone_not_owned_by_account": "Zone này không thuộc tài khoản đã chọn.",
+    "cloudflare_missing_dns_priority": "Bản ghi MX yêu cầu giá trị độ ưu tiên.",
+    "cloudflare_dns_sync_failed": "Cloudflare đã được cập nhật nhưng lưu cục bộ thất bại — vui lòng tải lại và kiểm tra.",
+    "cloudflare_dns_records_exist_for_config": "Hãy xóa toàn bộ bản ghi DNS trước khi gỡ liên kết này."
+  }
+}

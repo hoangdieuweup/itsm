@@ -9,24 +9,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.integrations.cache.client import CacheClient
 from app.integrations.cache.dependencies import get_cache
+from app.integrations.cloudflare.client import CloudflareClient
+from app.integrations.cloudflare.dependencies import get_cloudflare_client
 from app.modules.audit.public import AuditApi, get_audit_api
 from app.modules.auth.public import AuthApi, get_auth_api
-from app.modules.cloudflare.client import CloudflareClient
+from app.modules.cloudflare.access import resolve_account_access_grant
 from app.modules.cloudflare.constants import AccessLevel
-from app.modules.cloudflare.exceptions import InsufficientAccountAccess
-from app.modules.cloudflare.rules import CloudflareAccountRules
+from app.modules.cloudflare.exceptions import CloudflareConfigNotFound
 from app.modules.cloudflare.schemas import AccountAccessGrant
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
+from app.modules.cloudflare.services.create_config import CreateCloudflareConfig
+from app.modules.cloudflare.services.create_dns_record import CreateDnsRecord
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
+from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
+from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
+from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
+from app.modules.cloudflare.services.list_zones import ListZones
 from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
+from app.modules.cloudflare.services.update_config import UpdateCloudflareConfig
+from app.modules.cloudflare.services.update_dns_record import UpdateDnsRecord
 from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork, CloudflareUnitOfWork
+from app.modules.projects.public import ProjectsApi, get_projects_api
 from app.modules.rbac.public import RbacApi, get_rbac_api
 from app.modules.users.public import UsersApi, get_users_api
 
@@ -38,19 +48,16 @@ async def get_uow(
     return CloudflareUnitOfWork(session, cache)
 
 
-async def get_cloudflare_client() -> CloudflareClient:
-    """Provide the Cloudflare API client. No transport override in production."""
-    return CloudflareClient()
-
-
 def require_account_access(min_level: AccessLevel):
     """Return a dependency that 403s unless the current user's per-account
     access_level (cloudflare_account_managers) meets min_level, OR they hold
-    the cloudflare_account:manage_all Layer-1 permission. Returns the
-    resolved AccountAccessGrant rather than a bare UserRead — callers that
-    need a stricter, request-body-dependent check (UpdateCloudflareAccount's
-    OWNER-for-token-rotation rule) re-validate the grant themselves instead
-    of this being expressible as a second static Depends factory."""
+    the cloudflare_account:manage_all Layer-1 permission. account_id is read
+    from the path — see require_account_access_for_environment for the
+    environment-keyed variant. Returns the resolved AccountAccessGrant rather
+    than a bare UserRead — callers that need a stricter, request-body-dependent
+    check (UpdateCloudflareAccount's OWNER-for-token-rotation rule) re-validate
+    the grant themselves instead of this being expressible as a second static
+    Depends factory."""
 
     async def check(
         account_id: UUID,
@@ -59,19 +66,35 @@ def require_account_access(min_level: AccessLevel):
         uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
     ) -> AccountAccessGrant:
         user = auth_api.current_user()
-        if await rbac_api.has_permission(user.id, "cloudflare_account", "manage_all"):
-            return AccountAccessGrant(user=user, held_level=None)
+        return await resolve_account_access_grant(account_id, user, rbac_api, uow, min_level)
 
-        manager_row = await uow.account_managers.get_for_user(account_id, user.id)
-        # IMPORTANT: do not funnel "no row" through satisfies_level(None, ...) —
-        # None there means "manage_all bypass, always sufficient" (see rules.py),
-        # which is a DIFFERENT meaning than "no relationship to this account at
-        # all". Guard the no-row case explicitly so the two never collide.
-        if manager_row is None or not CloudflareAccountRules.satisfies_level(
-            manager_row.access_level, min_level
-        ):
-            raise InsufficientAccountAccess()
-        return AccountAccessGrant(user=user, held_level=manager_row.access_level)
+    return check
+
+
+def require_account_access_for_environment(min_level: AccessLevel):
+    """Same check as require_account_access, but keyed by environment_id
+    (read from the path) instead of account_id — resolves the environment's
+    cloudflare_configs row to find which account to check against. Used by
+    every DNS/binding route except POST /cloudflare-configs itself, where no
+    binding exists yet to resolve from (see CreateCloudflareConfig, which
+    calls resolve_account_access_grant directly with the body's account_id —
+    account_id is body-only there, and FastAPI cannot resolve a bare-scalar
+    sub-dependency parameter from the body, only from the path or query
+    string, so no Depends factory can express that check)."""
+
+    async def check(
+        environment_id: UUID,
+        auth_api: AuthApi = Depends(get_auth_api),
+        rbac_api: RbacApi = Depends(get_rbac_api),
+        uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    ) -> AccountAccessGrant:
+        user = auth_api.current_user()
+        config = await uow.configs.get_by_environment_id(environment_id)
+        if config is None:
+            raise CloudflareConfigNotFound()
+        return await resolve_account_access_grant(
+            config.cloudflare_account_id, user, rbac_api, uow, min_level
+        )
 
     return check
 
@@ -149,3 +172,70 @@ async def get_remove_manager(
 ) -> RemoveCloudflareAccountManager:
     """Provide the remove-manager use case."""
     return RemoveCloudflareAccountManager(uow, audit_api)
+
+
+async def get_create_config(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    rbac_api: RbacApi = Depends(get_rbac_api),
+    projects_api: ProjectsApi = Depends(get_projects_api),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> CreateCloudflareConfig:
+    """Provide the create-config use case."""
+    return CreateCloudflareConfig(uow, client, rbac_api, projects_api, audit_api)
+
+
+async def get_update_config(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> UpdateCloudflareConfig:
+    """Provide the update-config use case."""
+    return UpdateCloudflareConfig(uow, client, audit_api)
+
+
+async def get_delete_config(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow), audit_api: AuditApi = Depends(get_audit_api)
+) -> DeleteCloudflareConfig:
+    """Provide the delete-config use case."""
+    return DeleteCloudflareConfig(uow, audit_api)
+
+
+async def get_list_zones(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+) -> ListZones:
+    """Provide the list-zones use case."""
+    return ListZones(uow, client)
+
+
+async def get_list_dns_records(uow: AbstractCloudflareUnitOfWork = Depends(get_uow)) -> ListDnsRecords:
+    """Provide the list-dns-records use case."""
+    return ListDnsRecords(uow)
+
+
+async def get_create_dns_record(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> CreateDnsRecord:
+    """Provide the create-dns-record use case."""
+    return CreateDnsRecord(uow, client, audit_api)
+
+
+async def get_update_dns_record(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> UpdateDnsRecord:
+    """Provide the update-dns-record use case."""
+    return UpdateDnsRecord(uow, client, audit_api)
+
+
+async def get_delete_dns_record(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> DeleteDnsRecord:
+    """Provide the delete-dns-record use case."""
+    return DeleteDnsRecord(uow, client, audit_api)

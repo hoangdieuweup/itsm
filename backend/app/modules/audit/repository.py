@@ -6,7 +6,7 @@ from uuid import UUID
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from app.core.base.markers import database
+from app.core.base.markers import database, helper
 from app.modules.audit.constants import (
     AuditCollections,
     AuditEventType,
@@ -148,6 +148,7 @@ class MongoAuditLogRepository(AbstractAuditLogRepository):
         await self._collection.create_index("expire_at", expireAfterSeconds=0)
 
     @staticmethod
+    @helper
     def _to_entry(doc: dict) -> AuditLogEntry:
         """Map a raw Mongo document to the wire schema."""
         actor_doc = doc["actor"]

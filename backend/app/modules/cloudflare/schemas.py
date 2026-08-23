@@ -4,7 +4,7 @@ from datetime import datetime
 from uuid import UUID
 
 from app.core.models import CustomModel, FrozenModel
-from app.modules.cloudflare.constants import AccessLevel
+from app.modules.cloudflare.constants import AccessLevel, DnsRecordType, ManagedBy
 from app.modules.users.public import UserRead
 
 
@@ -79,3 +79,70 @@ class AccountAccessGrant(FrozenModel):
 
     user: UserRead
     held_level: AccessLevel | None
+
+
+class CloudflareConfigRead(FrozenModel):
+    """One environment's Cloudflare binding."""
+
+    id: UUID
+    environment_id: UUID
+    cloudflare_account_id: UUID
+    zone_id: str
+    zone_name: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class CloudflareConfigCreate(CustomModel):
+    """Request body for POST /cloudflare-configs."""
+
+    environment_id: UUID
+    cloudflare_account_id: UUID
+    zone_id: str
+
+
+class CloudflareConfigUpdate(CustomModel):
+    """Request body for PATCH /environments/{id}/cloudflare-config. Only the
+    zone can change — moving to a different account entirely is delete+recreate."""
+
+    zone_id: str
+
+
+class DnsRecordRead(FrozenModel):
+    """One DNS record."""
+
+    id: UUID
+    environment_id: UUID
+    cf_record_id: str
+    record_type: DnsRecordType
+    name: str
+    content: str
+    priority: int | None = None
+    proxied: bool
+    ttl: int
+    managed_by: ManagedBy
+    created_by: UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class DnsRecordCreate(CustomModel):
+    """Request body for POST /environments/{id}/dns-records. priority is
+    required only for MX — see CloudflareDnsRules.normalize_priority."""
+
+    record_type: DnsRecordType
+    name: str
+    content: str
+    priority: int | None = None
+    proxied: bool = False
+    ttl: int = 1
+
+
+class DnsRecordUpdate(CustomModel):
+    """Request body for PATCH .../dns-records/{id}. record_type is immutable
+    after creation — changing type means delete+recreate."""
+
+    content: str
+    priority: int | None = None
+    proxied: bool = False
+    ttl: int = 1

@@ -10,7 +10,8 @@
   "actions": {
     "create": "New Project",
     "addEnvironment": "Add",
-    "addLink": "Add"
+    "addLink": "Add",
+    "manageDns": "Manage DNS"
   },
   "table": {
     "name": "Name",

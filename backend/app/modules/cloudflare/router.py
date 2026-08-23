@@ -18,22 +18,32 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 
 from app.core.models import ApiResponse
+from app.integrations.cloudflare.schemas import ZoneOption
 from app.modules.cloudflare.constants import AccessLevel
 from app.modules.cloudflare.dependencies import (
     get_assign_manager,
     get_create_account,
+    get_create_config,
+    get_create_dns_record,
     get_delete_account,
+    get_delete_config,
+    get_delete_dns_record,
     get_list_account_managers,
+    get_list_dns_records,
     get_list_visible_accounts,
+    get_list_zones,
     get_remove_manager,
     get_reveal_token,
     get_test_connection,
     get_uow,
     get_update_account,
+    get_update_config,
+    get_update_dns_record,
     get_update_manager,
     require_account_access,
+    require_account_access_for_environment,
 )
-from app.modules.cloudflare.exceptions import CloudflareAccountNotFound
+from app.modules.cloudflare.exceptions import CloudflareAccountNotFound, CloudflareConfigNotFound
 from app.modules.cloudflare.schemas import (
     AccountAccessGrant,
     CloudflareAccountCreate,
@@ -42,17 +52,31 @@ from app.modules.cloudflare.schemas import (
     CloudflareAccountManagerUpdate,
     CloudflareAccountRead,
     CloudflareAccountUpdate,
+    CloudflareConfigCreate,
+    CloudflareConfigRead,
+    CloudflareConfigUpdate,
+    DnsRecordCreate,
+    DnsRecordRead,
+    DnsRecordUpdate,
     TokenRevealResponse,
 )
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
+from app.modules.cloudflare.services.create_config import CreateCloudflareConfig
+from app.modules.cloudflare.services.create_dns_record import CreateDnsRecord
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
+from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
+from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
+from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
+from app.modules.cloudflare.services.list_zones import ListZones
 from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
+from app.modules.cloudflare.services.update_config import UpdateCloudflareConfig
+from app.modules.cloudflare.services.update_dns_record import UpdateDnsRecord
 from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 from app.modules.rbac.public import require_permission
@@ -209,4 +233,133 @@ async def remove_cloudflare_account_manager(
 ) -> ApiResponse[None]:
     """Remove a user's access to this account. Blocked if they are the last OWNER."""
     await use_case.execute(account_id, user_id, actor_id=grant.user.id, actor_email=grant.user.email)
+    return ApiResponse[None](success=True)
+
+
+@router.get("/cloudflare-accounts/{account_id}/zones")
+async def list_zones(
+    account_id: UUID,
+    use_case: ListZones = Depends(get_list_zones),
+    _l1: UserRead = Depends(require_permission("cloudflare_account", "view")),
+    _grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.VIEWER)),
+) -> ApiResponse[list[ZoneOption]]:
+    """List zones available on an account, for the bind-time zone picker."""
+    zones = await use_case.execute(account_id)
+    return ApiResponse[list[ZoneOption]](success=True, data=zones)
+
+
+@router.post("/cloudflare-configs")
+async def create_cloudflare_config(
+    body: CloudflareConfigCreate,
+    use_case: CreateCloudflareConfig = Depends(get_create_config),
+    user: UserRead = Depends(require_permission("cloudflare_account", "manage")),
+) -> ApiResponse[CloudflareConfigRead]:
+    """Bind an environment to an account + zone. No Depends(require_account_access(...))
+    here — cloudflare_account_id is body-only (Decision #1); CreateCloudflareConfig
+    resolves the Layer-2 grant itself via resolve_account_access_grant."""
+    config = await use_case.execute(body.environment_id, body.cloudflare_account_id, body.zone_id, actor=user)
+    return ApiResponse[CloudflareConfigRead](success=True, data=config)
+
+
+@router.get("/environments/{environment_id}/cloudflare-config")
+async def get_cloudflare_config(
+    environment_id: UUID,
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    _l1: UserRead = Depends(require_permission("cloudflare_account", "view")),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
+) -> ApiResponse[CloudflareConfigRead]:
+    """Return one environment's binding, 404 if unbound."""
+    config = await uow.configs.get_by_environment_id(environment_id)
+    if config is None:
+        raise CloudflareConfigNotFound()
+    return ApiResponse[CloudflareConfigRead](success=True, data=config)
+
+
+@router.patch("/environments/{environment_id}/cloudflare-config")
+async def update_cloudflare_config(
+    environment_id: UUID,
+    body: CloudflareConfigUpdate,
+    use_case: UpdateCloudflareConfig = Depends(get_update_config),
+    _l1: UserRead = Depends(require_permission("cloudflare_account", "manage")),
+    grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+) -> ApiResponse[CloudflareConfigRead]:
+    """Rebind an environment to a different zone on the same account."""
+    config = await use_case.execute(
+        environment_id, body.zone_id, actor_id=grant.user.id, actor_email=grant.user.email
+    )
+    return ApiResponse[CloudflareConfigRead](success=True, data=config)
+
+
+@router.delete("/environments/{environment_id}/cloudflare-config")
+async def delete_cloudflare_config(
+    environment_id: UUID,
+    use_case: DeleteCloudflareConfig = Depends(get_delete_config),
+    _l1: UserRead = Depends(require_permission("cloudflare_account", "manage")),
+    grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+) -> ApiResponse[None]:
+    """Remove an environment's binding. Blocked while DNS records still exist."""
+    await use_case.execute(environment_id, actor_id=grant.user.id, actor_email=grant.user.email)
+    return ApiResponse[None](success=True)
+
+
+@router.get("/environments/{environment_id}/dns-records")
+async def list_environment_dns_records(
+    environment_id: UUID,
+    use_case: ListDnsRecords = Depends(get_list_dns_records),
+    _l1: UserRead = Depends(require_permission("cloudflare_account", "view")),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
+) -> ApiResponse[list[DnsRecordRead]]:
+    """List an environment's DNS records."""
+    records = await use_case.execute(environment_id)
+    return ApiResponse[list[DnsRecordRead]](success=True, data=records)
+
+
+@router.post("/environments/{environment_id}/dns-records")
+async def create_environment_dns_record(
+    environment_id: UUID,
+    body: DnsRecordCreate,
+    use_case: CreateDnsRecord = Depends(get_create_dns_record),
+    user: UserRead = Depends(require_permission("cloudflare_account", "manage")),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+) -> ApiResponse[DnsRecordRead]:
+    """Create a DNS record — Cloudflare must confirm first (Decision #3)."""
+    record = await use_case.execute(
+        environment_id,
+        body.record_type,
+        body.name,
+        body.content,
+        body.priority,
+        body.proxied,
+        body.ttl,
+        actor=user,
+    )
+    return ApiResponse[DnsRecordRead](success=True, data=record)
+
+
+@router.patch("/environments/{environment_id}/dns-records/{record_id}")
+async def update_environment_dns_record(
+    environment_id: UUID,
+    record_id: UUID,
+    body: DnsRecordUpdate,
+    use_case: UpdateDnsRecord = Depends(get_update_dns_record),
+    user: UserRead = Depends(require_permission("cloudflare_account", "manage")),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+) -> ApiResponse[DnsRecordRead]:
+    """Update a DNS record — Cloudflare must confirm first (Decision #3)."""
+    record = await use_case.execute(
+        environment_id, record_id, body.content, body.priority, body.proxied, body.ttl, actor=user
+    )
+    return ApiResponse[DnsRecordRead](success=True, data=record)
+
+
+@router.delete("/environments/{environment_id}/dns-records/{record_id}")
+async def delete_environment_dns_record(
+    environment_id: UUID,
+    record_id: UUID,
+    use_case: DeleteDnsRecord = Depends(get_delete_dns_record),
+    user: UserRead = Depends(require_permission("cloudflare_account", "manage")),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+) -> ApiResponse[None]:
+    """Delete a DNS record — Cloudflare must confirm first (Decision #3)."""
+    await use_case.execute(environment_id, record_id, actor=user)
     return ApiResponse[None](success=True)

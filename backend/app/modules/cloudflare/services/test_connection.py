@@ -5,7 +5,7 @@ from uuid import UUID
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
 from app.core.crypto import FernetCodec
-from app.modules.cloudflare.client import CloudflareClient
+from app.integrations.cloudflare.client import CloudflareClient
 from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.exceptions import CloudflareAccountNotFound
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
@@ -27,5 +27,7 @@ class TestCloudflareAccountConnection(AbstractUseCase):
         if account is None:
             raise CloudflareAccountNotFound()
         ciphertext = await self._uow.accounts.get_token_ciphertext(account_id)
+        if ciphertext is None:
+            raise CloudflareAccountNotFound()
         plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
         await self._client.test_connection(cf_account_id=account.cf_account_id, api_token=plaintext)

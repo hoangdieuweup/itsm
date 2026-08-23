@@ -1,7 +1,10 @@
 """Unit tests for app.modules.cloudflare.rules — pure functions, no I/O."""
 
-from app.modules.cloudflare.constants import AccessLevel
-from app.modules.cloudflare.rules import CloudflareAccountRules
+import pytest
+
+from app.modules.cloudflare.constants import AccessLevel, DnsRecordType
+from app.modules.cloudflare.exceptions import MissingDnsRecordPriority
+from app.modules.cloudflare.rules import CloudflareAccountRules, CloudflareDnsRules
 
 
 class TestSatisfiesLevel:
@@ -36,3 +39,26 @@ class TestBlocksLastOwnerRemoval:
 
     def test_allows_removing_a_non_owner(self) -> None:
         assert CloudflareAccountRules.blocks_last_owner_removal(AccessLevel.EDITOR, 1) is False
+
+
+class TestRequiresPriority:
+    def test_mx_requires_priority(self) -> None:
+        assert CloudflareDnsRules.requires_priority(DnsRecordType.MX) is True
+
+    def test_a_record_does_not_require_priority(self) -> None:
+        assert CloudflareDnsRules.requires_priority(DnsRecordType.A) is False
+
+
+class TestNormalizePriority:
+    def test_mx_with_priority_keeps_it(self) -> None:
+        assert CloudflareDnsRules.normalize_priority(DnsRecordType.MX, 10) == 10
+
+    def test_mx_without_priority_raises(self) -> None:
+        with pytest.raises(MissingDnsRecordPriority):
+            CloudflareDnsRules.normalize_priority(DnsRecordType.MX, None)
+
+    def test_non_mx_with_priority_is_forced_to_none(self) -> None:
+        assert CloudflareDnsRules.normalize_priority(DnsRecordType.CNAME, 10) is None
+
+    def test_non_mx_without_priority_stays_none(self) -> None:
+        assert CloudflareDnsRules.normalize_priority(DnsRecordType.A, None) is None
