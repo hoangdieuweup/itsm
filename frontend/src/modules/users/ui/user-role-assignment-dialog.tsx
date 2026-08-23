@@ -2,8 +2,9 @@
 
 import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { X, Shield, AlertCircle, Check, Lock } from "lucide-react";
+import { Shield, Check, Lock } from "lucide-react";
 import { Button } from "@/shared/ui/button";
+import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useCan } from "@/entities/permission";
 import type { User } from "@/entities/user";
@@ -28,16 +29,7 @@ export function UserRoleAssignmentDialog({
 }: UserRoleAssignmentDialogProps) {
   if (!isOpen || !user) return null;
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in-0"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="user-role-assignment-title"
-    >
-      <UserRoleAssignmentInner key={`user-roles-${user.id}`} user={user} onClose={onClose} />
-    </div>
-  );
+  return <UserRoleAssignmentInner key={`user-roles-${user.id}`} user={user} onClose={onClose} />;
 }
 
 function UserRoleAssignmentInner({
@@ -125,45 +117,22 @@ function UserRoleAssignmentInner({
   };
 
   return (
-    <div className="relative flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-border/80 bg-card text-card-foreground shadow-2xl animate-in zoom-in-95 duration-150">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border/60 px-6 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex size-9 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
-            <Shield className="size-5" />
-          </div>
-          <div>
-            <h2 id="user-role-assignment-title" className="text-lg font-semibold tracking-tight text-foreground">
-              {t("actions.assignRolesDialogTitle")}
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              {user.name} ({user.email})
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={assignRoles.isPending}
-          className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="Close dialog"
-        >
-          <X className="size-5" />
-        </button>
-      </div>
-
+    <Dialog
+      icon={Shield}
+      title={t("actions.assignRolesDialogTitle")}
+      onClose={onClose}
+      closeLabel="Close dialog"
+      size="lg"
+      disableClose={assignRoles.isPending}
+    >
       {/* Body */}
       <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
           {/* Error Banner */}
           {(errorMessage || rolesFetchError) && (
-            <div
-              role="alert"
-              className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs font-medium text-destructive"
-            >
-              <AlertCircle className="size-4 shrink-0" />
-              <span>{errorMessage || (rolesFetchError ? getErrorMessage(rolesFetchError) : "")}</span>
-            </div>
+            <DialogErrorAlert
+              message={errorMessage || (rolesFetchError ? getErrorMessage(rolesFetchError) : "")}
+            />
           )}
 
           {/* Protected Admin Notice */}
@@ -265,6 +234,6 @@ function UserRoleAssignmentInner({
           </Button>
         </div>
       </form>
-    </div>
+    </Dialog>
   );
 }

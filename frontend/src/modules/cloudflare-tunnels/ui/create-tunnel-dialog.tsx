@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { X } from "lucide-react";
+import { Waypoints } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
+import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useCreateTunnel } from "../hooks/use-tunnels";
 
@@ -27,28 +28,13 @@ export function CreateTunnelDialog({ environmentId, onClose }: { environmentId: 
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in-0"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="create-tunnel-title"
+    <Dialog
+      icon={Waypoints}
+      title={t("createDialog.title")}
+      onClose={onClose}
+      closeLabel={t("createDialog.cancel")}
     >
-      <div className="w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-lg animate-in zoom-in-95">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 id="create-tunnel-title" className="text-lg font-semibold">
-            {t("createDialog.title")}
-          </h2>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onClose}
-            aria-label={t("createDialog.cancel")}
-            className="focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            <X className="size-4" aria-hidden="true" />
-          </Button>
-        </div>
-
+      <div className="overflow-y-auto p-6">
         {createdToken ? (
           <div className="flex flex-col gap-3">
             <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
@@ -62,11 +48,7 @@ export function CreateTunnelDialog({ environmentId, onClose }: { environmentId: 
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            {errorMessage && (
-              <div role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {errorMessage}
-              </div>
-            )}
+            {errorMessage && <DialogErrorAlert message={errorMessage} />}
 
             <div className="space-y-1.5">
               <Label htmlFor="tunnel-name">{t("createDialog.nameLabel")}</Label>
@@ -90,6 +72,6 @@ export function CreateTunnelDialog({ environmentId, onClose }: { environmentId: 
           </form>
         )}
       </div>
-    </div>
+    </Dialog>
   );
 }
