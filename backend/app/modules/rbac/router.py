@@ -15,10 +15,11 @@ from app.modules.rbac.dependencies import (
     get_create_role,
     get_delete_role,
     get_update_role,
+    require_any_permission,
+    require_permission,
 )
 from app.modules.rbac.dependencies import get_uow as get_rbac_uow
 from app.modules.rbac.exceptions import RoleNotFound
-from app.modules.rbac.public import require_any_permission, require_permission
 from app.modules.rbac.schemas import (
     PermissionRead,
     RoleAssignment,

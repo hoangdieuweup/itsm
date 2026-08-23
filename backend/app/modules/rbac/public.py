@@ -7,16 +7,13 @@ from uuid import UUID
 from fastapi import Depends
 
 from app.core.base.markers import facade
-from app.modules.auth.public import AuthApi, get_auth_api
 from app.modules.rbac.constants import RbacActions, RbacDefaults, RbacResources
-from app.modules.rbac.dependencies import get_uow
-from app.modules.rbac.exceptions import PermissionDenied
+from app.modules.rbac.dependencies import get_uow, require_any_permission, require_permission
 from app.modules.rbac.models import Permission, Role, UserRole
 from app.modules.rbac.rules import RbacRules
 from app.modules.rbac.schemas import RoleSummary
 from app.modules.rbac.services.assign_default_role import AssignDefaultRole
 from app.modules.rbac.uow import AbstractRbacUnitOfWork
-from app.modules.users.public import UserRead
 
 __all__ = [
     "Permission",
@@ -86,38 +83,3 @@ class RbacApi:
 async def get_rbac_api(uow: AbstractRbacUnitOfWork = Depends(get_uow)) -> RbacApi:
     """Provide the facade to other modules."""
     return RbacApi(uow)
-
-
-def require_permission(resource: str, action: str):
-    """Return a dependency that 403s unless the current user's role grants
-    resource.action. Routes ask 'can this user do X,' never 'does this user
-    have role Y' — see references/rbac.md."""
-
-    async def check(
-        auth_api: AuthApi = Depends(get_auth_api),
-        uow: AbstractRbacUnitOfWork = Depends(get_uow),
-    ) -> UserRead:
-        user = auth_api.current_user()
-        if not await uow.user_roles.user_has_permission(user.id, resource, action):
-            raise PermissionDenied(resource=resource, action=action)
-        return user
-
-    return check
-
-
-def require_any_permission(*permissions: tuple[str, str]):
-    """Return a dependency that 403s unless the current user holds AT LEAST ONE
-    of the specified (resource, action) permissions."""
-
-    async def check(
-        auth_api: AuthApi = Depends(get_auth_api),
-        uow: AbstractRbacUnitOfWork = Depends(get_uow),
-    ) -> UserRead:
-        user = auth_api.current_user()
-        for resource, action in permissions:
-            if await uow.user_roles.user_has_permission(user.id, resource, action):
-                return user
-        first_res, first_act = permissions[0] if permissions else ("unknown", "unknown")
-        raise PermissionDenied(resource=first_res, action=first_act)
-
-    return check
