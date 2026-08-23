@@ -1,6 +1,7 @@
 """Integration tests for app.modules.cloudflare.router — real Postgres via
 testcontainers, Cloudflare API calls faked via a dependency override."""
 
+import asyncio
 from uuid import UUID
 
 import pytest
@@ -37,11 +38,21 @@ class FakeCloudflareClient:
         raises: Exception | None = None,
         zones: list | None = None,
         create_record_id: str = "rec-fake",
+        create_tunnel_id: str = "tun-fake",
+        tunnel_token: str = "token-fake",
+        tunnel_connections: list | None = None,
+        tunnel_ingress: list | None = None,
     ) -> None:
         self._raises = raises
         self._zones = zones or []
         self._create_record_id = create_record_id
+        self._create_tunnel_id = create_tunnel_id
+        self._tunnel_token = tunnel_token
+        self._tunnel_connections = tunnel_connections if tunnel_connections is not None else []
+        self._tunnel_ingress = tunnel_ingress if tunnel_ingress is not None else []
         self.deleted_record_ids: list[str] = []
+        self.deleted_tunnel_ids: list[str] = []
+        self.put_calls: list[list[dict]] = []
 
     async def test_connection(self, *, cf_account_id: str, api_token: str) -> None:
         if self._raises is not None:
@@ -58,6 +69,36 @@ class FakeCloudflareClient:
 
     async def delete_dns_record(self, *, zone_id, cf_record_id, api_token) -> None:
         self.deleted_record_ids.append(cf_record_id)
+
+    async def create_tunnel(self, *, cf_account_id: str, api_token: str, name: str) -> str:
+        return self._create_tunnel_id
+
+    async def get_tunnel_token(self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str) -> str:
+        return self._tunnel_token
+
+    async def list_tunnel_connections(self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str) -> list:
+        return self._tunnel_connections
+
+    async def get_tunnel_configuration(
+        self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str
+    ) -> list:
+        # Small synthetic delay so the two concurrent requests in
+        # TestTunnelRouterFullDemoScript's lock-contention test reliably
+        # overlap inside the critical section — without it, a fast fake
+        # response can let the first request fully release the lock before
+        # the second request's own acquire attempt ever runs, making the
+        # race non-deterministic.
+        await asyncio.sleep(0.05)
+        return self._tunnel_ingress
+
+    async def put_tunnel_configuration(
+        self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str, ingress: list[dict]
+    ) -> None:
+        self.put_calls.append(ingress)
+        self._tunnel_ingress = ingress
+
+    async def delete_tunnel(self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str) -> None:
+        self.deleted_tunnel_ids.append(cf_tunnel_id)
 
 
 async def _login_with_permissions(
@@ -489,5 +530,129 @@ class TestDnsRecordFullDemoScript:
 
         assert response.status_code == 422
         assert response.json()["error"]["code"] == "cloudflare_missing_dns_priority"
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+
+class TestTunnelRouterFullDemoScript:
+    async def test_create_reveal_token_add_hostnames_and_delete(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        """The Phase 5 acceptance demo, verbatim: create a tunnel -> token
+        shown once -> add 2 hostnames -> delete the tunnel."""
+        cf_client = FakeCloudflareClient(
+            zones=[ZoneOption(id="z1", name="example.com")], tunnel_token="conn-token-xyz"
+        )
+        environment_id, account_id, owner_id = await _bind_environment(client, engine, cf_client=cf_client)
+
+        create_resp = await client.post(
+            f"/api/v1/environments/{environment_id}/cloudflare-tunnels", json={"name": "prod-tunnel"}
+        )
+        assert create_resp.status_code == 200, create_resp.text
+        body = create_resp.json()["data"]
+        assert body["token"] == "conn-token-xyz"
+        tunnel_id = body["tunnel"]["id"]
+
+        reveal_resp = await client.post(
+            f"/api/v1/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}/reveal-token"
+        )
+        assert reveal_resp.status_code == 200
+        assert reveal_resp.json()["data"]["token"] == "conn-token-xyz"
+
+        add_a = await client.post(
+            f"/api/v1/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}/hostnames",
+            json={"hostname": "a.example.com", "service": "http://x"},
+        )
+        assert add_a.status_code == 200, add_a.text
+        add_b = await client.post(
+            f"/api/v1/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}/hostnames",
+            json={"hostname": "b.example.com", "service": "http://y"},
+        )
+        assert add_b.status_code == 200, add_b.text
+
+        list_resp = await client.get(
+            f"/api/v1/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}/hostnames"
+        )
+        assert len(list_resp.json()["data"]) == 2
+
+        delete_resp = await client.delete(
+            f"/api/v1/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}"
+        )
+        assert delete_resp.status_code == 200
+        assert cf_client.deleted_tunnel_ids == [cf_client._create_tunnel_id]
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+    async def test_lock_contention_second_concurrent_add_hostname_gets_409(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        """Genuine two-request concurrency test — proves the Redis lock (not
+        just sequential logic) actually serializes concurrent editors, per
+        the Phase 5 demo script (Decision #1)."""
+        cf_client = FakeCloudflareClient(zones=[ZoneOption(id="z1", name="example.com")])
+        environment_id, account_id, owner_id = await _bind_environment(client, engine, cf_client=cf_client)
+        create_resp = await client.post(
+            f"/api/v1/environments/{environment_id}/cloudflare-tunnels", json={"name": "prod-tunnel"}
+        )
+        tunnel_id = create_resp.json()["data"]["tunnel"]["id"]
+
+        responses = await asyncio.gather(
+            client.post(
+                f"/api/v1/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}/hostnames",
+                json={"hostname": "a.example.com", "service": "http://x"},
+            ),
+            client.post(
+                f"/api/v1/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}/hostnames",
+                json={"hostname": "b.example.com", "service": "http://y"},
+            ),
+        )
+        statuses = sorted(r.status_code for r in responses)
+        assert statuses == [200, 409]
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+    async def test_sub_editor_gets_403_on_hostname_write(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        """A VIEWER-level manager (Layer-2 below EDITOR) must be blocked from
+        writing a hostname, mirroring TestDnsRecordFullDemoScript's own
+        permission-boundary assertion for DNS records."""
+        cf_client = FakeCloudflareClient(zones=[ZoneOption(id="z1", name="example.com")])
+        environment_id, account_id, owner_id = await _bind_environment(client, engine, cf_client=cf_client)
+        create_resp = await client.post(
+            f"/api/v1/environments/{environment_id}/cloudflare-tunnels", json={"name": "prod-tunnel"}
+        )
+        tunnel_id = create_resp.json()["data"]["tunnel"]["id"]
+
+        viewer_id = await _login_with_permissions(
+            client,
+            engine,
+            permissions=[("cloudflare_account", "manage"), ("cloudflare_account", "view")],
+            email="viewer@example.com",
+        )
+        owner_token = JwtCodec.encode(
+            {"sub": str(owner_id), "type": "access", "jti": "owner-reassign-tunnel"},
+            secret=auth_settings.JWT_SECRET,
+            ttl_seconds=3600,
+        )
+        client.cookies.set(AuthCookies.ACCESS_TOKEN, owner_token)
+        assign_resp = await client.post(
+            f"/api/v1/cloudflare-accounts/{account_id}/managers",
+            json={"userId": str(viewer_id), "accessLevel": "viewer"},
+        )
+        assert assign_resp.status_code == 200, assign_resp.text
+
+        viewer_token = JwtCodec.encode(
+            {"sub": str(viewer_id), "type": "access", "jti": "viewer-tunnel-write-attempt"},
+            secret=auth_settings.JWT_SECRET,
+            ttl_seconds=3600,
+        )
+        client.cookies.set(AuthCookies.ACCESS_TOKEN, viewer_token)
+
+        response = await client.post(
+            f"/api/v1/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}/hostnames",
+            json={"hostname": "a.example.com", "service": "http://x"},
+        )
+        assert response.status_code == 403
 
         del app.dependency_overrides[get_cloudflare_client]
