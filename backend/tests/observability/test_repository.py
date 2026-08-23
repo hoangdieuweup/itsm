@@ -66,6 +66,24 @@ class TestLokiConfigRepository:
         repo = LokiConfigRepository(_session)
         assert await repo.get_by_environment_id(uuid4()) is None
 
+    async def test_get_credential_ciphertext_returns_raw_column(self, _session: AsyncSession) -> None:
+        env = await _make_environment(_session)
+        repo = LokiConfigRepository(_session)
+        await repo.create(
+            environment_id=env.id,
+            endpoint_url="http://loki:3100",
+            tenant_id=None,
+            auth_type=LokiAuthType.BEARER,
+            credential="ciphertext-value",
+            default_query="",
+            default_range_minutes=60,
+        )
+        assert await repo.get_credential_ciphertext(env.id) == "ciphertext-value"
+
+    async def test_get_credential_ciphertext_returns_none_when_absent(self, _session: AsyncSession) -> None:
+        repo = LokiConfigRepository(_session)
+        assert await repo.get_credential_ciphertext(uuid4()) is None
+
     async def test_environment_id_is_unique(self, _session: AsyncSession) -> None:
         env = await _make_environment(_session)
         repo = LokiConfigRepository(_session)

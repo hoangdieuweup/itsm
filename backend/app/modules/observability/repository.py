@@ -22,6 +22,14 @@ class AbstractLokiConfigRepository(AbstractRepository[LokiConfigRead, UUID]):
         raise NotImplementedError
 
     @abstractmethod
+    async def get_credential_ciphertext(self, environment_id: UUID) -> str | None:
+        """Return the raw (still-encrypted) credential column, or None if
+        unconfigured or no credential was ever set. Bypasses LokiConfigRead
+        entirely — mirrors CloudflareAccountRepository.get_token_ciphertext,
+        same reasoning: a secret never enters the safe Read schema."""
+        raise NotImplementedError
+
+    @abstractmethod
     async def create(
         self,
         *,
@@ -100,6 +108,11 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
     async def get_by_environment_id(self, environment_id: UUID) -> LokiConfigRead | None:
         row = await self._session.scalar(select(LokiConfig).where(LokiConfig.environment_id == environment_id))
         return _to_read(row) if row else None
+
+    @database
+    async def get_credential_ciphertext(self, environment_id: UUID) -> str | None:
+        row = await self._session.scalar(select(LokiConfig).where(LokiConfig.environment_id == environment_id))
+        return row.credential if row is not None else None
 
     @database
     async def create(
