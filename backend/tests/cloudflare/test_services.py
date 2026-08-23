@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.core.crypto import FernetCodec
+from app.integrations.cache.exceptions import CacheUnavailable
 from app.integrations.cloudflare.exceptions import CloudflareApiUnavailable as CfUnavailable
 from app.integrations.cloudflare.exceptions import InvalidCloudflareToken
 from app.integrations.cloudflare.schemas import ZoneOption
@@ -16,6 +17,7 @@ from app.modules.cloudflare.constants import (
     CloudflareAccountAuditActions,
     DnsRecordType,
     ManagedBy,
+    TunnelStatus,
 )
 from app.modules.cloudflare.exceptions import (
     CloudflareAccountManagerNotFound,
@@ -23,12 +25,16 @@ from app.modules.cloudflare.exceptions import (
     CloudflareConfigAlreadyExists,
     CloudflareConfigNotFound,
     CloudflareEnvironmentNotFound,
+    CloudflareTunnelNotFound,
     DnsRecordNotFound,
     DnsRecordsExistForConfig,
     DnsRecordSyncFailed,
     InsufficientAccountAccess,
     LastOwnerRemovalBlocked,
     MissingDnsRecordPriority,
+    TunnelConfigLocked,
+    TunnelHostnameAlreadyExists,
+    TunnelIngressSyncFailed,
     ZoneNotOwnedByAccount,
 )
 from app.modules.cloudflare.repository import (
@@ -40,26 +46,37 @@ from app.modules.cloudflare.schemas import (
     AccountAccessGrant,
     CloudflareAccountRead,
     CloudflareConfigRead,
+    CloudflareTunnelRead,
     DnsRecordRead,
+    TunnelPublicHostnameRead,
 )
+from app.modules.cloudflare.services.add_tunnel_hostname import AddTunnelHostname
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
 from app.modules.cloudflare.services.create_config import CreateCloudflareConfig
 from app.modules.cloudflare.services.create_dns_record import CreateDnsRecord
+from app.modules.cloudflare.services.create_tunnel import CreateCloudflareTunnel
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
 from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
 from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
+from app.modules.cloudflare.services.delete_tunnel import DeleteCloudflareTunnel
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
 from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
+from app.modules.cloudflare.services.list_tunnel_hostnames import ListTunnelHostnames
+from app.modules.cloudflare.services.list_tunnels import ListTunnels
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
 from app.modules.cloudflare.services.list_zones import ListZones
+from app.modules.cloudflare.services.refresh_tunnel_status import RefreshTunnelStatus
 from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
+from app.modules.cloudflare.services.remove_tunnel_hostname import RemoveTunnelHostname
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
+from app.modules.cloudflare.services.reveal_tunnel_token import RevealCloudflareTunnelToken
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
 from app.modules.cloudflare.services.update_config import UpdateCloudflareConfig
 from app.modules.cloudflare.services.update_dns_record import UpdateDnsRecord
 from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
+from app.modules.cloudflare.services.update_tunnel_hostname import UpdateTunnelHostname
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 from app.modules.users.public import UserRead
 
@@ -234,6 +251,84 @@ class FakeDnsRecordsRepo:
         self._rows.pop(record_id, None)
 
 
+class FakeCloudflareTunnelRepository:
+    def __init__(self) -> None:
+        self._rows: dict[UUID, CloudflareTunnelRead] = {}
+
+    async def get_by_id(self, entity_id: UUID) -> CloudflareTunnelRead | None:
+        return self._rows.get(entity_id)
+
+    async def list_page(self, limit: int, offset: int) -> tuple[list[CloudflareTunnelRead], int]:
+        items = list(self._rows.values())[offset : offset + limit]
+        return items, len(self._rows)
+
+    async def list_for_environment(self, environment_id: UUID) -> list[CloudflareTunnelRead]:
+        return [t for t in self._rows.values() if t.environment_id == environment_id]
+
+    async def create(self, *, environment_id: UUID, cf_tunnel_id: str, name: str) -> CloudflareTunnelRead:
+        tunnel = CloudflareTunnelRead(
+            id=uuid4(),
+            environment_id=environment_id,
+            cf_tunnel_id=cf_tunnel_id,
+            name=name,
+            status=TunnelStatus.UNKNOWN,
+            last_synced_at=None,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        self._rows[tunnel.id] = tunnel
+        return tunnel
+
+    async def update_status(self, tunnel_id: UUID, *, status, last_synced_at) -> CloudflareTunnelRead:
+        existing = self._rows[tunnel_id]
+        updated = existing.model_copy(update={"status": status, "last_synced_at": last_synced_at})
+        self._rows[tunnel_id] = updated
+        return updated
+
+    async def delete(self, tunnel_id: UUID) -> None:
+        self._rows.pop(tunnel_id, None)
+
+
+class FakeTunnelHostnameRepository:
+    def __init__(self) -> None:
+        self._rows: dict[UUID, TunnelPublicHostnameRead] = {}
+
+    async def get_by_id(self, entity_id: UUID) -> TunnelPublicHostnameRead | None:
+        return self._rows.get(entity_id)
+
+    async def list_page(self, limit: int, offset: int) -> tuple[list[TunnelPublicHostnameRead], int]:
+        items = list(self._rows.values())[offset : offset + limit]
+        return items, len(self._rows)
+
+    async def list_for_tunnel(self, tunnel_id: UUID) -> list[TunnelPublicHostnameRead]:
+        return [h for h in self._rows.values() if h.tunnel_id == tunnel_id]
+
+    async def create(
+        self, *, tunnel_id: UUID, hostname: str, service: str, created_by: UUID | None
+    ) -> TunnelPublicHostnameRead:
+        row = TunnelPublicHostnameRead(
+            id=uuid4(),
+            tunnel_id=tunnel_id,
+            hostname=hostname,
+            service=service,
+            managed_by=ManagedBy.SYSTEM,
+            created_by=created_by,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        self._rows[row.id] = row
+        return row
+
+    async def update_service(self, hostname_id: UUID, *, service: str) -> TunnelPublicHostnameRead:
+        existing = self._rows[hostname_id]
+        updated = existing.model_copy(update={"service": service})
+        self._rows[hostname_id] = updated
+        return updated
+
+    async def delete(self, hostname_id: UUID) -> None:
+        self._rows.pop(hostname_id, None)
+
+
 class FakeCloudflareUnitOfWork(AbstractCloudflareUnitOfWork):
     """In-memory unit of work. commit/rollback are no-ops that just count calls."""
 
@@ -242,6 +337,8 @@ class FakeCloudflareUnitOfWork(AbstractCloudflareUnitOfWork):
         self.account_managers = FakeCloudflareAccountManagerRepository()
         self.configs = FakeConfigsRepo()
         self.dns_records = FakeDnsRecordsRepo()
+        self.tunnels = FakeCloudflareTunnelRepository()
+        self.tunnel_hostnames = FakeTunnelHostnameRepository()
         self.commits = 0
         self.rollbacks = 0
         self.stale: list[tuple[str, UUID]] = []
@@ -278,6 +375,73 @@ class FakeClientWithZones(FakeCloudflareClient):
         if self._raises is not None:
             raise self._raises
         return self._zones
+
+
+class FakeCloudflareTunnelClient:
+    """Fakes only the 6 Tunnel methods — the DNS methods aren't needed by
+    these tests, so they're omitted rather than stubbed unused."""
+
+    def __init__(
+        self,
+        create_tunnel_id: str = "tun-fake",
+        token: str = "token-fake",
+        connections: list | None = None,
+        ingress: list | None = None,
+        raises_on_put: Exception | None = None,
+    ) -> None:
+        self._create_tunnel_id = create_tunnel_id
+        self._token = token
+        self._connections = connections if connections is not None else []
+        self._ingress = ingress if ingress is not None else []
+        self._raises_on_put = raises_on_put
+        self.deleted_tunnel_ids: list[str] = []
+        self.put_calls: list[list[dict]] = []
+
+    async def create_tunnel(self, *, cf_account_id: str, api_token: str, name: str) -> str:
+        return self._create_tunnel_id
+
+    async def get_tunnel_token(self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str) -> str:
+        return self._token
+
+    async def list_tunnel_connections(self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str) -> list:
+        return self._connections
+
+    async def get_tunnel_configuration(
+        self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str
+    ) -> list:
+        return self._ingress
+
+    async def put_tunnel_configuration(
+        self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str, ingress: list[dict]
+    ) -> None:
+        self.put_calls.append(ingress)
+        if self._raises_on_put is not None:
+            raise self._raises_on_put
+
+    async def delete_tunnel(self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str) -> None:
+        self.deleted_tunnel_ids.append(cf_tunnel_id)
+
+
+class FakeCacheClient:
+    """Fakes only try_acquire_lock/release_lock — the 3 hostname-mutation
+    services never call any other CacheClient method."""
+
+    def __init__(self, raises: Exception | None = None) -> None:
+        self._locked: set[str] = set()
+        self._raises = raises
+        self.released_keys: list[str] = []
+
+    async def try_acquire_lock(self, key: str, *, ttl: int) -> bool:
+        if self._raises is not None:
+            raise self._raises
+        if key in self._locked:
+            return False
+        self._locked.add(key)
+        return True
+
+    async def release_lock(self, key: str) -> None:
+        self._locked.discard(key)
+        self.released_keys.append(key)
 
 
 class FakeProjectsApi:
@@ -1343,3 +1507,450 @@ class TestDeleteDnsRecord:
             await DeleteDnsRecord(uow, FakeDnsClientForDelete(), FakeAuditApi()).execute(
                 env_id, uuid4(), actor=actor
             )
+
+
+class TestCreateCloudflareTunnel:
+    async def test_creates_tunnel_and_returns_plaintext_token_once(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="acc",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plaintext-token", key=TEST_FERNET_KEY),
+            created_by=None,
+        )
+        config = await uow.configs.create(
+            environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
+        )
+        client = FakeCloudflareTunnelClient(create_tunnel_id="tun-1", token="conn-token-xyz")
+        use_case = CreateCloudflareTunnel(uow, client, FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        tunnel, token = await use_case.execute(config.environment_id, "prod-tunnel", actor=actor)
+
+        assert tunnel.cf_tunnel_id == "tun-1"
+        assert tunnel.status == "unknown"
+        assert token == "conn-token-xyz"
+
+    async def test_raises_config_not_found_when_environment_unbound(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        use_case = CreateCloudflareTunnel(uow, FakeCloudflareTunnelClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(CloudflareConfigNotFound):
+            await use_case.execute(uuid4(), "prod-tunnel", actor=actor)
+
+
+class TestDeleteCloudflareTunnel:
+    async def test_deletes_on_cloudflare_then_locally_no_hostname_guard(self) -> None:
+        """Decision #7: unlike DeleteCloudflareConfig, this does NOT check for
+        existing tunnel_public_hostnames rows — CASCADE handles them."""
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="acc",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            created_by=None,
+        )
+        config = await uow.configs.create(
+            environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
+        )
+        tunnel = await uow.tunnels.create(
+            environment_id=config.environment_id, cf_tunnel_id="tun-1", name="t"
+        )
+        await uow.tunnel_hostnames.create(
+            tunnel_id=tunnel.id, hostname="a.example.com", service="http://x", created_by=None
+        )
+        client = FakeCloudflareTunnelClient()
+        use_case = DeleteCloudflareTunnel(uow, client, FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        await use_case.execute(config.environment_id, tunnel.id, actor=actor)
+
+        assert client.deleted_tunnel_ids == ["tun-1"]
+        assert await uow.tunnels.get_by_id(tunnel.id) is None
+
+    async def test_raises_not_found_for_tunnel_in_different_environment(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="acc",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            created_by=None,
+        )
+        config = await uow.configs.create(
+            environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
+        )
+        other_tunnel = await uow.tunnels.create(environment_id=uuid4(), cf_tunnel_id="tun-x", name="x")
+        use_case = DeleteCloudflareTunnel(uow, FakeCloudflareTunnelClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(CloudflareTunnelNotFound):
+            await use_case.execute(config.environment_id, other_tunnel.id, actor=actor)
+
+
+class TestRevealCloudflareTunnelToken:
+    async def test_refetches_token_live_never_from_storage(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="acc",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            created_by=None,
+        )
+        config = await uow.configs.create(
+            environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
+        )
+        tunnel = await uow.tunnels.create(
+            environment_id=config.environment_id, cf_tunnel_id="tun-1", name="t"
+        )
+        client = FakeCloudflareTunnelClient(token="fresh-token-123")
+        use_case = RevealCloudflareTunnelToken(uow, client, FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        token = await use_case.execute(config.environment_id, tunnel.id, actor=actor)
+
+        assert token == "fresh-token-123"
+
+
+class TestRefreshTunnelStatus:
+    async def test_zero_connections_is_down(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="acc",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            created_by=None,
+        )
+        config = await uow.configs.create(
+            environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
+        )
+        tunnel = await uow.tunnels.create(
+            environment_id=config.environment_id, cf_tunnel_id="tun-1", name="t"
+        )
+        client = FakeCloudflareTunnelClient(connections=[])
+        use_case = RefreshTunnelStatus(uow, client)
+
+        updated = await use_case.execute(config.environment_id, tunnel.id)
+
+        assert updated.status == "down"
+        assert updated.last_synced_at is not None
+
+    async def test_one_or_more_connections_is_healthy(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="acc",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            created_by=None,
+        )
+        config = await uow.configs.create(
+            environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
+        )
+        tunnel = await uow.tunnels.create(
+            environment_id=config.environment_id, cf_tunnel_id="tun-1", name="t"
+        )
+        client = FakeCloudflareTunnelClient(connections=[{"id": "c1"}, {"id": "c2"}])
+        use_case = RefreshTunnelStatus(uow, client)
+
+        updated = await use_case.execute(config.environment_id, tunnel.id)
+
+        assert updated.status == "healthy"
+
+
+class TestListTunnels:
+    async def test_returns_every_tunnel_for_environment(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        environment_id = uuid4()
+        await uow.tunnels.create(environment_id=environment_id, cf_tunnel_id="tun-a", name="a")
+        await uow.tunnels.create(environment_id=environment_id, cf_tunnel_id="tun-b", name="b")
+        use_case = ListTunnels(uow)
+        tunnels = await use_case.execute(environment_id)
+        assert len(tunnels) == 2
+
+
+class TestListTunnelHostnames:
+    async def test_returns_every_hostname_for_tunnel(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        environment_id = uuid4()
+        tunnel = await uow.tunnels.create(environment_id=environment_id, cf_tunnel_id="tun-1", name="t")
+        await uow.tunnel_hostnames.create(
+            tunnel_id=tunnel.id, hostname="a.example.com", service="http://x", created_by=None
+        )
+        use_case = ListTunnelHostnames(uow)
+        hostnames = await use_case.execute(environment_id, tunnel.id)
+        assert len(hostnames) == 1
+
+    async def test_raises_not_found_for_tunnel_in_different_environment(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        tunnel = await uow.tunnels.create(environment_id=uuid4(), cf_tunnel_id="tun-1", name="t")
+        use_case = ListTunnelHostnames(uow)
+        with pytest.raises(CloudflareTunnelNotFound):
+            await use_case.execute(uuid4(), tunnel.id)
+
+
+class TestAddTunnelHostname:
+    async def _setup(self, **client_kwargs):
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="acc",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            created_by=None,
+        )
+        config = await uow.configs.create(
+            environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
+        )
+        tunnel = await uow.tunnels.create(
+            environment_id=config.environment_id, cf_tunnel_id="tun-1", name="t"
+        )
+        client = FakeCloudflareTunnelClient(**client_kwargs)
+        return uow, config, tunnel, client
+
+    async def test_adds_to_empty_ingress(self) -> None:
+        uow, config, tunnel, client = await self._setup(ingress=[])
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        created = await use_case.execute(
+            config.environment_id, tunnel.id, "app.example.com", "http://localhost:8080", actor=actor
+        )
+
+        assert created.hostname == "app.example.com"
+        assert client.put_calls[-1] == [{"hostname": "app.example.com", "service": "http://localhost:8080"}]
+
+    async def test_inserts_before_catch_all_and_preserves_its_unmodeled_fields(self) -> None:
+        catch_all = {"service": "http_status:404", "originRequest": {"noTLSVerify": True}}
+        uow, config, tunnel, client = await self._setup(ingress=[catch_all])
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        await use_case.execute(
+            config.environment_id, tunnel.id, "app.example.com", "http://localhost:8080", actor=actor
+        )
+
+        sent = client.put_calls[-1]
+        assert sent[0] == {"hostname": "app.example.com", "service": "http://localhost:8080"}
+        assert sent[-1] == catch_all
+
+    async def test_preserves_unrelated_existing_rule_unmodeled_fields(self) -> None:
+        existing_rule = {"hostname": "other.example.com", "service": "http://y", "path": "/api/*"}
+        uow, config, tunnel, client = await self._setup(ingress=[existing_rule])
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        await use_case.execute(
+            config.environment_id, tunnel.id, "app.example.com", "http://localhost:8080", actor=actor
+        )
+
+        sent = client.put_calls[-1]
+        assert existing_rule in sent
+
+    async def test_duplicate_hostname_on_same_tunnel_rejected_before_calling_cloudflare(self) -> None:
+        uow, config, tunnel, client = await self._setup(ingress=[])
+        await uow.tunnel_hostnames.create(
+            tunnel_id=tunnel.id, hostname="app.example.com", service="http://old", created_by=None
+        )
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(TunnelHostnameAlreadyExists):
+            await use_case.execute(
+                config.environment_id, tunnel.id, "app.example.com", "http://new", actor=actor
+            )
+        assert client.put_calls == []
+
+    async def test_lock_already_held_raises_config_locked_without_calling_cloudflare(self) -> None:
+        uow, config, tunnel, client = await self._setup(ingress=[])
+        cache = FakeCacheClient()
+        await cache.try_acquire_lock(f"lock:tunnel:{tunnel.id}", ttl=5)
+        use_case = AddTunnelHostname(uow, client, cache, FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(TunnelConfigLocked):
+            await use_case.execute(
+                config.environment_id, tunnel.id, "app.example.com", "http://x", actor=actor
+            )
+        assert client.put_calls == []
+
+    async def test_cache_unavailable_propagates_loudly(self) -> None:
+        uow, config, tunnel, client = await self._setup(ingress=[])
+        cache = FakeCacheClient(raises=CacheUnavailable())
+        use_case = AddTunnelHostname(uow, client, cache, FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(CacheUnavailable):
+            await use_case.execute(
+                config.environment_id, tunnel.id, "app.example.com", "http://x", actor=actor
+            )
+
+    async def test_lock_is_released_after_success(self) -> None:
+        uow, config, tunnel, client = await self._setup(ingress=[])
+        cache = FakeCacheClient()
+        use_case = AddTunnelHostname(uow, client, cache, FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        await use_case.execute(config.environment_id, tunnel.id, "app.example.com", "http://x", actor=actor)
+
+        assert cache.released_keys == [f"lock:tunnel:{tunnel.id}"]
+
+    async def test_local_write_failure_triggers_compensating_put_back_and_raises_sync_failed(self) -> None:
+        starting_ingress = [{"service": "http_status:404"}]
+        uow, config, tunnel, client = await self._setup(ingress=starting_ingress)
+
+        class BrokenHostnameRepo:
+            async def list_for_tunnel(self, tunnel_id):
+                return []
+
+            async def create(self, **kwargs):
+                raise RuntimeError("db exploded")
+
+        uow.tunnel_hostnames = BrokenHostnameRepo()
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(TunnelIngressSyncFailed):
+            await use_case.execute(
+                config.environment_id, tunnel.id, "app.example.com", "http://x", actor=actor
+            )
+
+        assert client.put_calls[0] == [
+            {"hostname": "app.example.com", "service": "http://x"},
+            {"service": "http_status:404"},
+        ]
+        assert client.put_calls[-1] == starting_ingress
+
+
+class TestUpdateTunnelHostname:
+    async def _setup_with_hostname(self, existing_rule_extra: dict | None = None):
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="acc",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            created_by=None,
+        )
+        config = await uow.configs.create(
+            environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
+        )
+        tunnel = await uow.tunnels.create(
+            environment_id=config.environment_id, cf_tunnel_id="tun-1", name="t"
+        )
+        hostname_row = await uow.tunnel_hostnames.create(
+            tunnel_id=tunnel.id, hostname="app.example.com", service="http://old", created_by=None
+        )
+        rule = {"hostname": "app.example.com", "service": "http://old", **(existing_rule_extra or {})}
+        client = FakeCloudflareTunnelClient(ingress=[rule])
+        return uow, config, tunnel, hostname_row, client
+
+    async def test_updates_service_preserving_unmodeled_fields(self) -> None:
+        uow, config, tunnel, hostname_row, client = await self._setup_with_hostname({"path": "/api/*"})
+        use_case = UpdateTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        updated = await use_case.execute(
+            config.environment_id, tunnel.id, hostname_row.id, "http://new", actor=actor
+        )
+
+        assert updated.service == "http://new"
+        sent = client.put_calls[-1]
+        assert sent == [{"hostname": "app.example.com", "service": "http://new", "path": "/api/*"}]
+
+    async def test_lock_already_held_raises_config_locked(self) -> None:
+        uow, config, tunnel, hostname_row, client = await self._setup_with_hostname()
+        cache = FakeCacheClient()
+        await cache.try_acquire_lock(f"lock:tunnel:{tunnel.id}", ttl=5)
+        use_case = UpdateTunnelHostname(uow, client, cache, FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(TunnelConfigLocked):
+            await use_case.execute(
+                config.environment_id, tunnel.id, hostname_row.id, "http://new", actor=actor
+            )
+        assert client.put_calls == []
+
+    async def test_local_write_failure_triggers_compensating_put_back(self) -> None:
+        uow, config, tunnel, hostname_row, client = await self._setup_with_hostname()
+
+        class BrokenHostnameRepo:
+            async def get_by_id(self, hostname_id):
+                return hostname_row
+
+            async def update_service(self, *args, **kwargs):
+                raise RuntimeError("db exploded")
+
+        uow.tunnel_hostnames = BrokenHostnameRepo()
+        use_case = UpdateTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(TunnelIngressSyncFailed):
+            await use_case.execute(
+                config.environment_id, tunnel.id, hostname_row.id, "http://new", actor=actor
+            )
+
+        assert client.put_calls[-1] == [{"hostname": "app.example.com", "service": "http://old"}]
+
+
+class TestRemoveTunnelHostname:
+    async def _setup_with_hostname(self):
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="acc",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            created_by=None,
+        )
+        config = await uow.configs.create(
+            environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
+        )
+        tunnel = await uow.tunnels.create(
+            environment_id=config.environment_id, cf_tunnel_id="tun-1", name="t"
+        )
+        hostname_row = await uow.tunnel_hostnames.create(
+            tunnel_id=tunnel.id, hostname="app.example.com", service="http://x", created_by=None
+        )
+        catch_all = {"service": "http_status:404"}
+        rule = {"hostname": "app.example.com", "service": "http://x"}
+        client = FakeCloudflareTunnelClient(ingress=[rule, catch_all])
+        return uow, config, tunnel, hostname_row, client, catch_all
+
+    async def test_removes_rule_and_preserves_catch_all(self) -> None:
+        uow, config, tunnel, hostname_row, client, catch_all = await self._setup_with_hostname()
+        use_case = RemoveTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        await use_case.execute(config.environment_id, tunnel.id, hostname_row.id, actor=actor)
+
+        assert client.put_calls[-1] == [catch_all]
+        assert await uow.tunnel_hostnames.get_by_id(hostname_row.id) is None
+
+    async def test_lock_already_held_raises_config_locked(self) -> None:
+        uow, config, tunnel, hostname_row, client, _ = await self._setup_with_hostname()
+        cache = FakeCacheClient()
+        await cache.try_acquire_lock(f"lock:tunnel:{tunnel.id}", ttl=5)
+        use_case = RemoveTunnelHostname(uow, client, cache, FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(TunnelConfigLocked):
+            await use_case.execute(config.environment_id, tunnel.id, hostname_row.id, actor=actor)
+        assert client.put_calls == []
+
+    async def test_local_delete_failure_triggers_compensating_put_back(self) -> None:
+        uow, config, tunnel, hostname_row, client, catch_all = await self._setup_with_hostname()
+        starting_ingress = [{"hostname": "app.example.com", "service": "http://x"}, catch_all]
+
+        class BrokenHostnameRepo:
+            async def get_by_id(self, hostname_id):
+                return hostname_row
+
+            async def delete(self, *args, **kwargs):
+                raise RuntimeError("db exploded")
+
+        uow.tunnel_hostnames = BrokenHostnameRepo()
+        use_case = RemoveTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(TunnelIngressSyncFailed):
+            await use_case.execute(config.environment_id, tunnel.id, hostname_row.id, actor=actor)
+
+        assert client.put_calls[0] == [catch_all]
+        assert client.put_calls[-1] == starting_ingress

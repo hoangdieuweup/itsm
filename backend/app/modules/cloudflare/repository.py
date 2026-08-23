@@ -16,14 +16,23 @@ from app.modules.cloudflare.constants import (
     CloudflareAccountsCacheKeys,
     DnsRecordType,
     ManagedBy,
+    TunnelStatus,
 )
 from app.modules.cloudflare.models import (
     CloudflareAccount,
     CloudflareAccountManager,
     CloudflareConfig,
+    CloudflareTunnel,
     DnsRecord,
+    TunnelPublicHostname,
 )
-from app.modules.cloudflare.schemas import CloudflareAccountRead, CloudflareConfigRead, DnsRecordRead
+from app.modules.cloudflare.schemas import (
+    CloudflareAccountRead,
+    CloudflareConfigRead,
+    CloudflareTunnelRead,
+    DnsRecordRead,
+    TunnelPublicHostnameRead,
+)
 
 
 class CloudflareAccountManagerRow(FrozenModel):
@@ -493,6 +502,183 @@ class DnsRecordRepository(AbstractDnsRecordRepository):
     @database
     async def delete(self, record_id: UUID) -> None:
         row = await self._session.get(DnsRecord, record_id)
+        if row is not None:
+            await self._session.delete(row)
+            await self._session.flush()
+
+
+class AbstractCloudflareTunnelRepository(AbstractRepository[CloudflareTunnelRead, UUID]):
+    """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
+
+    @abstractmethod
+    async def list_for_environment(self, environment_id: UUID) -> list[CloudflareTunnelRead]:
+        """Return every tunnel for an environment — one environment may have MANY (1:N)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def create(self, *, environment_id: UUID, cf_tunnel_id: str, name: str) -> CloudflareTunnelRead:
+        """Create a new tunnel row, status defaults to UNKNOWN."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update_status(
+        self, tunnel_id: UUID, *, status: TunnelStatus, last_synced_at: datetime
+    ) -> CloudflareTunnelRead:
+        """Persist a fresh status reading from refresh-status."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete(self, tunnel_id: UUID) -> None:
+        """Delete a tunnel. tunnel_public_hostnames rows cascade at the DB level."""
+        raise NotImplementedError
+
+
+class CloudflareTunnelRepository(AbstractCloudflareTunnelRepository):
+    """SQLAlchemy implementation. No cache-aside — Decision #8's reasoning
+    (low-traffic, frequently-mutated) applies here identically."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    @database
+    async def get_by_id(self, entity_id: UUID) -> CloudflareTunnelRead | None:
+        row = await self._session.get(CloudflareTunnel, entity_id)
+        return CloudflareTunnelRead.model_validate(row) if row else None
+
+    @database
+    async def list_page(self, limit: int, offset: int) -> tuple[list[CloudflareTunnelRead], int]:
+        """Required by AbstractRepository; tunnels are listed per-environment in practice."""
+        rows = await self._session.scalars(
+            select(CloudflareTunnel).order_by(CloudflareTunnel.id).limit(limit).offset(offset)
+        )
+        items = [CloudflareTunnelRead.model_validate(row) for row in rows]
+        total = await self._session.scalar(select(func.count()).select_from(CloudflareTunnel))
+        return items, total or 0
+
+    @database
+    async def list_for_environment(self, environment_id: UUID) -> list[CloudflareTunnelRead]:
+        rows = await self._session.scalars(
+            select(CloudflareTunnel)
+            .where(CloudflareTunnel.environment_id == environment_id)
+            .order_by(CloudflareTunnel.created_at)
+        )
+        return [CloudflareTunnelRead.model_validate(row) for row in rows]
+
+    @database
+    async def create(self, *, environment_id: UUID, cf_tunnel_id: str, name: str) -> CloudflareTunnelRead:
+        row = CloudflareTunnel(environment_id=environment_id, cf_tunnel_id=cf_tunnel_id, name=name)
+        self._session.add(row)
+        await self._session.flush()
+        await self._session.refresh(row)
+        return CloudflareTunnelRead.model_validate(row)
+
+    @database
+    async def update_status(
+        self, tunnel_id: UUID, *, status: TunnelStatus, last_synced_at: datetime
+    ) -> CloudflareTunnelRead:
+        row = await self._session.get(CloudflareTunnel, tunnel_id)
+        if row is None:
+            raise ValueError(f"cloudflare tunnel {tunnel_id} does not exist")
+        row.status = status
+        row.last_synced_at = last_synced_at
+        await self._session.flush()
+        await self._session.refresh(row)
+        return CloudflareTunnelRead.model_validate(row)
+
+    @database
+    async def delete(self, tunnel_id: UUID) -> None:
+        row = await self._session.get(CloudflareTunnel, tunnel_id)
+        if row is not None:
+            await self._session.delete(row)
+            await self._session.flush()
+
+
+class AbstractTunnelHostnameRepository(AbstractRepository[TunnelPublicHostnameRead, UUID]):
+    """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
+
+    @abstractmethod
+    async def list_for_tunnel(self, tunnel_id: UUID) -> list[TunnelPublicHostnameRead]:
+        """Return every hostname published through a tunnel."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def create(
+        self, *, tunnel_id: UUID, hostname: str, service: str, created_by: UUID | None
+    ) -> TunnelPublicHostnameRead:
+        """Create a new hostname row. Caller must have already confirmed the
+        Cloudflare ingress PUT succeeded."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update_service(self, hostname_id: UUID, *, service: str) -> TunnelPublicHostnameRead:
+        """Update a hostname's service target. hostname itself is immutable."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete(self, hostname_id: UUID) -> None:
+        """Delete a hostname row."""
+        raise NotImplementedError
+
+
+class TunnelHostnameRepository(AbstractTunnelHostnameRepository):
+    """SQLAlchemy implementation. No cache-aside — Decision #8."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    @database
+    async def get_by_id(self, entity_id: UUID) -> TunnelPublicHostnameRead | None:
+        row = await self._session.get(TunnelPublicHostname, entity_id)
+        return TunnelPublicHostnameRead.model_validate(row) if row else None
+
+    @database
+    async def list_page(self, limit: int, offset: int) -> tuple[list[TunnelPublicHostnameRead], int]:
+        """Required by AbstractRepository; hostnames are listed per-tunnel in practice."""
+        rows = await self._session.scalars(
+            select(TunnelPublicHostname).order_by(TunnelPublicHostname.id).limit(limit).offset(offset)
+        )
+        items = [TunnelPublicHostnameRead.model_validate(row) for row in rows]
+        total = await self._session.scalar(select(func.count()).select_from(TunnelPublicHostname))
+        return items, total or 0
+
+    @database
+    async def list_for_tunnel(self, tunnel_id: UUID) -> list[TunnelPublicHostnameRead]:
+        rows = await self._session.scalars(
+            select(TunnelPublicHostname)
+            .where(TunnelPublicHostname.tunnel_id == tunnel_id)
+            .order_by(TunnelPublicHostname.created_at)
+        )
+        return [TunnelPublicHostnameRead.model_validate(row) for row in rows]
+
+    @database
+    async def create(
+        self, *, tunnel_id: UUID, hostname: str, service: str, created_by: UUID | None
+    ) -> TunnelPublicHostnameRead:
+        row = TunnelPublicHostname(
+            tunnel_id=tunnel_id,
+            hostname=hostname,
+            service=service,
+            managed_by=ManagedBy.SYSTEM,
+            created_by=created_by,
+        )
+        self._session.add(row)
+        await self._session.flush()
+        await self._session.refresh(row)
+        return TunnelPublicHostnameRead.model_validate(row)
+
+    @database
+    async def update_service(self, hostname_id: UUID, *, service: str) -> TunnelPublicHostnameRead:
+        row = await self._session.get(TunnelPublicHostname, hostname_id)
+        if row is None:
+            raise ValueError(f"tunnel hostname {hostname_id} does not exist")
+        row.service = service
+        await self._session.flush()
+        await self._session.refresh(row)
+        return TunnelPublicHostnameRead.model_validate(row)
+
+    @database
+    async def delete(self, hostname_id: UUID) -> None:
+        row = await self._session.get(TunnelPublicHostname, hostname_id)
         if row is not None:
             await self._session.delete(row)
             await self._session.flush()

@@ -21,25 +21,34 @@ from app.core.models import ApiResponse
 from app.integrations.cloudflare.schemas import ZoneOption
 from app.modules.cloudflare.constants import AccessLevel
 from app.modules.cloudflare.dependencies import (
+    get_add_tunnel_hostname,
     get_assign_manager,
     get_create_account,
     get_create_config,
     get_create_dns_record,
+    get_create_tunnel,
     get_delete_account,
     get_delete_config,
     get_delete_dns_record,
+    get_delete_tunnel,
     get_list_account_managers,
     get_list_dns_records,
+    get_list_tunnel_hostnames,
+    get_list_tunnels,
     get_list_visible_accounts,
     get_list_zones,
+    get_refresh_tunnel_status,
     get_remove_manager,
+    get_remove_tunnel_hostname,
     get_reveal_token,
+    get_reveal_tunnel_token,
     get_test_connection,
     get_uow,
     get_update_account,
     get_update_config,
     get_update_dns_record,
     get_update_manager,
+    get_update_tunnel_hostname,
     require_account_access,
     require_account_access_for_environment,
 )
@@ -55,29 +64,45 @@ from app.modules.cloudflare.schemas import (
     CloudflareConfigCreate,
     CloudflareConfigRead,
     CloudflareConfigUpdate,
+    CloudflareTunnelCreate,
+    CloudflareTunnelCreateResponse,
+    CloudflareTunnelRead,
     DnsRecordCreate,
     DnsRecordRead,
     DnsRecordUpdate,
     TokenRevealResponse,
+    TunnelPublicHostnameCreate,
+    TunnelPublicHostnameRead,
+    TunnelPublicHostnameUpdate,
+    TunnelTokenResponse,
 )
+from app.modules.cloudflare.services.add_tunnel_hostname import AddTunnelHostname
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
 from app.modules.cloudflare.services.create_config import CreateCloudflareConfig
 from app.modules.cloudflare.services.create_dns_record import CreateDnsRecord
+from app.modules.cloudflare.services.create_tunnel import CreateCloudflareTunnel
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
 from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
 from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
+from app.modules.cloudflare.services.delete_tunnel import DeleteCloudflareTunnel
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
 from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
+from app.modules.cloudflare.services.list_tunnel_hostnames import ListTunnelHostnames
+from app.modules.cloudflare.services.list_tunnels import ListTunnels
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
 from app.modules.cloudflare.services.list_zones import ListZones
+from app.modules.cloudflare.services.refresh_tunnel_status import RefreshTunnelStatus
 from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
+from app.modules.cloudflare.services.remove_tunnel_hostname import RemoveTunnelHostname
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
+from app.modules.cloudflare.services.reveal_tunnel_token import RevealCloudflareTunnelToken
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
 from app.modules.cloudflare.services.update_config import UpdateCloudflareConfig
 from app.modules.cloudflare.services.update_dns_record import UpdateDnsRecord
 from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
+from app.modules.cloudflare.services.update_tunnel_hostname import UpdateTunnelHostname
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 from app.modules.rbac.public import require_permission
 from app.modules.users.public import UserRead
@@ -362,4 +387,128 @@ async def delete_environment_dns_record(
 ) -> ApiResponse[None]:
     """Delete a DNS record — Cloudflare must confirm first (Decision #3)."""
     await use_case.execute(environment_id, record_id, actor=user)
+    return ApiResponse[None](success=True)
+
+
+@router.get("/environments/{environment_id}/cloudflare-tunnels")
+async def list_environment_tunnels(
+    environment_id: UUID,
+    use_case: ListTunnels = Depends(get_list_tunnels),
+    _l1: UserRead = Depends(require_permission("cloudflare_account", "view")),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
+) -> ApiResponse[list[CloudflareTunnelRead]]:
+    """List every tunnel bound to an environment (1:N)."""
+    tunnels = await use_case.execute(environment_id)
+    return ApiResponse[list[CloudflareTunnelRead]](success=True, data=tunnels)
+
+
+@router.post("/environments/{environment_id}/cloudflare-tunnels")
+async def create_environment_tunnel(
+    environment_id: UUID,
+    body: CloudflareTunnelCreate,
+    use_case: CreateCloudflareTunnel = Depends(get_create_tunnel),
+    user: UserRead = Depends(require_permission("cloudflare_account", "manage")),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+) -> ApiResponse[CloudflareTunnelCreateResponse]:
+    """Create a tunnel and return its one-time connector token (Decision #8)."""
+    tunnel, token = await use_case.execute(environment_id, body.name, actor=user)
+    return ApiResponse[CloudflareTunnelCreateResponse](
+        success=True, data=CloudflareTunnelCreateResponse(tunnel=tunnel, token=token)
+    )
+
+
+@router.delete("/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}")
+async def delete_environment_tunnel(
+    environment_id: UUID,
+    tunnel_id: UUID,
+    use_case: DeleteCloudflareTunnel = Depends(get_delete_tunnel),
+    user: UserRead = Depends(require_permission("cloudflare_account", "manage")),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+) -> ApiResponse[None]:
+    """Delete a tunnel. Its public hostnames cascade at the DB level (Decision #7)."""
+    await use_case.execute(environment_id, tunnel_id, actor=user)
+    return ApiResponse[None](success=True)
+
+
+@router.post("/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}/reveal-token")
+async def reveal_environment_tunnel_token(
+    environment_id: UUID,
+    tunnel_id: UUID,
+    use_case: RevealCloudflareTunnelToken = Depends(get_reveal_tunnel_token),
+    user: UserRead = Depends(require_permission("cloudflare_account", "manage")),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+) -> ApiResponse[TunnelTokenResponse]:
+    """Re-fetch the connector token live. EDITOR only (Decision #6 — a
+    narrower blast radius than an account's own OWNER-gated reveal-token)."""
+    token = await use_case.execute(environment_id, tunnel_id, actor=user)
+    return ApiResponse[TunnelTokenResponse](success=True, data=TunnelTokenResponse(token=token))
+
+
+@router.post("/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}/refresh-status")
+async def refresh_environment_tunnel_status(
+    environment_id: UUID,
+    tunnel_id: UUID,
+    use_case: RefreshTunnelStatus = Depends(get_refresh_tunnel_status),
+    _l1: UserRead = Depends(require_permission("cloudflare_account", "manage")),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+) -> ApiResponse[CloudflareTunnelRead]:
+    """On-demand status sync (Decision #10 — never automatic)."""
+    tunnel = await use_case.execute(environment_id, tunnel_id)
+    return ApiResponse[CloudflareTunnelRead](success=True, data=tunnel)
+
+
+@router.get("/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}/hostnames")
+async def list_environment_tunnel_hostnames(
+    environment_id: UUID,
+    tunnel_id: UUID,
+    use_case: ListTunnelHostnames = Depends(get_list_tunnel_hostnames),
+    _l1: UserRead = Depends(require_permission("cloudflare_account", "view")),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
+) -> ApiResponse[list[TunnelPublicHostnameRead]]:
+    """List every public hostname published through a tunnel."""
+    hostnames = await use_case.execute(environment_id, tunnel_id)
+    return ApiResponse[list[TunnelPublicHostnameRead]](success=True, data=hostnames)
+
+
+@router.post("/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}/hostnames")
+async def add_environment_tunnel_hostname(
+    environment_id: UUID,
+    tunnel_id: UUID,
+    body: TunnelPublicHostnameCreate,
+    use_case: AddTunnelHostname = Depends(get_add_tunnel_hostname),
+    user: UserRead = Depends(require_permission("cloudflare_account", "manage")),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+) -> ApiResponse[TunnelPublicHostnameRead]:
+    """Add a hostname — Redis-locked GET-modify-PUT (Decisions #1-#5). 409 if
+    another edit is already in flight for this tunnel."""
+    hostname = await use_case.execute(environment_id, tunnel_id, body.hostname, body.service, actor=user)
+    return ApiResponse[TunnelPublicHostnameRead](success=True, data=hostname)
+
+
+@router.patch("/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}/hostnames/{hostname_id}")
+async def update_environment_tunnel_hostname(
+    environment_id: UUID,
+    tunnel_id: UUID,
+    hostname_id: UUID,
+    body: TunnelPublicHostnameUpdate,
+    use_case: UpdateTunnelHostname = Depends(get_update_tunnel_hostname),
+    user: UserRead = Depends(require_permission("cloudflare_account", "manage")),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+) -> ApiResponse[TunnelPublicHostnameRead]:
+    """Update a hostname's service target — same Redis-locked shape."""
+    hostname = await use_case.execute(environment_id, tunnel_id, hostname_id, body.service, actor=user)
+    return ApiResponse[TunnelPublicHostnameRead](success=True, data=hostname)
+
+
+@router.delete("/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}/hostnames/{hostname_id}")
+async def remove_environment_tunnel_hostname(
+    environment_id: UUID,
+    tunnel_id: UUID,
+    hostname_id: UUID,
+    use_case: RemoveTunnelHostname = Depends(get_remove_tunnel_hostname),
+    user: UserRead = Depends(require_permission("cloudflare_account", "manage")),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+) -> ApiResponse[None]:
+    """Remove a hostname — same Redis-locked shape."""
+    await use_case.execute(environment_id, tunnel_id, hostname_id, actor=user)
     return ApiResponse[None](success=True)

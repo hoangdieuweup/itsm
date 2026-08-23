@@ -8,16 +8,18 @@ export default getRequestConfig(async ({ requestLocale }) => {
     ? requested
     : routing.defaultLocale;
 
-  const [common, auth, users, roles, projects, auditLog, cloudflareAccounts, cloudflareDns] = await Promise.all([
-    import(`../../../../locales/${locale}/common.json`),
-    import(`../../../../locales/${locale}/modules/auth.json`),
-    import(`../../../../locales/${locale}/modules/users.json`),
-    import(`../../../../locales/${locale}/modules/roles.json`),
-    import(`../../../../locales/${locale}/modules/projects.json`),
-    import(`../../../../locales/${locale}/modules/audit-log.json`),
-    import(`../../../../locales/${locale}/modules/cloudflare-accounts.json`),
-    import(`../../../../locales/${locale}/modules/cloudflare-dns.json`),
-  ]);
+  const [common, auth, users, roles, projects, auditLog, cloudflareAccounts, cloudflareDns, cloudflareTunnels] =
+    await Promise.all([
+      import(`../../../../locales/${locale}/common.json`),
+      import(`../../../../locales/${locale}/modules/auth.json`),
+      import(`../../../../locales/${locale}/modules/users.json`),
+      import(`../../../../locales/${locale}/modules/roles.json`),
+      import(`../../../../locales/${locale}/modules/projects.json`),
+      import(`../../../../locales/${locale}/modules/audit-log.json`),
+      import(`../../../../locales/${locale}/modules/cloudflare-accounts.json`),
+      import(`../../../../locales/${locale}/modules/cloudflare-dns.json`),
+      import(`../../../../locales/${locale}/modules/cloudflare-tunnels.json`),
+    ]);
 
   return {
     locale,
@@ -30,6 +32,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       auditLog: auditLog.default,
       cloudflareAccounts: cloudflareAccounts.default,
       cloudflareDns: cloudflareDns.default,
+      cloudflareTunnels: cloudflareTunnels.default,
     },
   };
 });

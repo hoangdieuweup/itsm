@@ -4,7 +4,7 @@ from datetime import datetime
 from uuid import UUID
 
 from app.core.models import CustomModel, FrozenModel
-from app.modules.cloudflare.constants import AccessLevel, DnsRecordType, ManagedBy
+from app.modules.cloudflare.constants import AccessLevel, DnsRecordType, ManagedBy, TunnelStatus
 from app.modules.users.public import UserRead
 
 
@@ -146,3 +146,67 @@ class DnsRecordUpdate(CustomModel):
     priority: int | None = None
     proxied: bool = False
     ttl: int = 1
+
+
+class CloudflareTunnelRead(FrozenModel):
+    """One Cloudflare Tunnel."""
+
+    id: UUID
+    environment_id: UUID
+    cf_tunnel_id: str
+    name: str
+    status: TunnelStatus
+    last_synced_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class CloudflareTunnelCreate(CustomModel):
+    """Request body for POST .../cloudflare-tunnels. No config_src field —
+    it's hardcoded to "cloudflare" inside the client (Decision #9)."""
+
+    name: str
+
+
+class TunnelTokenResponse(FrozenModel):
+    """Response body for the create and reveal-token endpoints. Never cached
+    or persisted anywhere (Decision #8)."""
+
+    token: str
+
+
+class CloudflareTunnelCreateResponse(FrozenModel):
+    """Response body for POST .../cloudflare-tunnels — bundles the created
+    tunnel with its one-time connector token (Decision #8: never persisted,
+    shown exactly once here and again only via the reveal-token endpoint)."""
+
+    tunnel: CloudflareTunnelRead
+    token: str
+
+
+class TunnelPublicHostnameRead(FrozenModel):
+    """One public hostname published through a Tunnel."""
+
+    id: UUID
+    tunnel_id: UUID
+    hostname: str
+    service: str
+    managed_by: ManagedBy
+    created_by: UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TunnelPublicHostnameCreate(CustomModel):
+    """Request body for POST .../hostnames."""
+
+    hostname: str
+    service: str
+
+
+class TunnelPublicHostnameUpdate(CustomModel):
+    """Request body for PATCH .../hostnames/{id}. hostname is immutable —
+    changing it means delete+recreate, mirrors DnsRecordUpdate's record_type
+    immutability."""
+
+    service: str

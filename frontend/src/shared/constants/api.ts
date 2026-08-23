@@ -49,5 +49,18 @@ export const API_CONFIG = {
       RECORD_DETAIL: (environmentId: string, recordId: string) =>
         `/environments/${environmentId}/dns-records/${recordId}`,
     },
+    CLOUDFLARE_TUNNELS: {
+      ROOT: (environmentId: string) => `/environments/${environmentId}/cloudflare-tunnels`,
+      DETAIL: (environmentId: string, tunnelId: string) =>
+        `/environments/${environmentId}/cloudflare-tunnels/${tunnelId}`,
+      REVEAL_TOKEN: (environmentId: string, tunnelId: string) =>
+        `/environments/${environmentId}/cloudflare-tunnels/${tunnelId}/reveal-token`,
+      REFRESH_STATUS: (environmentId: string, tunnelId: string) =>
+        `/environments/${environmentId}/cloudflare-tunnels/${tunnelId}/refresh-status`,
+      HOSTNAMES: (environmentId: string, tunnelId: string) =>
+        `/environments/${environmentId}/cloudflare-tunnels/${tunnelId}/hostnames`,
+      HOSTNAME_DETAIL: (environmentId: string, tunnelId: string, hostnameId: string) =>
+        `/environments/${environmentId}/cloudflare-tunnels/${tunnelId}/hostnames/${hostnameId}`,
+    },
   },
 } as const;

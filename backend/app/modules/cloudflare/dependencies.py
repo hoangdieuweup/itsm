@@ -17,24 +17,33 @@ from app.modules.cloudflare.access import resolve_account_access_grant
 from app.modules.cloudflare.constants import AccessLevel
 from app.modules.cloudflare.exceptions import CloudflareConfigNotFound
 from app.modules.cloudflare.schemas import AccountAccessGrant
+from app.modules.cloudflare.services.add_tunnel_hostname import AddTunnelHostname
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
 from app.modules.cloudflare.services.create_config import CreateCloudflareConfig
 from app.modules.cloudflare.services.create_dns_record import CreateDnsRecord
+from app.modules.cloudflare.services.create_tunnel import CreateCloudflareTunnel
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
 from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
 from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
+from app.modules.cloudflare.services.delete_tunnel import DeleteCloudflareTunnel
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
 from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
+from app.modules.cloudflare.services.list_tunnel_hostnames import ListTunnelHostnames
+from app.modules.cloudflare.services.list_tunnels import ListTunnels
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
 from app.modules.cloudflare.services.list_zones import ListZones
+from app.modules.cloudflare.services.refresh_tunnel_status import RefreshTunnelStatus
 from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
+from app.modules.cloudflare.services.remove_tunnel_hostname import RemoveTunnelHostname
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
+from app.modules.cloudflare.services.reveal_tunnel_token import RevealCloudflareTunnelToken
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
 from app.modules.cloudflare.services.update_config import UpdateCloudflareConfig
 from app.modules.cloudflare.services.update_dns_record import UpdateDnsRecord
 from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
+from app.modules.cloudflare.services.update_tunnel_hostname import UpdateTunnelHostname
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork, CloudflareUnitOfWork
 from app.modules.projects.public import ProjectsApi, get_projects_api
 from app.modules.rbac.public import RbacApi, get_rbac_api
@@ -239,3 +248,80 @@ async def get_delete_dns_record(
 ) -> DeleteDnsRecord:
     """Provide the delete-dns-record use case."""
     return DeleteDnsRecord(uow, client, audit_api)
+
+
+async def get_create_tunnel(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> CreateCloudflareTunnel:
+    """Provide the create-tunnel use case."""
+    return CreateCloudflareTunnel(uow, client, audit_api)
+
+
+async def get_delete_tunnel(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> DeleteCloudflareTunnel:
+    """Provide the delete-tunnel use case."""
+    return DeleteCloudflareTunnel(uow, client, audit_api)
+
+
+async def get_reveal_tunnel_token(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> RevealCloudflareTunnelToken:
+    """Provide the reveal-tunnel-token use case."""
+    return RevealCloudflareTunnelToken(uow, client, audit_api)
+
+
+async def get_refresh_tunnel_status(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+) -> RefreshTunnelStatus:
+    """Provide the refresh-tunnel-status use case."""
+    return RefreshTunnelStatus(uow, client)
+
+
+async def get_list_tunnels(uow: AbstractCloudflareUnitOfWork = Depends(get_uow)) -> ListTunnels:
+    """Provide the list-tunnels use case."""
+    return ListTunnels(uow)
+
+
+async def get_list_tunnel_hostnames(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+) -> ListTunnelHostnames:
+    """Provide the list-tunnel-hostnames use case."""
+    return ListTunnelHostnames(uow)
+
+
+async def get_add_tunnel_hostname(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    cache: CacheClient = Depends(get_cache),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> AddTunnelHostname:
+    """Provide the add-tunnel-hostname use case."""
+    return AddTunnelHostname(uow, client, cache, audit_api)
+
+
+async def get_update_tunnel_hostname(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    cache: CacheClient = Depends(get_cache),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> UpdateTunnelHostname:
+    """Provide the update-tunnel-hostname use case."""
+    return UpdateTunnelHostname(uow, client, cache, audit_api)
+
+
+async def get_remove_tunnel_hostname(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+    cache: CacheClient = Depends(get_cache),
+    audit_api: AuditApi = Depends(get_audit_api),
+) -> RemoveTunnelHostname:
+    """Provide the remove-tunnel-hostname use case."""
+    return RemoveTunnelHostname(uow, client, cache, audit_api)

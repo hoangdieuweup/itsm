@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Server, Link2, Globe } from "lucide-react";
+import { Plus, Pencil, Trash2, Server, Link2, Globe, Waypoints } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Link } from "@/shared/lib/i18n/navigation";
@@ -73,6 +73,15 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                   aria-label={t("actions.manageDns")}
                 >
                   <Globe className="size-3.5" />
+                </Link>
+              </Can>
+              <Can I={ACTIONS.VIEW} a={RESOURCES.CLOUDFLARE_ACCOUNT}>
+                <Link
+                  href={`/admin/environments/${env.id}/tunnels`}
+                  className="text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  aria-label={t("actions.manageTunnels")}
+                >
+                  <Waypoints className="size-3.5" />
                 </Link>
               </Can>
               <Can I={ACTIONS.UPDATE} a={RESOURCES.ENVIRONMENT}>

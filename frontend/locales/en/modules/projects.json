@@ -11,7 +11,8 @@
     "create": "New Project",
     "addEnvironment": "Add",
     "addLink": "Add",
-    "manageDns": "Manage DNS"
+    "manageDns": "Manage DNS",
+    "manageTunnels": "Manage Tunnels"
   },
   "table": {
     "name": "Name",

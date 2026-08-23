@@ -8,6 +8,7 @@ truncate-after-test for isolation) but scoped to a raw AsyncSession instead
 of a full HTTP client, since these tests exercise the repository layer directly."""
 
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -17,12 +18,20 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.integrations.cache.client import CacheClient
 from app.modules.cloudflare.constants import DnsRecordType
-from app.modules.cloudflare.models import CloudflareAccount, CloudflareAccountManager, CloudflareConfig
+from app.modules.cloudflare.models import (
+    CloudflareAccount,
+    CloudflareAccountManager,
+    CloudflareConfig,
+    CloudflareTunnel,
+    TunnelPublicHostname,
+)
 from app.modules.cloudflare.models import DnsRecord as DnsRecordModel
 from app.modules.cloudflare.repository import (
     CloudflareAccountRepository,
     CloudflareConfigRepository,
+    CloudflareTunnelRepository,
     DnsRecordRepository,
+    TunnelHostnameRepository,
 )
 from app.modules.projects.models import Environment, Project
 
@@ -40,6 +49,8 @@ async def _session(engine) -> AsyncIterator[AsyncSession]:
         await session.rollback()
 
     async with engine.begin() as conn:
+        await conn.execute(delete(TunnelPublicHostname))
+        await conn.execute(delete(CloudflareTunnel))
         await conn.execute(delete(DnsRecordModel))
         await conn.execute(delete(CloudflareConfig))
         await conn.execute(delete(CloudflareAccountManager))
@@ -189,3 +200,77 @@ class TestDnsRecordRepository:
                 created_by=None,
             )
             await _session.commit()
+
+
+class TestCloudflareTunnelRepository:
+    async def test_create_and_get_by_id(self, _session: AsyncSession) -> None:
+        env = await _make_environment(_session)
+        repo = CloudflareTunnelRepository(_session)
+        created = await repo.create(environment_id=env.id, cf_tunnel_id="tun-1", name="prod-tunnel")
+        assert created.status == "unknown"
+        fetched = await repo.get_by_id(created.id)
+        assert fetched is not None
+        assert fetched.cf_tunnel_id == "tun-1"
+
+    async def test_list_for_environment_supports_many_tunnels(self, _session: AsyncSession) -> None:
+        env = await _make_environment(_session)
+        repo = CloudflareTunnelRepository(_session)
+        await repo.create(environment_id=env.id, cf_tunnel_id="tun-a", name="a")
+        await repo.create(environment_id=env.id, cf_tunnel_id="tun-b", name="b")
+        tunnels = await repo.list_for_environment(env.id)
+        assert len(tunnels) == 2
+
+    async def test_update_status(self, _session: AsyncSession) -> None:
+        env = await _make_environment(_session)
+        repo = CloudflareTunnelRepository(_session)
+        created = await repo.create(environment_id=env.id, cf_tunnel_id="tun-1", name="prod-tunnel")
+        updated = await repo.update_status(created.id, status="healthy", last_synced_at=datetime.now(UTC))
+        assert updated.status == "healthy"
+        assert updated.last_synced_at is not None
+
+    async def test_delete(self, _session: AsyncSession) -> None:
+        env = await _make_environment(_session)
+        repo = CloudflareTunnelRepository(_session)
+        created = await repo.create(environment_id=env.id, cf_tunnel_id="tun-1", name="prod-tunnel")
+        await repo.delete(created.id)
+        assert await repo.get_by_id(created.id) is None
+
+
+class TestTunnelHostnameRepository:
+    async def test_create_and_list_for_tunnel(self, _session: AsyncSession) -> None:
+        env = await _make_environment(_session)
+        tunnel = await CloudflareTunnelRepository(_session).create(
+            environment_id=env.id, cf_tunnel_id="tun-1", name="prod-tunnel"
+        )
+        repo = TunnelHostnameRepository(_session)
+        created = await repo.create(
+            tunnel_id=tunnel.id, hostname="app.example.com", service="http://localhost:8080", created_by=None
+        )
+        assert created.managed_by == "system"
+        hostnames = await repo.list_for_tunnel(tunnel.id)
+        assert len(hostnames) == 1
+        assert hostnames[0].hostname == "app.example.com"
+
+    async def test_update_service(self, _session: AsyncSession) -> None:
+        env = await _make_environment(_session)
+        tunnel = await CloudflareTunnelRepository(_session).create(
+            environment_id=env.id, cf_tunnel_id="tun-1", name="prod-tunnel"
+        )
+        repo = TunnelHostnameRepository(_session)
+        created = await repo.create(
+            tunnel_id=tunnel.id, hostname="app.example.com", service="http://localhost:8080", created_by=None
+        )
+        updated = await repo.update_service(created.id, service="http://localhost:9090")
+        assert updated.service == "http://localhost:9090"
+
+    async def test_delete(self, _session: AsyncSession) -> None:
+        env = await _make_environment(_session)
+        tunnel = await CloudflareTunnelRepository(_session).create(
+            environment_id=env.id, cf_tunnel_id="tun-1", name="prod-tunnel"
+        )
+        repo = TunnelHostnameRepository(_session)
+        created = await repo.create(
+            tunnel_id=tunnel.id, hostname="app.example.com", service="http://localhost:8080", created_by=None
+        )
+        await repo.delete(created.id)
+        assert await repo.get_by_id(created.id) is None

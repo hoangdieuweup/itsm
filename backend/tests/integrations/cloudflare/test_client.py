@@ -1,6 +1,8 @@
 """Unit tests for app.integrations.cloudflare.client — no real network calls,
 a fake httpx transport stands in for Cloudflare's API."""
 
+import json
+
 import httpx
 import pytest
 
@@ -229,3 +231,148 @@ class TestDeleteDnsRecord:
         client = CloudflareClient(transport=httpx.MockTransport(handler))
         with pytest.raises(CloudflareApiUnavailable):
             await client.delete_dns_record(zone_id="zone1", cf_record_id="rec-123", api_token="x")
+
+
+class TestCreateTunnel:
+    async def test_returns_id_and_hardcodes_config_src(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.method == "POST"
+            assert request.url.path == "/client/v4/accounts/acc-1/cfd_tunnel"
+            body = json.loads(request.content)
+            assert body["config_src"] == "cloudflare"
+            assert body["name"] == "my-tunnel"
+            return httpx.Response(200, json={"success": True, "result": {"id": "tun-1"}})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        tunnel_id = await client.create_tunnel(cf_account_id="acc-1", api_token="tok", name="my-tunnel")
+        assert tunnel_id == "tun-1"
+
+    async def test_raises_rejected_on_success_false(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(400, json={"success": False, "errors": [{"message": "bad"}]})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        with pytest.raises(CloudflareDnsOperationRejected):
+            await client.create_tunnel(cf_account_id="acc-1", api_token="tok", name="my-tunnel")
+
+    async def test_raises_unavailable_on_transport_error(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("boom")
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        with pytest.raises(CloudflareApiUnavailable):
+            await client.create_tunnel(cf_account_id="acc-1", api_token="tok", name="my-tunnel")
+
+
+class TestGetTunnelToken:
+    async def test_returns_plaintext_token(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.method == "GET"
+            assert request.url.path == "/client/v4/accounts/acc-1/cfd_tunnel/tun-1/token"
+            return httpx.Response(200, json={"success": True, "result": "eyJ0..."})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        token = await client.get_tunnel_token(cf_account_id="acc-1", cf_tunnel_id="tun-1", api_token="tok")
+        assert token == "eyJ0..."
+
+
+class TestListTunnelConnections:
+    async def test_returns_raw_list(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.method == "GET"
+            assert request.url.path == "/client/v4/accounts/acc-1/cfd_tunnel/tun-1/connections"
+            return httpx.Response(200, json={"success": True, "result": [{"id": "conn-1"}]})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        connections = await client.list_tunnel_connections(
+            cf_account_id="acc-1", cf_tunnel_id="tun-1", api_token="tok"
+        )
+        assert connections == [{"id": "conn-1"}]
+
+    async def test_returns_empty_list_when_down(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"success": True, "result": []})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        connections = await client.list_tunnel_connections(
+            cf_account_id="acc-1", cf_tunnel_id="tun-1", api_token="tok"
+        )
+        assert connections == []
+
+
+class TestGetTunnelConfiguration:
+    async def test_returns_ingress_array(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.method == "GET"
+            assert request.url.path == "/client/v4/accounts/acc-1/cfd_tunnel/tun-1/configurations"
+            return httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "result": {"config": {"ingress": [{"hostname": "a.example.com", "service": "http://x"}]}},
+                },
+            )
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        ingress = await client.get_tunnel_configuration(
+            cf_account_id="acc-1", cf_tunnel_id="tun-1", api_token="tok"
+        )
+        assert ingress == [{"hostname": "a.example.com", "service": "http://x"}]
+
+    async def test_returns_empty_list_for_new_tunnel(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"success": True, "result": {"config": {}}})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        ingress = await client.get_tunnel_configuration(
+            cf_account_id="acc-1", cf_tunnel_id="tun-1", api_token="tok"
+        )
+        assert ingress == []
+
+
+class TestPutTunnelConfiguration:
+    async def test_sends_ingress_array(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.method == "PUT"
+            assert request.url.path == "/client/v4/accounts/acc-1/cfd_tunnel/tun-1/configurations"
+            body = json.loads(request.content)
+            assert body["config"]["ingress"][0]["hostname"] == "a.example.com"
+            assert body["config"]["ingress"][-1] == {"service": "http_status:404"}
+            return httpx.Response(200, json={"success": True, "result": {}})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        await client.put_tunnel_configuration(
+            cf_account_id="acc-1",
+            cf_tunnel_id="tun-1",
+            api_token="tok",
+            ingress=[{"hostname": "a.example.com", "service": "http://x"}, {"service": "http_status:404"}],
+        )
+
+    async def test_raises_rejected_on_success_false(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(400, json={"success": False, "errors": [{"message": "bad"}]})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        with pytest.raises(CloudflareDnsOperationRejected):
+            await client.put_tunnel_configuration(
+                cf_account_id="acc-1", cf_tunnel_id="tun-1", api_token="tok", ingress=[]
+            )
+
+
+class TestDeleteTunnel:
+    async def test_succeeds(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.method == "DELETE"
+            assert request.url.path == "/client/v4/accounts/acc-1/cfd_tunnel/tun-1"
+            return httpx.Response(200, json={"success": True, "result": {}})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        await client.delete_tunnel(cf_account_id="acc-1", cf_tunnel_id="tun-1", api_token="tok")
+
+    async def test_raises_unavailable_on_5xx(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(500, json={"success": False})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        with pytest.raises(CloudflareApiUnavailable):
+            await client.delete_tunnel(cf_account_id="acc-1", cf_tunnel_id="tun-1", api_token="tok")
