@@ -2,6 +2,7 @@
 testcontainers. Mirrors tests/cloudflare/test_router.py's exact helper shape
 (_login_with_permissions, real HTTP project/environment creation)."""
 
+import json
 from uuid import UUID
 
 import pytest
@@ -10,6 +11,9 @@ from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.security import JwtCodec
+from app.integrations.loki.dependencies import get_loki_client
+from app.integrations.loki.schemas import LokiLogEntry
+from app.main import app
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCookies
 from app.modules.observability.config import observability_settings
@@ -263,3 +267,71 @@ class TestRunLogQuery:
             },
         )
         assert response.status_code == 404
+
+
+class TestStreamLogTail:
+    async def test_requires_environment_read_permission(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        environment_id = await _make_environment(client, engine)
+        await _login_with_permissions(client, engine, permissions=[], email="notail@x.com")
+
+        response = await client.get(f"/api/v1/environments/{environment_id}/loki-config/tail?query=%7B%7D")
+        assert response.status_code == 403
+
+    async def test_404s_when_unconfigured(self, client: AsyncClient, engine: AsyncEngine) -> None:
+        environment_id = await _make_environment(client, engine)
+        await _login_with_permissions(
+            client, engine, permissions=[("environment", "read")], email="tailreader@x.com"
+        )
+
+        response = await client.get(f"/api/v1/environments/{environment_id}/loki-config/tail?query=%7B%7D")
+        assert response.status_code == 404
+        assert response.json()["error"]["code"] == "loki_config_not_found"
+
+    async def test_streams_entries_as_sse_events(self, client: AsyncClient, engine: AsyncEngine) -> None:
+        environment_id = await _make_environment(client, engine)
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[("environment", "update"), ("environment", "read")],
+            email="tailadmin@x.com",
+        )
+        await client.post(
+            f"/api/v1/environments/{environment_id}/loki-config",
+            json={
+                "endpointUrl": "http://loki:3100",
+                "tenantId": None,
+                "authType": "none",
+                "credential": None,
+                "defaultQuery": "",
+                "defaultRangeMinutes": 60,
+            },
+        )
+
+        class FakeTailLokiClient:
+            async def tail(self, **kwargs):
+                yield LokiLogEntry(timestamp="1", line="hello", labels={})
+
+        app.dependency_overrides[get_loki_client] = lambda: FakeTailLokiClient()
+
+        try:
+            async with client.stream(
+                "GET", f"/api/v1/environments/{environment_id}/loki-config/tail?query=%7B%7D"
+            ) as response:
+                assert response.status_code == 200
+                assert response.headers["content-type"].startswith("text/event-stream")
+                assert response.headers.get("x-accel-buffering") == "no"
+                body_lines: list[str] = []
+                async for line in response.aiter_lines():
+                    body_lines.append(line)
+                    if len(body_lines) > 3:
+                        break
+        finally:
+            del app.dependency_overrides[get_loki_client]
+
+        data_lines = [line for line in body_lines if line.startswith("data:")]
+        assert len(data_lines) >= 1
+        payload = json.loads(data_lines[0][len("data:") :].strip())
+        assert payload["success"] is True
+        assert payload["data"]["line"] == "hello"
