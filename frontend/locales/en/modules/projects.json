@@ -12,7 +12,8 @@
     "addEnvironment": "Add",
     "addLink": "Add",
     "manageDns": "Manage DNS",
-    "manageTunnels": "Manage Tunnels"
+    "manageTunnels": "Manage Tunnels",
+    "manageLogs": "View Logs"
   },
   "table": {
     "name": "Name",

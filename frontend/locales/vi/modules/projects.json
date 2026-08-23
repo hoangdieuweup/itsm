@@ -12,7 +12,8 @@
     "addEnvironment": "Thêm",
     "addLink": "Thêm",
     "manageDns": "Quản lý DNS",
-    "manageTunnels": "Quản lý Tunnel"
+    "manageTunnels": "Quản lý Tunnel",
+    "manageLogs": "Xem Log"
   },
   "table": {
     "name": "Tên",

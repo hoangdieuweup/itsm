@@ -74,12 +74,28 @@ export async function runLogQuery(environmentId: string, data: LogQueryValues): 
   return logQueryResultSchema.parse(raw).entries;
 }
 
-export async function fetchCloudflareAuditLogs(
+/**
+ * Fetches an environment's Cloudflare Audit Log entries, or null if the
+ * environment has no Cloudflare zone bound (GET returns 404
+ * `cloudflare_config_not_found`, normalized to null — same OrNull pattern
+ * as fetchLokiConfigOrNull). Deliberately does NOT reach into
+ * modules/cloudflare-dns for a separate "is bound" check — that would be a
+ * forbidden module-to-module import; this endpoint's own 404 already tells
+ * us everything we need.
+ */
+export async function fetchCloudflareAuditLogsOrNull(
   environmentId: string,
   params: { since?: string; before?: string },
-): Promise<CloudflareAuditLogEntry[]> {
-  const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_AUDIT_LOGS.ROOT(environmentId), {
-    params,
-  });
-  return cloudflareAuditLogEntrySchema.array().parse(raw);
+): Promise<CloudflareAuditLogEntry[] | null> {
+  try {
+    const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_AUDIT_LOGS.ROOT(environmentId), {
+      params,
+    });
+    return cloudflareAuditLogEntrySchema.array().parse(raw);
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.code === "cloudflare_config_not_found") {
+      return null;
+    }
+    throw error;
+  }
 }
