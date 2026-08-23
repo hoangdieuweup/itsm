@@ -18,6 +18,9 @@ from app.modules.users import (
 from app.modules.rbac import (
     models as rbac_models,  # noqa: F401 -- registers rbac tables on Base.metadata for autogenerate
 )
+from app.modules.observability import (
+    models as observability_models,  # noqa: F401 -- registers loki_configs on Base.metadata for autogenerate
+)
 
 config = context.config
 config.set_main_option("sqlalchemy.url", str(settings.DATABASE_URL))
