@@ -5,9 +5,9 @@ Revises: c1a3f9d2b8e4
 Create Date: 2026-08-22 12:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 revision = 'd7e2a4c9f1b3'
 down_revision = 'c1a3f9d2b8e4'
@@ -66,7 +66,8 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(
-        ['environment_id'], ['environments.id'], name=op.f('dns_records_environment_id_fkey'), ondelete='CASCADE'
+        ['environment_id'], ['environments.id'],
+        name=op.f('dns_records_environment_id_fkey'), ondelete='CASCADE'
     ),
     sa.ForeignKeyConstraint(
         ['created_by'], ['users.id'], name=op.f('dns_records_created_by_fkey'), ondelete='SET NULL'
