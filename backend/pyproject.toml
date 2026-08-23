@@ -21,6 +21,7 @@ dependencies = [
     "motor>=3.7.1",
     "sse-starlette>=3.4.8",
     "websockets>=17.0.1",
+    "aiosmtplib>=5.1.2",
 ]
 
 [dependency-groups]
