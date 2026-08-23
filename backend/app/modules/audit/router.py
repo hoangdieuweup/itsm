@@ -11,7 +11,8 @@ from fastapi import APIRouter, Depends, Query
 from app.core.models import ApiResponse
 from app.core.pagination import Page, PaginationParams, pagination_params
 from app.modules.audit.constants import AuditEventType
-from app.modules.audit.public import AuditApi, AuditLogEntry, get_audit_api
+from app.modules.audit.public import AuditApi, get_audit_api
+from app.modules.audit.schemas import AuditLogEntry
 from app.modules.rbac.public import RbacActions, RbacResources, require_permission
 from app.modules.users.public import UserRead
 

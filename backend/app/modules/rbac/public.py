@@ -15,10 +15,8 @@ from app.modules.rbac.models import Permission, Role, UserRole
 from app.modules.rbac.rules import RbacRules
 from app.modules.rbac.schemas import RoleSummary
 from app.modules.rbac.services.assign_default_role import AssignDefaultRole
-from app.modules.rbac.services.assign_role import AssignRole
-from app.modules.rbac.services.assign_roles import AssignRoles
 from app.modules.rbac.uow import AbstractRbacUnitOfWork
-from app.modules.users.public import UserRead, UsersApi, get_users_api
+from app.modules.users.public import UserRead
 
 __all__ = [
     "Permission",
@@ -29,8 +27,6 @@ __all__ = [
     "RbacActions",
     "RbacApi",
     "get_rbac_api",
-    "get_assign_role",
-    "get_assign_roles",
     "require_permission",
     "require_any_permission",
 ]
@@ -90,24 +86,6 @@ class RbacApi:
 async def get_rbac_api(uow: AbstractRbacUnitOfWork = Depends(get_uow)) -> RbacApi:
     """Provide the facade to other modules."""
     return RbacApi(uow)
-
-
-async def get_assign_role(
-    uow: AbstractRbacUnitOfWork = Depends(get_uow),
-    users_api: UsersApi = Depends(get_users_api),
-) -> AssignRole:
-    """Provide the assign-role use case, wired to users' existence and
-    protected-admin checks."""
-    return AssignRole(uow, users_api.get_user_by_id, users_api.is_protected_admin)
-
-
-async def get_assign_roles(
-    uow: AbstractRbacUnitOfWork = Depends(get_uow),
-    users_api: UsersApi = Depends(get_users_api),
-) -> AssignRoles:
-    """Provide the assign-roles use case, wired to users' existence and
-    protected-admin checks."""
-    return AssignRoles(uow, users_api.get_user_by_id, users_api.is_protected_admin)
 
 
 def require_permission(resource: str, action: str):
