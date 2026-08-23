@@ -49,7 +49,10 @@
     "empty": "Không có dòng log nào cho truy vấn và khoảng thời gian này.",
     "timestamp": "Thời gian",
     "line": "Nội dung",
-    "labels": "Nhãn"
+    "labels": "Nhãn",
+    "live": "Live",
+    "pause": "Tạm dừng",
+    "liveHint": "Khoảng thời gian bị vô hiệu hoá khi đang xem trực tiếp — dòng log mới sẽ tự động xuất hiện."
   },
   "auditLog": {
     "since": "Từ",

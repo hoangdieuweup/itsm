@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { ScrollText, Pencil, Trash2, Play, RefreshCw, AlertTriangle } from "lucide-react";
+import { ScrollText, Pencil, Trash2, Play, RefreshCw, AlertTriangle, Radio, Pause } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -14,6 +14,7 @@ import { useEnvironmentQuery } from "@/entities/environment";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useLokiConfigQuery, useDeleteLokiConfig } from "../hooks/use-loki-config";
 import { useRunLogQuery } from "../hooks/use-log-query";
+import { useLogTail } from "../hooks/use-log-tail";
 import { useCloudflareAuditLogsQuery } from "../hooks/use-cloudflare-audit-logs";
 import type { LogEntry } from "../model/schema";
 import { LokiConfigFormDialog } from "./loki-config-form-dialog";
@@ -66,6 +67,67 @@ function LogResultsTable({ entries }: { entries: LogEntry[] }) {
   );
 }
 
+function TimeRangeInputs({
+  start,
+  end,
+  onStartChange,
+  onEndChange,
+  disabled,
+}: {
+  start: string;
+  end: string;
+  onStartChange: (value: string) => void;
+  onEndChange: (value: string) => void;
+  disabled: boolean;
+}) {
+  const t = useTranslations("logViewer");
+  const describedBy = disabled ? "loki-live-hint" : undefined;
+  return (
+    <>
+      <div className="space-y-1.5">
+        <Label htmlFor="loki-query-start">{t("query.start")}</Label>
+        <Input
+          id="loki-query-start"
+          type="datetime-local"
+          value={start}
+          onChange={(event) => onStartChange(event.target.value)}
+          disabled={disabled}
+          aria-describedby={describedBy}
+          required
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="loki-query-end">{t("query.end")}</Label>
+        <Input
+          id="loki-query-end"
+          type="datetime-local"
+          value={end}
+          onChange={(event) => onEndChange(event.target.value)}
+          disabled={disabled}
+          aria-describedby={describedBy}
+          required
+        />
+      </div>
+    </>
+  );
+}
+
+function LiveToggleButton({ isLive, onStart, onStop }: { isLive: boolean; onStart: () => void; onStop: () => void }) {
+  const t = useTranslations("logViewer");
+  const Icon = isLive ? Pause : Radio;
+  return (
+    <Button
+      type="button"
+      variant={isLive ? "destructive" : "outline"}
+      aria-pressed={isLive}
+      onClick={isLive ? onStop : onStart}
+    >
+      <Icon className="mr-1.5 size-3.5" aria-hidden="true" />
+      {isLive ? t("query.pause") : t("query.live")}
+    </Button>
+  );
+}
+
 function LokiQueryTab({ environmentId, defaultQuery, defaultRangeMinutes }: {
   environmentId: string;
   defaultQuery: string;
@@ -79,6 +141,7 @@ function LokiQueryTab({ environmentId, defaultQuery, defaultRangeMinutes }: {
   const [end, setEnd] = useState(initialRange.end);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const runQuery = useRunLogQuery(environmentId);
+  const tail = useLogTail(environmentId, query);
 
   const handleRun = (event: React.FormEvent) => {
     event.preventDefault();
@@ -88,6 +151,8 @@ function LokiQueryTab({ environmentId, defaultQuery, defaultRangeMinutes }: {
       { onError: (err) => setErrorMessage(getErrorMessage(err)) },
     );
   };
+
+  const displayedEntries = tail.isLive ? tail.entries : runQuery.data;
 
   return (
     <div className="flex flex-col gap-4">
@@ -103,41 +168,40 @@ function LokiQueryTab({ environmentId, defaultQuery, defaultRangeMinutes }: {
           />
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="loki-query-start">{t("query.start")}</Label>
-            <Input
-              id="loki-query-start"
-              type="datetime-local"
-              value={start}
-              onChange={(event) => setStart(event.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="loki-query-end">{t("query.end")}</Label>
-            <Input
-              id="loki-query-end"
-              type="datetime-local"
-              value={end}
-              onChange={(event) => setEnd(event.target.value)}
-              required
-            />
-          </div>
-          <Button type="submit" disabled={runQuery.isPending}>
+          <TimeRangeInputs
+            start={start}
+            end={end}
+            onStartChange={setStart}
+            onEndChange={setEnd}
+            disabled={tail.isLive}
+          />
+          <Button type="submit" disabled={runQuery.isPending || tail.isLive}>
             <Play className="mr-1.5 size-3.5" aria-hidden="true" />
             {runQuery.isPending ? t("query.running") : t("query.run")}
           </Button>
+          <LiveToggleButton isLive={tail.isLive} onStart={tail.start} onStop={tail.stop} />
         </div>
+        {tail.isLive && (
+          <p id="loki-live-hint" className="sr-only">
+            {t("query.liveHint")}
+          </p>
+        )}
       </form>
 
-      {errorMessage && (
-        <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
-          <AlertTriangle className="size-3.5" aria-hidden="true" /> {errorMessage}
+      {tail.isLive && (
+        <p role="status" aria-atomic="true" className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Radio className="size-3 animate-pulse text-primary" aria-hidden="true" /> {t("query.live")}
         </p>
       )}
 
-      {runQuery.isPending && <Skeleton className="h-32 w-full" />}
-      {runQuery.data && <LogResultsTable entries={runQuery.data} />}
+      {(errorMessage ?? tail.error) && (
+        <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
+          <AlertTriangle className="size-3.5" aria-hidden="true" /> {errorMessage ?? tail.error}
+        </p>
+      )}
+
+      {!tail.isLive && runQuery.isPending && <Skeleton className="h-32 w-full" />}
+      {displayedEntries && <LogResultsTable entries={displayedEntries} />}
     </div>
   );
 }

@@ -49,7 +49,10 @@
     "empty": "No log lines for this query and range.",
     "timestamp": "Timestamp",
     "line": "Line",
-    "labels": "Labels"
+    "labels": "Labels",
+    "live": "Go Live",
+    "pause": "Pause",
+    "liveHint": "Time range is disabled while live tailing — new lines stream in as they arrive."
   },
   "auditLog": {
     "since": "Since",
