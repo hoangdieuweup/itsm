@@ -11,7 +11,8 @@
     "create": "Dự án mới",
     "addEnvironment": "Thêm",
     "addLink": "Thêm",
-    "manageDns": "Quản lý DNS"
+    "manageDns": "Quản lý DNS",
+    "manageTunnels": "Quản lý Tunnel"
   },
   "table": {
     "name": "Tên",

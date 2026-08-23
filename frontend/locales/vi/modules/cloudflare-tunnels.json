@@ -1,0 +1,61 @@
+{
+  "title": "Tunnel",
+  "addTunnel": "Thêm Tunnel",
+  "empty": "Chưa có tunnel nào.",
+  "refreshStatus": "Làm mới trạng thái",
+  "revealToken": "Hiện token kết nối",
+  "status": {
+    "healthy": "Hoạt động tốt",
+    "degraded": "Suy giảm",
+    "down": "Ngừng hoạt động",
+    "unknown": "Không xác định"
+  },
+  "tokenRevealed": {
+    "title": "Token kết nối",
+    "hint": "Sao chép ngay bây giờ — sẽ không hiển thị lại. Sử dụng với `cloudflared tunnel run --token <token>`."
+  },
+  "deleteConfirm": {
+    "action": "Xóa tunnel",
+    "title": "Xóa tunnel này?",
+    "description": "Thao tác này sẽ xóa \"{name}\" cùng mọi hostname được công bố qua nó trên Cloudflare."
+  },
+  "createDialog": {
+    "title": "Tạo Tunnel",
+    "nameLabel": "Tên",
+    "cancel": "Hủy",
+    "create": "Tạo",
+    "creating": "Đang tạo...",
+    "done": "Xong"
+  },
+  "hostnames": {
+    "title": "Hostname công khai",
+    "add": "Thêm Hostname",
+    "empty": "Chưa có hostname nào được công bố.",
+    "edit": "Sửa hostname",
+    "remove": "Xóa hostname",
+    "addTitle": "Thêm Hostname",
+    "editTitle": "Sửa Hostname",
+    "hostnameLabel": "Hostname",
+    "serviceLabel": "Service",
+    "cancel": "Hủy",
+    "save": "Lưu",
+    "saving": "Đang lưu...",
+    "deleteConfirm": {
+      "title": "Xóa hostname này?",
+      "description": "\"{hostname}\" sẽ không còn được định tuyến qua tunnel này."
+    }
+  },
+  "environmentTypes": {
+    "dev": "Phát triển",
+    "staging": "Staging",
+    "production": "Sản xuất"
+  },
+  "errors": {
+    "cloudflare_config_not_found": "Môi trường này chưa được liên kết với tài khoản/zone Cloudflare.",
+    "cloudflare_tunnel_not_found": "Không tìm thấy tunnel.",
+    "cloudflare_tunnel_hostname_not_found": "Không tìm thấy hostname.",
+    "cloudflare_tunnel_config_locked": "Có người khác đang chỉnh sửa tunnel này — vui lòng thử lại sau.",
+    "cloudflare_tunnel_hostname_already_exists": "Hostname này đã được công bố trên tunnel này.",
+    "cloudflare_tunnel_ingress_sync_failed": "Cloudflare đã được cập nhật nhưng lưu cục bộ thất bại — vui lòng tải lại và kiểm tra."
+  }
+}
