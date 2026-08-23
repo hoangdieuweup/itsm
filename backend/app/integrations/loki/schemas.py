@@ -1,11 +1,11 @@
-from pydantic import BaseModel
+from app.core.models import FrozenModel
 
 
-class LokiLogEntry(BaseModel):
+class LokiLogEntry(FrozenModel):
     timestamp: str
     line: str
     labels: dict[str, str]
 
 
-class LokiQueryResult(BaseModel):
+class LokiQueryResult(FrozenModel):
     entries: list[LokiLogEntry]
