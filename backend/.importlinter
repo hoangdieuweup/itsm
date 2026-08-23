@@ -24,6 +24,7 @@ source_modules =
     app.modules.users
     app.modules.common
     app.modules.cloudflare
+    app.modules.observability
 forbidden_modules =
     app.modules.rbac.repository
     app.modules.rbac.models
@@ -39,6 +40,7 @@ source_modules =
     app.modules.rbac
     app.modules.common
     app.modules.cloudflare
+    app.modules.observability
 forbidden_modules =
     app.modules.users.repository
     app.modules.users.models
@@ -56,6 +58,7 @@ source_modules =
     app.modules.users
     app.modules.common
     app.modules.cloudflare
+    app.modules.observability
 forbidden_modules =
     app.modules.projects.repository
     app.modules.projects.models
@@ -73,6 +76,7 @@ source_modules =
     app.modules.projects
     app.modules.common
     app.modules.cloudflare
+    app.modules.observability
 forbidden_modules =
     app.modules.audit.repository
 allow_indirect_imports = True
@@ -92,6 +96,24 @@ forbidden_modules =
     app.modules.cloudflare.models
     app.modules.cloudflare.uow
     app.modules.cloudflare.services
+allow_indirect_imports = True
+
+[importlinter:contract:observability-facade]
+name = Other modules reach observability only through public.py
+type = forbidden
+source_modules =
+    app.modules.auth
+    app.modules.rbac
+    app.modules.users
+    app.modules.projects
+    app.modules.audit
+    app.modules.cloudflare
+    app.modules.common
+forbidden_modules =
+    app.modules.observability.repository
+    app.modules.observability.models
+    app.modules.observability.uow
+    app.modules.observability.services
 allow_indirect_imports = True
 
 [importlinter:contract:common-is-a-leaf-module]
@@ -120,6 +142,7 @@ forbidden_modules =
     app.integrations.dx_core
     app.integrations.mongo
     app.integrations.cloudflare
+    app.integrations.loki
 
 [importlinter:contract:integrations-are-leaves]
 name = Integrations never import a domain module
@@ -131,5 +154,6 @@ source_modules =
     app.integrations.dx_core
     app.integrations.mongo
     app.integrations.cloudflare
+    app.integrations.loki
 forbidden_modules =
     app.modules
