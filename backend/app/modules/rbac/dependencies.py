@@ -11,10 +11,13 @@ from app.core.database import get_session
 from app.integrations.cache.client import CacheClient
 from app.integrations.cache.dependencies import get_cache
 from app.modules.rbac.services.assign_default_role import AssignDefaultRole
+from app.modules.rbac.services.assign_role import AssignRole
+from app.modules.rbac.services.assign_roles import AssignRoles
 from app.modules.rbac.services.create_role import CreateRole
 from app.modules.rbac.services.delete_role import DeleteRole
 from app.modules.rbac.services.update_role import UpdateRole
 from app.modules.rbac.uow import AbstractRbacUnitOfWork, RbacUnitOfWork
+from app.modules.users.public import UsersApi, get_users_api
 
 
 async def get_uow(
@@ -42,3 +45,21 @@ async def get_delete_role(uow: AbstractRbacUnitOfWork = Depends(get_uow)) -> Del
 async def get_assign_default_role(uow: AbstractRbacUnitOfWork = Depends(get_uow)) -> AssignDefaultRole:
     """Provide the default-role-grant use case, used by auth's SSO sync flow."""
     return AssignDefaultRole(uow)
+
+
+async def get_assign_role(
+    uow: AbstractRbacUnitOfWork = Depends(get_uow),
+    users_api: UsersApi = Depends(get_users_api),
+) -> AssignRole:
+    """Provide the assign-role use case, wired to users' existence and
+    protected-admin checks."""
+    return AssignRole(uow, users_api.get_user_by_id, users_api.is_protected_admin)
+
+
+async def get_assign_roles(
+    uow: AbstractRbacUnitOfWork = Depends(get_uow),
+    users_api: UsersApi = Depends(get_users_api),
+) -> AssignRoles:
+    """Provide the assign-roles use case, wired to users' existence and
+    protected-admin checks."""
+    return AssignRoles(uow, users_api.get_user_by_id, users_api.is_protected_admin)
