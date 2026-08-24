@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Menu } from "lucide-react";
-import { usePathname } from "@/shared/lib/i18n/navigation";
+import { Menu, ChevronLeft } from "lucide-react";
+import { Link, usePathname } from "@/shared/lib/i18n/navigation";
 import { ROUTES } from "@/shared/constants/routes";
 import { DashboardSidebar } from "./dashboard-sidebar";
 import { UserMenu } from "@/modules/auth";
@@ -12,19 +12,69 @@ interface DashboardShellProps {
   children: React.ReactNode;
 }
 
+interface Breadcrumb {
+  currentLabel: string;
+  parentLabel?: string;
+  parentHref?: string;
+}
+
 export function DashboardShell({ children }: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const t = useTranslations("common.nav");
+  const tm = useTranslations("common.meta");
   const pathname = usePathname();
 
-  const getPageTitle = () => {
-    if (pathname === ROUTES.adminUsers) return t("users");
-    if (pathname === ROUTES.adminRoles) return t("roles");
-    if (pathname.startsWith(ROUTES.adminProjects)) return t("projects");
-    if (pathname === ROUTES.adminAuditLog) return t("auditLog");
-    if (pathname.startsWith(ROUTES.adminCloudflareAccounts)) return t("cloudflareAccounts");
-    return t("dashboard");
+  const getBreadcrumb = (): Breadcrumb => {
+    if (
+      pathname.startsWith(ROUTES.adminCloudflareAccounts) &&
+      pathname !== ROUTES.adminCloudflareAccounts
+    ) {
+      return {
+        currentLabel: t("detail"),
+        parentLabel: t("cloudflareAccounts"),
+        parentHref: ROUTES.adminCloudflareAccounts,
+      };
+    }
+    if (pathname.startsWith(ROUTES.adminEnvironments)) {
+      return {
+        currentLabel: t("environments"),
+        parentLabel: t("cloudflareAccounts"),
+        parentHref: ROUTES.adminCloudflareAccounts,
+      };
+    }
+    if (
+      pathname.startsWith(ROUTES.adminProjects) &&
+      pathname !== ROUTES.adminProjects
+    ) {
+      return {
+        currentLabel: t("detail"),
+        parentLabel: t("projects"),
+        parentHref: ROUTES.adminProjects,
+      };
+    }
+    if (
+      pathname.startsWith(ROUTES.adminIncidents) &&
+      pathname !== ROUTES.adminIncidents
+    ) {
+      return {
+        currentLabel: t("detail"),
+        parentLabel: t("incidents"),
+        parentHref: ROUTES.adminIncidents,
+      };
+    }
+
+    // Top-level list pages — no back link
+    if (pathname.startsWith(ROUTES.adminUsers)) return { currentLabel: t("users") };
+    if (pathname.startsWith(ROUTES.adminRoles)) return { currentLabel: t("roles") };
+    if (pathname === ROUTES.adminProjects) return { currentLabel: t("projects") };
+    if (pathname === ROUTES.adminAuditLog) return { currentLabel: t("auditLog") };
+    if (pathname === ROUTES.adminCloudflareAccounts) return { currentLabel: t("cloudflareAccounts") };
+    if (pathname === ROUTES.adminIncidents) return { currentLabel: t("incidents") };
+
+    return { currentLabel: t("dashboard") };
   };
+
+  const breadcrumb = getBreadcrumb();
 
   return (
     <div className="flex min-h-screen w-full bg-slate-50/50 dark:bg-background text-foreground">
@@ -49,14 +99,31 @@ export function DashboardShell({ children }: DashboardShellProps) {
               <Menu className="size-5" />
             </button>
 
-            <div className="flex items-center gap-2">
+            <nav className="flex items-center gap-1.5" aria-label="Breadcrumb">
               <span className="text-sm font-medium text-muted-foreground hidden sm:inline">
-                ITSM /
+                {tm("appName")} /
               </span>
-              <h1 className="text-base font-bold tracking-tight text-foreground sm:text-lg">
-                {getPageTitle()}
-              </h1>
-            </div>
+
+              {breadcrumb.parentHref ? (
+                <>
+                  <Link
+                    href={breadcrumb.parentHref}
+                    className="group flex items-center gap-1 text-sm font-medium text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    <ChevronLeft className="size-4 transition-transform group-hover:-translate-x-0.5" aria-hidden />
+                    {breadcrumb.parentLabel}
+                  </Link>
+                  <span className="text-sm text-muted-foreground/60" aria-hidden>/</span>
+                  <h1 className="text-base font-bold tracking-tight text-foreground sm:text-lg" aria-current="page">
+                    {breadcrumb.currentLabel}
+                  </h1>
+                </>
+              ) : (
+                <h1 className="text-base font-bold tracking-tight text-foreground sm:text-lg" aria-current="page">
+                  {breadcrumb.currentLabel}
+                </h1>
+              )}
+            </nav>
           </div>
 
           {/* Right: Clean User profile avatar */}
