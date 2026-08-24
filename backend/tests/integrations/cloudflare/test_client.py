@@ -440,3 +440,192 @@ class TestGetAccountAuditLogs:
             await client.get_account_audit_logs(
                 cf_account_id="acc-1", api_token="tok", zone_name="example.com", since=None, before=None
             )
+
+
+class TestListAvailableAlerts:
+    async def test_success_returns_result_list(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.url.path == "/client/v4/accounts/acc1/alerting/v3/available_alerts"
+            return httpx.Response(
+                200, json={"success": True, "result": [{"type": "advanced_ddos_attack_l4_alert"}]}
+            )
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        alerts = await client.list_available_alerts(cf_account_id="acc1", api_token="tok")
+        assert alerts == [{"type": "advanced_ddos_attack_l4_alert"}]
+
+    async def test_rejected_raises(self) -> None:
+        client = CloudflareClient(
+            transport=httpx.MockTransport(
+                lambda r: httpx.Response(400, json={"success": False, "errors": []})
+            )
+        )
+        with pytest.raises(CloudflareDnsOperationRejected):
+            await client.list_available_alerts(cf_account_id="acc1", api_token="tok")
+
+    async def test_unavailable_raises(self) -> None:
+        client = CloudflareClient(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
+        with pytest.raises(CloudflareApiUnavailable):
+            await client.list_available_alerts(cf_account_id="acc1", api_token="tok")
+
+
+class TestCreateWebhookDestination:
+    async def test_success_returns_id(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.url.path == "/client/v4/accounts/acc1/alerting/v3/destinations/webhooks"
+            payload = json.loads(request.read())
+            assert payload == {
+                "name": "itsm-webhook",
+                "url": "https://x/webhooks/cloudflare-alert/acc1",
+                "secret": "s3cr3t",
+            }
+            return httpx.Response(200, json={"success": True, "result": {"id": "wh-123"}})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        webhook_id = await client.create_webhook_destination(
+            cf_account_id="acc1",
+            api_token="tok",
+            name="itsm-webhook",
+            url="https://x/webhooks/cloudflare-alert/acc1",
+            secret="s3cr3t",
+        )
+        assert webhook_id == "wh-123"
+
+    async def test_rejected_raises(self) -> None:
+        client = CloudflareClient(
+            transport=httpx.MockTransport(
+                lambda r: httpx.Response(400, json={"success": False, "errors": []})
+            )
+        )
+        with pytest.raises(CloudflareDnsOperationRejected):
+            await client.create_webhook_destination(
+                cf_account_id="acc1", api_token="tok", name="n", url="u", secret="s"
+            )
+
+    async def test_unavailable_raises(self) -> None:
+        client = CloudflareClient(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
+        with pytest.raises(CloudflareApiUnavailable):
+            await client.create_webhook_destination(
+                cf_account_id="acc1", api_token="tok", name="n", url="u", secret="s"
+            )
+
+
+class TestCreatePolicy:
+    async def test_success_returns_policy_id(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.url.path == "/client/v4/accounts/acc1/alerting/v3/policies"
+            payload = json.loads(request.read())
+            assert payload["mechanisms"] == {"webhooks": [{"id": "wh-123"}]}
+            assert payload["alert_type"] == "health_check_status_notification"
+            return httpx.Response(200, json={"success": True, "result": {"id": "policy-789"}})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        policy_id = await client.create_policy(
+            cf_account_id="acc1",
+            api_token="tok",
+            name="My rule",
+            alert_type="health_check_status_notification",
+            webhook_destination_id="wh-123",
+        )
+        assert policy_id == "policy-789"
+
+    async def test_rejected_raises(self) -> None:
+        client = CloudflareClient(
+            transport=httpx.MockTransport(
+                lambda r: httpx.Response(422, json={"success": False, "errors": []})
+            )
+        )
+        with pytest.raises(CloudflareDnsOperationRejected):
+            await client.create_policy(
+                cf_account_id="acc1", api_token="tok", name="n", alert_type="t", webhook_destination_id="w"
+            )
+
+    async def test_unavailable_raises(self) -> None:
+        client = CloudflareClient(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
+        with pytest.raises(CloudflareApiUnavailable):
+            await client.create_policy(
+                cf_account_id="acc1", api_token="tok", name="n", alert_type="t", webhook_destination_id="w"
+            )
+
+
+class TestUpdatePolicy:
+    async def test_success_sends_only_provided_fields(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.url.path == "/client/v4/accounts/acc1/alerting/v3/policies/policy-789"
+            assert request.method == "PUT"
+            payload = json.loads(request.read())
+            assert payload == {"enabled": False}
+            return httpx.Response(200, json={"success": True, "result": {}})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        await client.update_policy(
+            cf_account_id="acc1", api_token="tok", policy_id="policy-789", name=None, enabled=False
+        )
+
+    async def test_rejected_raises(self) -> None:
+        client = CloudflareClient(
+            transport=httpx.MockTransport(
+                lambda r: httpx.Response(400, json={"success": False, "errors": []})
+            )
+        )
+        with pytest.raises(CloudflareDnsOperationRejected):
+            await client.update_policy(
+                cf_account_id="acc1", api_token="tok", policy_id="p", name="n", enabled=None
+            )
+
+    async def test_unavailable_raises(self) -> None:
+        client = CloudflareClient(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
+        with pytest.raises(CloudflareApiUnavailable):
+            await client.update_policy(
+                cf_account_id="acc1", api_token="tok", policy_id="p", name=None, enabled=None
+            )
+
+
+class TestDeletePolicy:
+    async def test_success(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.url.path == "/client/v4/accounts/acc1/alerting/v3/policies/policy-789"
+            assert request.method == "DELETE"
+            return httpx.Response(200, json={"success": True, "result": {}})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        await client.delete_policy(cf_account_id="acc1", api_token="tok", policy_id="policy-789")
+
+    async def test_rejected_raises(self) -> None:
+        client = CloudflareClient(
+            transport=httpx.MockTransport(
+                lambda r: httpx.Response(404, json={"success": False, "errors": []})
+            )
+        )
+        with pytest.raises(CloudflareDnsOperationRejected):
+            await client.delete_policy(cf_account_id="acc1", api_token="tok", policy_id="p")
+
+    async def test_unavailable_raises(self) -> None:
+        client = CloudflareClient(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
+        with pytest.raises(CloudflareApiUnavailable):
+            await client.delete_policy(cf_account_id="acc1", api_token="tok", policy_id="p")
+
+
+class TestTestPolicy:
+    async def test_success(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.url.path == "/client/v4/accounts/acc1/alerting/v3/policies/policy-789/test"
+            assert request.method == "POST"
+            return httpx.Response(200, json={"success": True, "result": {}})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        await client.test_policy(cf_account_id="acc1", api_token="tok", policy_id="policy-789")
+
+    async def test_rejected_raises(self) -> None:
+        client = CloudflareClient(
+            transport=httpx.MockTransport(
+                lambda r: httpx.Response(400, json={"success": False, "errors": []})
+            )
+        )
+        with pytest.raises(CloudflareDnsOperationRejected):
+            await client.test_policy(cf_account_id="acc1", api_token="tok", policy_id="p")
+
+    async def test_unavailable_raises(self) -> None:
+        client = CloudflareClient(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
+        with pytest.raises(CloudflareApiUnavailable):
+            await client.test_policy(cf_account_id="acc1", api_token="tok", policy_id="p")

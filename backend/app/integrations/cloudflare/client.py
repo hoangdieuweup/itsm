@@ -279,3 +279,74 @@ class CloudflareClient:
             )
             for entry in body.get("result", [])
         ]
+
+    @integration
+    async def list_available_alerts(self, *, cf_account_id: str, api_token: str) -> list[dict]:
+        """GET /accounts/{cf_account_id}/alerting/v3/available_alerts. Returns
+        the raw result list — the observability service layer shapes it into
+        AvailableAlertOption."""
+        body = await self._write(f"/accounts/{cf_account_id}/alerting/v3/available_alerts", "GET", api_token)
+        return body.get("result", [])
+
+    @integration
+    async def create_webhook_destination(
+        self, *, cf_account_id: str, api_token: str, name: str, url: str, secret: str
+    ) -> str:
+        """POST /accounts/{cf_account_id}/alerting/v3/destinations/webhooks.
+        Returns the real webhook destination id — Cloudflare will call `url`
+        with `cf-webhook-auth: <secret>` on every future notification."""
+        body = await self._write(
+            f"/accounts/{cf_account_id}/alerting/v3/destinations/webhooks",
+            "POST",
+            api_token,
+            json={"name": name, "url": url, "secret": secret},
+        )
+        return body["result"]["id"]
+
+    @integration
+    async def create_policy(
+        self, *, cf_account_id: str, api_token: str, name: str, alert_type: str, webhook_destination_id: str
+    ) -> str:
+        """POST /accounts/{cf_account_id}/alerting/v3/policies. mechanisms.webhooks
+        points at the already-registered destination id. Returns the real
+        policy_id — persisted as alert_rules.cf_policy_id for 2-way sync."""
+        body = await self._write(
+            f"/accounts/{cf_account_id}/alerting/v3/policies",
+            "POST",
+            api_token,
+            json={
+                "name": name,
+                "alert_type": alert_type,
+                "enabled": True,
+                "mechanisms": {"webhooks": [{"id": webhook_destination_id}]},
+            },
+        )
+        return body["result"]["id"]
+
+    @integration
+    async def update_policy(
+        self, *, cf_account_id: str, api_token: str, policy_id: str, name: str | None, enabled: bool | None
+    ) -> None:
+        """PUT /accounts/{cf_account_id}/alerting/v3/policies/{policy_id}."""
+        payload: dict = {}
+        if name is not None:
+            payload["name"] = name
+        if enabled is not None:
+            payload["enabled"] = enabled
+        await self._write(
+            f"/accounts/{cf_account_id}/alerting/v3/policies/{policy_id}", "PUT", api_token, json=payload
+        )
+
+    @integration
+    async def delete_policy(self, *, cf_account_id: str, api_token: str, policy_id: str) -> None:
+        """DELETE /accounts/{cf_account_id}/alerting/v3/policies/{policy_id}."""
+        await self._write(f"/accounts/{cf_account_id}/alerting/v3/policies/{policy_id}", "DELETE", api_token)
+
+    @integration
+    async def test_policy(self, *, cf_account_id: str, api_token: str, policy_id: str) -> None:
+        """POST .../policies/{policy_id}/test — sends a synthetic INFO-severity
+        alert through the policy's configured mechanisms, no DB side effect
+        here; the resulting webhook call is handled identically to a real one."""
+        await self._write(
+            f"/accounts/{cf_account_id}/alerting/v3/policies/{policy_id}/test", "POST", api_token
+        )
