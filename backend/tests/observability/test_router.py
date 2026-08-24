@@ -3,22 +3,34 @@ testcontainers. Mirrors tests/cloudflare/test_router.py's exact helper shape
 (_login_with_permissions, real HTTP project/environment creation)."""
 
 import json
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.core.crypto import FernetCodec
 from app.core.security import JwtCodec
+from app.integrations.cloudflare.dependencies import get_cloudflare_client
+from app.integrations.cloudflare.schemas import ZoneOption
 from app.integrations.loki.dependencies import get_loki_client
 from app.integrations.loki.schemas import LokiLogEntry
 from app.main import app
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCookies
+from app.modules.cloudflare.config import cloudflare_settings
+from app.modules.cloudflare.models import CloudflareAccount
 from app.modules.observability.config import observability_settings
 from app.modules.rbac.models import Permission, Role, RolePermission, UserRole
 from app.modules.users.models import User
+
+_TEST_FERNET_KEY = "kL8Zx3vQ9mN2pR7wT4yU6bC1dF5gH0jK3lM6nO9pQ2s="
+
+
+@pytest.fixture(autouse=True)
+def _cloudflare_fernet_key_for_alert_rules(monkeypatch) -> None:
+    monkeypatch.setattr(cloudflare_settings, "FERNET_KEY", _TEST_FERNET_KEY)
 
 
 @pytest.fixture(autouse=True)
@@ -335,3 +347,309 @@ class TestStreamLogTail:
         payload = json.loads(data_lines[0][len("data:") :].strip())
         assert payload["success"] is True
         assert payload["data"]["line"] == "hello"
+
+
+class FakeCloudflareClientForAlerting:
+    """Overrides the real CloudflareClient for observability's router tests —
+    supports account creation (test_connection), zone binding (list_zones),
+    and the alerting flow (create_webhook_destination/create_policy/
+    update_policy/delete_policy)."""
+
+    def __init__(self, policy_id: str = "policy-789", webhook_destination_id: str = "wh-123") -> None:
+        self._policy_id = policy_id
+        self._webhook_destination_id = webhook_destination_id
+        self.created_policies: list[dict] = []
+        self.deleted_policy_ids: list[str] = []
+
+    async def test_connection(self, *, cf_account_id: str, api_token: str) -> None:
+        pass
+
+    async def list_zones(self, *, cf_account_id: str, api_token: str):
+        return [ZoneOption(id="z1", name="example.com")]
+
+    async def list_available_alerts(self, **kwargs):
+        return [{"type": "advanced_ddos_attack_l4_alert"}]
+
+    async def create_webhook_destination(self, **kwargs) -> str:
+        return self._webhook_destination_id
+
+    async def create_policy(self, **kwargs) -> str:
+        self.created_policies.append(kwargs)
+        return self._policy_id
+
+    async def update_policy(self, **kwargs) -> None:
+        pass
+
+    async def delete_policy(self, *, cf_account_id, api_token, policy_id) -> None:
+        self.deleted_policy_ids.append(policy_id)
+
+
+async def _bind_environment(client: AsyncClient, engine: AsyncEngine, *, cf_client) -> tuple[str, str]:
+    """Login with manage+view, create an account (creator becomes OWNER),
+    create a project + environment, bind them. Returns (environment_id, account_id)."""
+    app.dependency_overrides[get_cloudflare_client] = lambda: cf_client
+    await _login_with_permissions(
+        client,
+        engine,
+        permissions=[
+            ("cloudflare_account", "manage"),
+            ("cloudflare_account", "view"),
+            ("project", "create"),
+            ("environment", "create"),
+            ("environment", "read"),
+        ],
+    )
+    account_resp = await client.post(
+        "/api/v1/cloudflare-accounts", json={"label": "CF - A", "cfAccountId": "cf-1", "apiToken": "x"}
+    )
+    account_id = account_resp.json()["data"]["id"]
+    project_resp = await client.post("/api/v1/projects", json={"name": "Site"})
+    project_id = project_resp.json()["data"]["id"]
+    env_resp = await client.post(
+        f"/api/v1/projects/{project_id}/environments", json={"type": "dev", "name": "Dev"}
+    )
+    environment_id = env_resp.json()["data"]["id"]
+
+    bind_resp = await client.post(
+        "/api/v1/cloudflare-configs",
+        json={"environmentId": environment_id, "cloudflareAccountId": account_id, "zoneId": "z1"},
+    )
+    assert bind_resp.status_code == 200, bind_resp.text
+    return environment_id, account_id
+
+
+class TestCloudflareWebhookAuth:
+    async def test_wrong_secret_returns_401_and_creates_nothing(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        account_id = uuid4()
+        response = await client.post(
+            f"/api/v1/webhooks/cloudflare-alert/{account_id}",
+            json={"policy_id": "p", "alert_event": "ALERT_STATE_EVENT_START"},
+            headers={"cf-webhook-auth": "wrong-secret"},
+        )
+        assert response.status_code == 401
+
+    async def test_correct_secret_returns_200_and_creates_incident(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        cf_client = FakeCloudflareClientForAlerting()
+        environment_id, account_id = await _bind_environment(client, engine, cf_client=cf_client)
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[("alert_rule", "create")],
+            email="alertadmin@x.com",
+        )
+        create_resp = await client.post(
+            f"/api/v1/environments/{environment_id}/alert-rules",
+            json={
+                "name": "DDoS",
+                "source": "CLOUDFLARE_NATIVE",
+                "cfAlertType": "advanced_ddos_attack_l4_alert",
+                "condition": None,
+                "severity": "HIGH",
+                "channelIds": [],
+            },
+        )
+        assert create_resp.status_code == 200, create_resp.text
+
+        async with engine.begin() as conn:
+            result = await conn.execute(
+                select(CloudflareAccount.webhook_secret_ciphertext).where(
+                    CloudflareAccount.id == UUID(account_id)
+                )
+            )
+            ciphertext = result.scalar_one()
+        webhook_secret = FernetCodec.decrypt(ciphertext, key=_TEST_FERNET_KEY)
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+        wrong_resp = await client.post(
+            f"/api/v1/webhooks/cloudflare-alert/{account_id}",
+            json={
+                "policy_id": "policy-789",
+                "text": "DDoS attack detected",
+                "alert_type": "advanced_ddos_attack_l4_alert",
+                "alert_correlation_id": "corr-1",
+                "alert_event": "ALERT_STATE_EVENT_START",
+            },
+            headers={"cf-webhook-auth": "wrong-secret"},
+        )
+        assert wrong_resp.status_code == 401
+
+        webhook_resp = await client.post(
+            f"/api/v1/webhooks/cloudflare-alert/{account_id}",
+            json={
+                "policy_id": "policy-789",
+                "text": "DDoS attack detected",
+                "alert_type": "advanced_ddos_attack_l4_alert",
+                "alert_correlation_id": "corr-1",
+                "alert_event": "ALERT_STATE_EVENT_START",
+            },
+            headers={"cf-webhook-auth": webhook_secret},
+        )
+        assert webhook_resp.status_code == 200, webhook_resp.text
+
+
+class TestLokiWebhookAuth:
+    async def test_wrong_bearer_returns_401(self, client: AsyncClient) -> None:
+        response = await client.post(
+            "/api/v1/webhooks/loki-alert", json={"alerts": []}, headers={"Authorization": "Bearer wrong"}
+        )
+        assert response.status_code == 401
+
+    async def test_correct_bearer_returns_200(self, client: AsyncClient, monkeypatch) -> None:
+        monkeypatch.setattr(observability_settings, "LOKI_WEBHOOK_SECRET", "real-secret")
+        response = await client.post(
+            "/api/v1/webhooks/loki-alert",
+            json={"alerts": []},
+            headers={"Authorization": "Bearer real-secret"},
+        )
+        assert response.status_code == 200
+
+
+class TestAlertRuleRoutes:
+    async def test_create_requires_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
+        cf_client = FakeCloudflareClientForAlerting()
+        environment_id, _account_id = await _bind_environment(client, engine, cf_client=cf_client)
+        await _login_with_permissions(client, engine, permissions=[], email="noperm@x.com")
+
+        response = await client.post(
+            f"/api/v1/environments/{environment_id}/alert-rules",
+            json={
+                "name": "DDoS",
+                "source": "CLOUDFLARE_NATIVE",
+                "cfAlertType": "advanced_ddos_attack_l4_alert",
+                "condition": None,
+                "severity": "HIGH",
+                "channelIds": [],
+            },
+        )
+        assert response.status_code == 403
+        del app.dependency_overrides[get_cloudflare_client]
+
+    async def test_full_crud_cycle(self, client: AsyncClient, engine: AsyncEngine) -> None:
+        cf_client = FakeCloudflareClientForAlerting()
+        environment_id, _account_id = await _bind_environment(client, engine, cf_client=cf_client)
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[
+                ("alert_rule", "create"),
+                ("alert_rule", "read"),
+                ("alert_rule", "update"),
+                ("alert_rule", "delete"),
+            ],
+            email="alertfull@x.com",
+        )
+
+        create_resp = await client.post(
+            f"/api/v1/environments/{environment_id}/alert-rules",
+            json={
+                "name": "DDoS",
+                "source": "CLOUDFLARE_NATIVE",
+                "cfAlertType": "advanced_ddos_attack_l4_alert",
+                "condition": None,
+                "severity": "HIGH",
+                "channelIds": [],
+            },
+        )
+        assert create_resp.status_code == 200, create_resp.text
+        alert_rule_id = create_resp.json()["data"]["id"]
+        assert create_resp.json()["data"]["cfPolicyId"] == "policy-789"
+
+        list_resp = await client.get(f"/api/v1/environments/{environment_id}/alert-rules")
+        assert list_resp.status_code == 200
+        assert len(list_resp.json()["data"]) == 1
+
+        update_resp = await client.patch(f"/api/v1/alert-rules/{alert_rule_id}", json={"isActive": False})
+        assert update_resp.status_code == 200
+        assert update_resp.json()["data"]["isActive"] is False
+
+        delete_resp = await client.delete(f"/api/v1/alert-rules/{alert_rule_id}")
+        assert delete_resp.status_code == 200
+        assert cf_client.deleted_policy_ids == ["policy-789"]
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+    async def test_available_alerts_requires_account_access(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        cf_client = FakeCloudflareClientForAlerting()
+        _environment_id, account_id = await _bind_environment(client, engine, cf_client=cf_client)
+        await _login_with_permissions(
+            client, engine, permissions=[("alert_rule", "read")], email="noaccountaccess@x.com"
+        )
+
+        response = await client.get(f"/api/v1/cloudflare-accounts/{account_id}/available-alerts")
+        assert response.status_code == 403
+        del app.dependency_overrides[get_cloudflare_client]
+
+
+class TestIncidentRoutes:
+    async def test_manual_create_ack_resolve_flow(self, client: AsyncClient, engine: AsyncEngine) -> None:
+        environment_id = await _make_environment(client, engine)
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[
+                ("incident", "create"),
+                ("incident", "read"),
+                ("incident", "acknowledge"),
+                ("incident", "resolve"),
+            ],
+            email="incidentfull@x.com",
+        )
+
+        create_resp = await client.post(
+            "/api/v1/incidents",
+            json={
+                "environmentId": environment_id,
+                "category": "TRAFFIC",
+                "severity": "MEDIUM",
+                "title": "Manually filed",
+            },
+        )
+        assert create_resp.status_code == 200, create_resp.text
+        incident_id = create_resp.json()["data"]["id"]
+        assert create_resp.json()["data"]["status"] == "OPEN"
+
+        get_resp = await client.get(f"/api/v1/incidents/{incident_id}")
+        assert get_resp.status_code == 200
+
+        list_resp = await client.get("/api/v1/incidents")
+        assert list_resp.status_code == 200
+        assert len(list_resp.json()["data"]) >= 1
+
+        ack_resp = await client.post(f"/api/v1/incidents/{incident_id}/acknowledge")
+        assert ack_resp.status_code == 200
+        assert ack_resp.json()["data"]["status"] == "ACKNOWLEDGED"
+
+        resolve_resp = await client.post(f"/api/v1/incidents/{incident_id}/resolve")
+        assert resolve_resp.status_code == 200
+        assert resolve_resp.json()["data"]["status"] == "RESOLVED"
+
+    async def test_acknowledge_requires_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
+        await _login_with_permissions(client, engine, permissions=[], email="noincidentperm@x.com")
+        response = await client.post(f"/api/v1/incidents/{uuid4()}/acknowledge")
+        assert response.status_code == 403
+
+    async def test_resolve_requires_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
+        await _login_with_permissions(client, engine, permissions=[], email="noresolveperm@x.com")
+        response = await client.post(f"/api/v1/incidents/{uuid4()}/resolve")
+        assert response.status_code == 403
+
+    async def test_create_requires_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
+        environment_id = await _make_environment(client, engine)
+        await _login_with_permissions(client, engine, permissions=[], email="nocreateperm@x.com")
+        response = await client.post(
+            "/api/v1/incidents",
+            json={
+                "environmentId": environment_id,
+                "category": "TRAFFIC",
+                "severity": "MEDIUM",
+                "title": "X",
+            },
+        )
+        assert response.status_code == 403

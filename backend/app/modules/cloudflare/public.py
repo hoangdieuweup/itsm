@@ -19,10 +19,15 @@ from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.client import CloudflareClient
 from app.integrations.cloudflare.dependencies import get_cloudflare_client
 from app.modules.cloudflare.config import cloudflare_settings
-from app.modules.cloudflare.dependencies import get_uow
+from app.modules.cloudflare.dependencies import get_uow, require_account_access
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 
-__all__ = ["ReadyCloudflareClient", "CloudflareApi", "get_cloudflare_api"]
+__all__ = [
+    "ReadyCloudflareClient",
+    "CloudflareApi",
+    "get_cloudflare_api",
+    "require_account_access",
+]
 
 
 @dataclass(frozen=True)

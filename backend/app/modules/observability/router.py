@@ -9,31 +9,66 @@ rows."""
 from collections.abc import AsyncIterator
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sse_starlette.sse import EventSourceResponse
 
 from app.core.models import ApiResponse, ErrorPayload
 from app.integrations.loki.schemas import LokiLogEntry
+from app.modules.cloudflare.constants import AccessLevel
+from app.modules.cloudflare.public import require_account_access
+from app.modules.observability.constants import IncidentStatus
 from app.modules.observability.dependencies import (
+    get_acknowledge_incident,
+    get_create_alert_rule,
     get_create_loki_config,
+    get_create_manual_incident,
+    get_delete_alert_rule,
     get_delete_loki_config,
+    get_get_incident,
     get_get_loki_config,
+    get_handle_cloudflare_webhook,
+    get_handle_loki_webhook,
+    get_list_alert_rules,
+    get_list_available_alerts,
+    get_list_incidents,
+    get_resolve_incident,
     get_run_log_query,
     get_stream_log_tail,
+    get_update_alert_rule,
     get_update_loki_config,
+    verify_cloudflare_webhook_secret,
+    verify_loki_webhook_secret,
 )
 from app.modules.observability.schemas import (
+    AlertRuleCreate,
+    AlertRuleRead,
+    AlertRuleUpdate,
+    AvailableAlertOption,
+    CreateManualIncidentRequest,
+    IncidentRead,
     LogQueryRequest,
     LogQueryResponse,
     LokiConfigCreate,
     LokiConfigRead,
     LokiConfigUpdate,
 )
+from app.modules.observability.services.acknowledge_incident import AcknowledgeIncident
+from app.modules.observability.services.create_alert_rule import CreateAlertRule
 from app.modules.observability.services.create_loki_config import CreateLokiConfig
+from app.modules.observability.services.create_manual_incident import CreateManualIncident
+from app.modules.observability.services.delete_alert_rule import DeleteAlertRule
 from app.modules.observability.services.delete_loki_config import DeleteLokiConfig
+from app.modules.observability.services.get_incident import GetIncident
 from app.modules.observability.services.get_loki_config import GetLokiConfig
+from app.modules.observability.services.handle_cloudflare_webhook import HandleCloudflareWebhook
+from app.modules.observability.services.handle_loki_webhook import HandleLokiWebhook
+from app.modules.observability.services.list_alert_rules import ListAlertRules
+from app.modules.observability.services.list_available_alerts import ListAvailableAlerts
+from app.modules.observability.services.list_incidents import ListIncidents
+from app.modules.observability.services.resolve_incident import ResolveIncident
 from app.modules.observability.services.run_log_query import RunLogQuery
 from app.modules.observability.services.stream_log_tail import StreamLogTail
+from app.modules.observability.services.update_alert_rule import UpdateAlertRule
 from app.modules.observability.services.update_loki_config import UpdateLokiConfig
 from app.modules.rbac.public import RbacActions, RbacResources, require_permission
 from app.modules.users.public import UserRead
@@ -130,3 +165,125 @@ async def stream_log_tail(
 
     return EventSourceResponse(event_stream(), headers={"X-Accel-Buffering": "no"})
 
+
+@router.get("/cloudflare-accounts/{account_id}/available-alerts")
+async def list_available_alerts(
+    account_id: UUID,
+    use_case: ListAvailableAlerts = Depends(get_list_available_alerts),
+    _grant=Depends(require_account_access(AccessLevel.VIEWER)),
+    _user: UserRead = Depends(require_permission(RbacResources.ALERT_RULE, RbacActions.READ)),
+) -> ApiResponse[list[AvailableAlertOption]]:
+    return ApiResponse[list[AvailableAlertOption]](success=True, data=await use_case.execute(account_id))
+
+
+@router.post("/environments/{environment_id}/alert-rules")
+async def create_alert_rule(
+    environment_id: UUID,
+    body: AlertRuleCreate,
+    use_case: CreateAlertRule = Depends(get_create_alert_rule),
+    user: UserRead = Depends(require_permission(RbacResources.ALERT_RULE, RbacActions.CREATE)),
+) -> ApiResponse[AlertRuleRead]:
+    result = await use_case.execute(environment_id=environment_id, **body.model_dump(), actor=user)
+    return ApiResponse[AlertRuleRead](success=True, data=result)
+
+
+@router.get("/environments/{environment_id}/alert-rules")
+async def list_alert_rules(
+    environment_id: UUID,
+    use_case: ListAlertRules = Depends(get_list_alert_rules),
+    _user: UserRead = Depends(require_permission(RbacResources.ALERT_RULE, RbacActions.READ)),
+) -> ApiResponse[list[AlertRuleRead]]:
+    return ApiResponse[list[AlertRuleRead]](success=True, data=await use_case.execute(environment_id))
+
+
+@router.patch("/alert-rules/{alert_rule_id}")
+async def update_alert_rule(
+    alert_rule_id: UUID,
+    body: AlertRuleUpdate,
+    use_case: UpdateAlertRule = Depends(get_update_alert_rule),
+    user: UserRead = Depends(require_permission(RbacResources.ALERT_RULE, RbacActions.UPDATE)),
+) -> ApiResponse[AlertRuleRead]:
+    result = await use_case.execute(alert_rule_id, **body.model_dump(exclude_unset=True), actor=user)
+    return ApiResponse[AlertRuleRead](success=True, data=result)
+
+
+@router.delete("/alert-rules/{alert_rule_id}")
+async def delete_alert_rule(
+    alert_rule_id: UUID,
+    use_case: DeleteAlertRule = Depends(get_delete_alert_rule),
+    user: UserRead = Depends(require_permission(RbacResources.ALERT_RULE, RbacActions.DELETE)),
+) -> ApiResponse[None]:
+    await use_case.execute(alert_rule_id, actor=user)
+    return ApiResponse[None](success=True, data=None)
+
+
+@router.get("/incidents")
+async def list_incidents(
+    project_id: UUID | None = Query(default=None, alias="projectId"),
+    environment_id: UUID | None = Query(default=None, alias="environmentId"),
+    status: IncidentStatus | None = Query(default=None),
+    use_case: ListIncidents = Depends(get_list_incidents),
+    _user: UserRead = Depends(require_permission(RbacResources.INCIDENT, RbacActions.READ)),
+) -> ApiResponse[list[IncidentRead]]:
+    items, _total = await use_case.execute(
+        project_id=project_id, environment_id=environment_id, status=status, limit=50, offset=0
+    )
+    return ApiResponse[list[IncidentRead]](success=True, data=items)
+
+
+@router.get("/incidents/{incident_id}")
+async def get_incident(
+    incident_id: UUID,
+    use_case: GetIncident = Depends(get_get_incident),
+    _user: UserRead = Depends(require_permission(RbacResources.INCIDENT, RbacActions.READ)),
+) -> ApiResponse[IncidentRead]:
+    return ApiResponse[IncidentRead](success=True, data=await use_case.execute(incident_id))
+
+
+@router.post("/incidents")
+async def create_manual_incident(
+    body: CreateManualIncidentRequest,
+    use_case: CreateManualIncident = Depends(get_create_manual_incident),
+    user: UserRead = Depends(require_permission(RbacResources.INCIDENT, RbacActions.CREATE)),
+) -> ApiResponse[IncidentRead]:
+    result = await use_case.execute(**body.model_dump(), actor=user)
+    return ApiResponse[IncidentRead](success=True, data=result)
+
+
+@router.post("/incidents/{incident_id}/acknowledge")
+async def acknowledge_incident(
+    incident_id: UUID,
+    use_case: AcknowledgeIncident = Depends(get_acknowledge_incident),
+    user: UserRead = Depends(require_permission(RbacResources.INCIDENT, RbacActions.ACKNOWLEDGE)),
+) -> ApiResponse[IncidentRead]:
+    return ApiResponse[IncidentRead](success=True, data=await use_case.execute(incident_id, actor=user))
+
+
+@router.post("/incidents/{incident_id}/resolve")
+async def resolve_incident(
+    incident_id: UUID,
+    use_case: ResolveIncident = Depends(get_resolve_incident),
+    user: UserRead = Depends(require_permission(RbacResources.INCIDENT, RbacActions.RESOLVE)),
+) -> ApiResponse[IncidentRead]:
+    return ApiResponse[IncidentRead](success=True, data=await use_case.execute(incident_id, actor=user))
+
+
+@router.post("/webhooks/cloudflare-alert/{cloudflare_account_id}")
+async def cloudflare_alert_webhook(
+    cloudflare_account_id: UUID,
+    payload: dict,
+    use_case: HandleCloudflareWebhook = Depends(get_handle_cloudflare_webhook),
+    _verified=Depends(verify_cloudflare_webhook_secret),
+) -> ApiResponse[None]:
+    await use_case.execute(cloudflare_account_id=cloudflare_account_id, payload=payload)
+    return ApiResponse[None](success=True, data=None)
+
+
+@router.post("/webhooks/loki-alert")
+async def loki_alert_webhook(
+    payload: dict,
+    use_case: HandleLokiWebhook = Depends(get_handle_loki_webhook),
+    _verified=Depends(verify_loki_webhook_secret),
+) -> ApiResponse[None]:
+    await use_case.execute(payload=payload)
+    return ApiResponse[None](success=True, data=None)
