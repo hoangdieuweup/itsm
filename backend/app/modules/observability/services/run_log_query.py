@@ -9,8 +9,8 @@ from app.integrations.loki.client import LokiClient
 from app.integrations.loki.schemas import LokiQueryResult
 from app.modules.observability.constants import ObservabilityLimits
 from app.modules.observability.exceptions import LokiConfigNotFound
-from app.modules.observability.services._auth import resolve_loki_auth_header
 from app.modules.observability.uow import AbstractObservabilityUnitOfWork
+from app.modules.observability.utils import LokiAuthHelper
 
 
 class RunLogQuery(AbstractUseCase):
@@ -27,7 +27,7 @@ class RunLogQuery(AbstractUseCase):
             raise LokiConfigNotFound()
 
         ciphertext = await self._uow.loki_configs.get_credential_ciphertext(environment_id)
-        auth_header = resolve_loki_auth_header(config, ciphertext)
+        auth_header = LokiAuthHelper.resolve_loki_auth_header(config, ciphertext)
 
         clamped_limit = min(limit, ObservabilityLimits.MAX_QUERY_LIMIT)
         return await self._client.query_range(

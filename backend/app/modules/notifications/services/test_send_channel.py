@@ -13,14 +13,16 @@ from app.integrations.telegram.client import TelegramClient
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
 from app.modules.notifications.config import notifications_settings
-from app.modules.notifications.constants import NotificationChannelType, NotificationsAuditActions
+from app.modules.notifications.constants import (
+    NotificationChannelType,
+    NotificationsAuditActions,
+    NotificationsDefaults,
+)
 from app.modules.notifications.exceptions import NotificationChannelNotFound, UnsupportedChannelType
 from app.modules.notifications.rules import NotificationRules
 from app.modules.notifications.schemas import NotificationChannelRead
 from app.modules.notifications.uow import AbstractNotificationsUnitOfWork
 from app.modules.users.public import UserRead
-
-_DEFAULT_TEST_MESSAGE = "Test notification from ITSM"
 
 
 class TestSendNotificationChannel(AbstractUseCase):
@@ -45,7 +47,7 @@ class TestSendNotificationChannel(AbstractUseCase):
         if channel is None:
             raise NotificationChannelNotFound()
 
-        text = message or _DEFAULT_TEST_MESSAGE
+        text = message or NotificationsDefaults.TEST_MESSAGE
         try:
             await self._dispatch(channel, text)
         finally:

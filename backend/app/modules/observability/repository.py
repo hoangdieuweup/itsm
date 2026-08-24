@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.base.markers import database
+from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
 from app.modules.observability.constants import LokiAuthType
 from app.modules.observability.models import LokiConfig
@@ -65,25 +65,6 @@ class AbstractLokiConfigRepository(AbstractRepository[LokiConfigRead, UUID]):
         raise NotImplementedError
 
 
-def _to_read(row: LokiConfig) -> LokiConfigRead:
-    """LokiConfigRead never carries the raw credential, only whether one is
-    set — a derived field with no matching ORM attribute, so plain
-    model_validate(row) can't produce it the way it does for every other
-    Read schema in this codebase."""
-    return LokiConfigRead(
-        id=row.id,
-        environment_id=row.environment_id,
-        endpoint_url=row.endpoint_url,
-        tenant_id=row.tenant_id,
-        auth_type=row.auth_type,
-        has_credential=row.credential is not None,
-        default_query=row.default_query,
-        default_range_minutes=row.default_range_minutes,
-        created_at=row.created_at,
-        updated_at=row.updated_at,
-    )
-
-
 class LokiConfigRepository(AbstractLokiConfigRepository):
     """SQLAlchemy implementation. No cache-aside — same low-traffic,
     high-mutation reasoning as CloudflareConfigRepository."""
@@ -91,10 +72,30 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
+    @staticmethod
+    @helper
+    def _to_read(row: LokiConfig) -> LokiConfigRead:
+        """LokiConfigRead never carries the raw credential, only whether one is
+        set — a derived field with no matching ORM attribute, so plain
+        model_validate(row) can't produce it the way it does for every other
+        Read schema in this codebase."""
+        return LokiConfigRead(
+            id=row.id,
+            environment_id=row.environment_id,
+            endpoint_url=row.endpoint_url,
+            tenant_id=row.tenant_id,
+            auth_type=row.auth_type,
+            has_credential=row.credential is not None,
+            default_query=row.default_query,
+            default_range_minutes=row.default_range_minutes,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
+
     @database
     async def get_by_id(self, entity_id: UUID) -> LokiConfigRead | None:
         row = await self._session.get(LokiConfig, entity_id)
-        return _to_read(row) if row else None
+        return self._to_read(row) if row else None
 
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[LokiConfigRead], int]:
@@ -102,7 +103,7 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
         rows = await self._session.scalars(
             select(LokiConfig).order_by(LokiConfig.id).limit(limit).offset(offset)
         )
-        items = [_to_read(row) for row in rows]
+        items = [self._to_read(row) for row in rows]
         total = await self._session.scalar(select(func.count()).select_from(LokiConfig))
         return items, total or 0
 
@@ -111,7 +112,7 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
         row = await self._session.scalar(
             select(LokiConfig).where(LokiConfig.environment_id == environment_id)
         )
-        return _to_read(row) if row else None
+        return self._to_read(row) if row else None
 
     @database
     async def get_credential_ciphertext(self, environment_id: UUID) -> str | None:
@@ -144,7 +145,7 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
         self._session.add(row)
         await self._session.flush()
         await self._session.refresh(row)
-        return _to_read(row)
+        return self._to_read(row)
 
     @database
     async def update_by_environment_id(
@@ -171,7 +172,7 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
         row.default_range_minutes = default_range_minutes
         await self._session.flush()
         await self._session.refresh(row)
-        return _to_read(row)
+        return self._to_read(row)
 
     @database
     async def delete_by_environment_id(self, environment_id: UUID) -> None:
@@ -181,3 +182,4 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
         if row is not None:
             await self._session.delete(row)
             await self._session.flush()
+
