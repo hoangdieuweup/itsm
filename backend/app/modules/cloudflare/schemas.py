@@ -112,10 +112,12 @@ class CloudflareConfigUpdate(CustomModel):
 
 
 class DnsRecordRead(FrozenModel):
-    """One DNS record."""
+    """One DNS record. environment_id is None when this record's name
+    matches no environment's base_url — a shared-zone record this app
+    doesn't attribute to anything it manages (see sync_dns_records.py)."""
 
     id: UUID
-    environment_id: UUID
+    environment_id: UUID | None
     cf_record_id: str
     record_type: DnsRecordType
     name: str
