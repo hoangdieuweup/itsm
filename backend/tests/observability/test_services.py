@@ -17,12 +17,15 @@ from app.modules.observability.constants import (
     AlertRuleSource,
     AlertSeverity,
     IncidentCategory,
+    IncidentSource,
     IncidentStatus,
     LokiAuthType,
 )
 from app.modules.observability.exceptions import (
     AlertRuleNotFound,
     CloudflareNotBoundForAlerting,
+    IncidentNotFound,
+    InvalidIncidentTransition,
     LokiConfigAlreadyExists,
     LokiConfigNotFound,
     ObservabilityEnvironmentNotFound,
@@ -33,15 +36,20 @@ from app.modules.observability.repository import (
     AbstractLokiConfigRepository,
 )
 from app.modules.observability.schemas import AlertRuleRead, IncidentRead, LokiConfigRead
+from app.modules.observability.services.acknowledge_incident import AcknowledgeIncident
 from app.modules.observability.services.create_alert_rule import CreateAlertRule
 from app.modules.observability.services.create_loki_config import CreateLokiConfig
+from app.modules.observability.services.create_manual_incident import CreateManualIncident
 from app.modules.observability.services.delete_alert_rule import DeleteAlertRule
 from app.modules.observability.services.delete_loki_config import DeleteLokiConfig
+from app.modules.observability.services.get_incident import GetIncident
 from app.modules.observability.services.get_loki_config import GetLokiConfig
 from app.modules.observability.services.handle_cloudflare_webhook import HandleCloudflareWebhook
 from app.modules.observability.services.handle_loki_webhook import HandleLokiWebhook
 from app.modules.observability.services.list_alert_rules import ListAlertRules
 from app.modules.observability.services.list_available_alerts import ListAvailableAlerts
+from app.modules.observability.services.list_incidents import ListIncidents
+from app.modules.observability.services.resolve_incident import ResolveIncident
 from app.modules.observability.services.run_log_query import RunLogQuery
 from app.modules.observability.services.stream_log_tail import StreamLogTail
 from app.modules.observability.services.update_alert_rule import UpdateAlertRule
@@ -1330,3 +1338,159 @@ class TestHandleLokiWebhook:
         await use_case.execute(payload)
         incidents, total = await uow.incidents.list_page_filtered(limit=10, offset=0)
         assert total == 1
+
+
+class TestAcknowledgeIncident:
+    async def test_open_to_acknowledged_succeeds(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        incident = await uow.incidents.create(
+            project_id=uuid4(),
+            environment_id=uuid4(),
+            alert_rule_id=None,
+            source=IncidentSource.MANUAL,
+            category=IncidentCategory.MANUAL,
+            severity=AlertSeverity.LOW,
+            title="t",
+        )
+        use_case = AcknowledgeIncident(uow, audit_api=FakeAuditApi())
+        result = await use_case.execute(incident.id, actor=_actor())
+        assert result.status == IncidentStatus.ACKNOWLEDGED
+        assert result.acknowledged_by == ACTOR_ID
+
+    async def test_resolved_incident_rejects_reacknowledge(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        incident = await uow.incidents.create(
+            project_id=uuid4(),
+            environment_id=uuid4(),
+            alert_rule_id=None,
+            source=IncidentSource.MANUAL,
+            category=IncidentCategory.MANUAL,
+            severity=AlertSeverity.LOW,
+            title="t",
+        )
+        await uow.incidents.update_status(
+            incident.id, status=IncidentStatus.RESOLVED, actor_id=ACTOR_ID, at=datetime.now(UTC)
+        )
+        use_case = AcknowledgeIncident(uow, audit_api=FakeAuditApi())
+        with pytest.raises(InvalidIncidentTransition):
+            await use_case.execute(incident.id, actor=_actor())
+
+    async def test_raises_not_found_when_absent(self) -> None:
+        use_case = AcknowledgeIncident(FakeObservabilityUnitOfWork(), audit_api=FakeAuditApi())
+        with pytest.raises(IncidentNotFound):
+            await use_case.execute(uuid4(), actor=_actor())
+
+
+class TestResolveIncident:
+    async def test_open_to_resolved_skips_acknowledge(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        incident = await uow.incidents.create(
+            project_id=uuid4(),
+            environment_id=uuid4(),
+            alert_rule_id=None,
+            source=IncidentSource.MANUAL,
+            category=IncidentCategory.MANUAL,
+            severity=AlertSeverity.LOW,
+            title="t",
+        )
+        use_case = ResolveIncident(uow, audit_api=FakeAuditApi())
+        result = await use_case.execute(incident.id, actor=_actor())
+        assert result.status == IncidentStatus.RESOLVED
+        assert result.resolved_by == ACTOR_ID
+
+    async def test_resolved_incident_rejects_re_resolve(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        incident = await uow.incidents.create(
+            project_id=uuid4(),
+            environment_id=uuid4(),
+            alert_rule_id=None,
+            source=IncidentSource.MANUAL,
+            category=IncidentCategory.MANUAL,
+            severity=AlertSeverity.LOW,
+            title="t",
+        )
+        await uow.incidents.update_status(
+            incident.id, status=IncidentStatus.RESOLVED, actor_id=ACTOR_ID, at=datetime.now(UTC)
+        )
+        use_case = ResolveIncident(uow, audit_api=FakeAuditApi())
+        with pytest.raises(InvalidIncidentTransition):
+            await use_case.execute(incident.id, actor=_actor())
+
+    async def test_raises_not_found_when_absent(self) -> None:
+        use_case = ResolveIncident(FakeObservabilityUnitOfWork(), audit_api=FakeAuditApi())
+        with pytest.raises(IncidentNotFound):
+            await use_case.execute(uuid4(), actor=_actor())
+
+
+class TestCreateManualIncident:
+    async def test_creates_with_source_manual_and_null_alert_rule(self) -> None:
+        env_id, project_id = uuid4(), uuid4()
+        use_case = CreateManualIncident(
+            FakeObservabilityUnitOfWork(),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id)}),
+            audit_api=FakeAuditApi(),
+        )
+        result = await use_case.execute(
+            environment_id=env_id,
+            category=IncidentCategory.TRAFFIC,
+            severity=AlertSeverity.MEDIUM,
+            title="Manually filed",
+            actor=_actor(),
+        )
+        assert result.source == IncidentSource.MANUAL
+        assert result.alert_rule_id is None
+        assert result.project_id == project_id
+
+    async def test_rejects_unknown_environment(self) -> None:
+        use_case = CreateManualIncident(
+            FakeObservabilityUnitOfWork(), projects_api=FakeProjectsApi({}), audit_api=FakeAuditApi()
+        )
+        with pytest.raises(ObservabilityEnvironmentNotFound):
+            await use_case.execute(
+                environment_id=uuid4(),
+                category=IncidentCategory.TRAFFIC,
+                severity=AlertSeverity.MEDIUM,
+                title="X",
+                actor=_actor(),
+            )
+
+
+class TestListIncidents:
+    async def test_returns_page_and_total(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        project_id = uuid4()
+        await uow.incidents.create(
+            project_id=project_id,
+            environment_id=uuid4(),
+            alert_rule_id=None,
+            source=IncidentSource.MANUAL,
+            category=IncidentCategory.MANUAL,
+            severity=AlertSeverity.LOW,
+            title="A",
+        )
+        use_case = ListIncidents(uow)
+        items, total = await use_case.execute(project_id=project_id, limit=10, offset=0)
+        assert total == 1
+        assert items[0].title == "A"
+
+
+class TestGetIncident:
+    async def test_returns_incident(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        incident = await uow.incidents.create(
+            project_id=uuid4(),
+            environment_id=uuid4(),
+            alert_rule_id=None,
+            source=IncidentSource.MANUAL,
+            category=IncidentCategory.MANUAL,
+            severity=AlertSeverity.LOW,
+            title="A",
+        )
+        use_case = GetIncident(uow)
+        result = await use_case.execute(incident.id)
+        assert result.id == incident.id
+
+    async def test_raises_not_found_when_absent(self) -> None:
+        use_case = GetIncident(FakeObservabilityUnitOfWork())
+        with pytest.raises(IncidentNotFound):
+            await use_case.execute(uuid4())
