@@ -7,6 +7,7 @@ import {
   fetchTunnels,
   refreshTunnelStatus,
   revealTunnelToken,
+  syncTunnels,
 } from "../api/fetchers";
 import { cloudflareTunnelsKeys } from "../api/query-keys";
 
@@ -52,3 +53,14 @@ export function useRefreshTunnelStatus(environmentId: string) {
     },
   });
 }
+
+export function useSyncTunnels(environmentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => syncTunnels(environmentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cloudflareTunnelsKeys.list(environmentId) });
+    },
+  });
+}
+

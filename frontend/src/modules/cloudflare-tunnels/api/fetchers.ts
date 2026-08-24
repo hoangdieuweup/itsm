@@ -15,6 +15,13 @@ export async function fetchTunnels(environmentId: string): Promise<CloudflareTun
   return cloudflareTunnelSchema.array().parse(raw);
 }
 
+export async function syncTunnels(environmentId: string): Promise<CloudflareTunnel[]> {
+  const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_TUNNELS.SYNC(environmentId), {
+    method: "POST",
+  });
+  return cloudflareTunnelSchema.array().parse(raw);
+}
+
 export async function createTunnel(
   environmentId: string,
   name: string,

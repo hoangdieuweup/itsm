@@ -35,7 +35,9 @@
     "openMenu": "Mở menu",
     "closeMenu": "Đóng menu",
     "language": "Ngôn ngữ",
-    "account": "Tài khoản"
+    "account": "Tài khoản",
+    "detail": "Chi tiết",
+    "environments": "Môi trường"
   },
   "dashboard": {
     "welcomeBack": "Chào mừng trở lại, {name}!",

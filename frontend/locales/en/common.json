@@ -35,7 +35,9 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "language": "Language",
-    "account": "Account"
+    "account": "Account",
+    "detail": "Detail",
+    "environments": "Environments"
   },
   "dashboard": {
     "welcomeBack": "Welcome back, {name}!",
