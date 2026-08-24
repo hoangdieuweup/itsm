@@ -95,6 +95,7 @@ source_modules =
     app.modules.projects
     app.modules.audit
     app.modules.common
+    app.modules.observability
 forbidden_modules =
     app.modules.cloudflare.repository
     app.modules.cloudflare.models

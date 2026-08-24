@@ -80,6 +80,19 @@ class AbstractCloudflareAccountRepository(AbstractRepository[CloudflareAccountRe
         order — backs the filtered GET /cloudflare-accounts list."""
         raise NotImplementedError
 
+    @abstractmethod
+    async def get_webhook_destination_ciphertext(self, account_id: UUID) -> tuple[str | None, str | None]:
+        """Return (cf_webhook_destination_id, webhook_secret_ciphertext), both
+        None if a webhook destination was never registered for this account."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def set_webhook_destination(
+        self, account_id: UUID, *, cf_webhook_destination_id: str, secret_ciphertext: str
+    ) -> None:
+        """Persist a newly-registered webhook destination."""
+        raise NotImplementedError
+
 
 class CloudflareAccountRepository(AbstractCloudflareAccountRepository):
     """SQLAlchemy implementation. Every read/write of cloudflare_accounts goes through this class."""
@@ -167,6 +180,24 @@ class CloudflareAccountRepository(AbstractCloudflareAccountRepository):
         """Return the raw api_token column, still Fernet-ciphertext. Never cached."""
         row = await self._session.get(CloudflareAccount, account_id)
         return row.api_token if row is not None else None
+
+    @database
+    async def get_webhook_destination_ciphertext(self, account_id: UUID) -> tuple[str | None, str | None]:
+        row = await self._session.get(CloudflareAccount, account_id)
+        if row is None:
+            return None, None
+        return row.cf_webhook_destination_id, row.webhook_secret_ciphertext
+
+    @database
+    async def set_webhook_destination(
+        self, account_id: UUID, *, cf_webhook_destination_id: str, secret_ciphertext: str
+    ) -> None:
+        row = await self._session.get(CloudflareAccount, account_id)
+        if row is None:
+            raise ValueError(f"cloudflare account {account_id} does not exist")
+        row.cf_webhook_destination_id = cf_webhook_destination_id
+        row.webhook_secret_ciphertext = secret_ciphertext
+        await self._session.flush()
 
 
 class AbstractCloudflareAccountManagerRepository(AbstractRepository[CloudflareAccountManagerRow, tuple]):

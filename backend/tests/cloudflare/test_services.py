@@ -86,6 +86,7 @@ class FakeCloudflareAccountRepository(AbstractCloudflareAccountRepository):
     def __init__(self) -> None:
         self._rows: dict[UUID, CloudflareAccountRead] = {}
         self._ciphertexts: dict[UUID, str] = {}
+        self._webhook_destinations: dict[UUID, tuple[str | None, str | None]] = {}
 
     async def get_by_id(self, entity_id: UUID) -> CloudflareAccountRead | None:
         return self._rows.get(entity_id)
@@ -128,6 +129,14 @@ class FakeCloudflareAccountRepository(AbstractCloudflareAccountRepository):
 
     async def get_token_ciphertext(self, account_id: UUID) -> str | None:
         return self._ciphertexts.get(account_id)
+
+    async def get_webhook_destination_ciphertext(self, account_id: UUID) -> tuple[str | None, str | None]:
+        return self._webhook_destinations.get(account_id, (None, None))
+
+    async def set_webhook_destination(
+        self, account_id: UUID, *, cf_webhook_destination_id: str, secret_ciphertext: str
+    ) -> None:
+        self._webhook_destinations[account_id] = (cf_webhook_destination_id, secret_ciphertext)
 
 
 class FakeCloudflareAccountManagerRepository(AbstractCloudflareAccountManagerRepository):
