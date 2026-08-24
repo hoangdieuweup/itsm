@@ -31,7 +31,7 @@
     "webhookUrl": "Webhook URL",
     "botName": "Bot Name",
     "messageTemplate": "Message Template",
-    "messageTemplateHint": "Use {message} as a placeholder — falls back to the raw message if left empty.",
+    "messageTemplateHint": "Use '{message}' as a placeholder — falls back to the raw message if left empty.",
     "otherConfig": "Config (JSON)",
     "typeImmutableHint": "Type cannot be changed after creation.",
     "secretKeepHint": "Leave blank to keep the current value."

@@ -31,7 +31,7 @@
     "webhookUrl": "Webhook URL",
     "botName": "Tên Bot",
     "messageTemplate": "Mẫu tin nhắn",
-    "messageTemplateHint": "Dùng {message} làm placeholder — nếu để trống sẽ dùng nguyên nội dung tin nhắn.",
+    "messageTemplateHint": "Dùng '{message}' làm placeholder — nếu để trống sẽ dùng nguyên nội dung tin nhắn.",
     "otherConfig": "Config (JSON)",
     "typeImmutableHint": "Không thể đổi loại sau khi tạo.",
     "secretKeepHint": "Để trống để giữ nguyên giá trị hiện tại."
