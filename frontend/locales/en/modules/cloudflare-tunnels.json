@@ -12,7 +12,7 @@
   },
   "tokenRevealed": {
     "title": "Connector token",
-    "hint": "Copy this now — it will not be shown here again. Use it with `cloudflared tunnel run --token <token>`."
+    "hint": "Copy this now — it will not be shown here again. Use it with `cloudflared tunnel run --token '<'token'>'`."
   },
   "deleteConfirm": {
     "action": "Delete tunnel",

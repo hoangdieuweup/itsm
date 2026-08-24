@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Waypoints, Plus, Trash2, RefreshCw, KeyRound } from "lucide-react";
 import { Button } from "@/shared/ui/button";
@@ -13,6 +13,7 @@ import {
   useDeleteTunnel,
   useRefreshTunnelStatus,
   useRevealTunnelToken,
+  useSyncTunnels,
 } from "../hooks/use-tunnels";
 import type { CloudflareTunnel } from "../model/schema";
 import { TunnelStatusBadge } from "./tunnel-status-badge";
@@ -26,6 +27,15 @@ export function CloudflareTunnelsPageContent({ environmentId }: { environmentId:
   const deleteTunnel = useDeleteTunnel(environmentId);
   const refreshStatus = useRefreshTunnelStatus(environmentId);
   const revealToken = useRevealTunnelToken(environmentId);
+  const syncMutation = useSyncTunnels(environmentId);
+
+  const syncTriggered = useRef(false);
+  useEffect(() => {
+    if (!syncTriggered.current) {
+      syncTriggered.current = true;
+      syncMutation.mutate();
+    }
+  }, [syncMutation]);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedTunnelId, setSelectedTunnelId] = useState<string | null>(null);

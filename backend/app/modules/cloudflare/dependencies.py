@@ -35,6 +35,8 @@ from app.modules.cloudflare.services.list_tunnels import ListTunnels
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
 from app.modules.cloudflare.services.list_zones import ListZones
 from app.modules.cloudflare.services.refresh_tunnel_status import RefreshTunnelStatus
+from app.modules.cloudflare.services.sync_dns_records import SyncDnsRecords
+from app.modules.cloudflare.services.sync_tunnels import SyncTunnels
 from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
 from app.modules.cloudflare.services.remove_tunnel_hostname import RemoveTunnelHostname
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
@@ -232,6 +234,14 @@ async def get_list_dns_records(uow: AbstractCloudflareUnitOfWork = Depends(get_u
     return ListDnsRecords(uow)
 
 
+async def get_sync_dns_records(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+) -> SyncDnsRecords:
+    """Provide the sync-dns-records use case."""
+    return SyncDnsRecords(uow, client)
+
+
 async def get_create_dns_record(
     uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
     client: CloudflareClient = Depends(get_cloudflare_client),
@@ -297,6 +307,14 @@ async def get_refresh_tunnel_status(
 async def get_list_tunnels(uow: AbstractCloudflareUnitOfWork = Depends(get_uow)) -> ListTunnels:
     """Provide the list-tunnels use case."""
     return ListTunnels(uow)
+
+
+async def get_sync_tunnels(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+) -> SyncTunnels:
+    """Provide the sync-tunnels use case."""
+    return SyncTunnels(uow, client)
 
 
 async def get_list_tunnel_hostnames(

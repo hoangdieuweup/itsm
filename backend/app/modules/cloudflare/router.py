@@ -40,6 +40,8 @@ from app.modules.cloudflare.dependencies import (
     get_list_visible_accounts,
     get_list_zones,
     get_refresh_tunnel_status,
+    get_sync_dns_records,
+    get_sync_tunnels,
     get_remove_manager,
     get_remove_tunnel_hostname,
     get_reveal_token,
@@ -96,6 +98,8 @@ from app.modules.cloudflare.services.list_tunnels import ListTunnels
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
 from app.modules.cloudflare.services.list_zones import ListZones
 from app.modules.cloudflare.services.refresh_tunnel_status import RefreshTunnelStatus
+from app.modules.cloudflare.services.sync_dns_records import SyncDnsRecords
+from app.modules.cloudflare.services.sync_tunnels import SyncTunnels
 from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
 from app.modules.cloudflare.services.remove_tunnel_hostname import RemoveTunnelHostname
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
@@ -342,6 +346,18 @@ async def list_environment_dns_records(
     return ApiResponse[list[DnsRecordRead]](success=True, data=records)
 
 
+@router.post("/environments/{environment_id}/dns-records/sync")
+async def sync_environment_dns_records(
+    environment_id: UUID,
+    use_case: SyncDnsRecords = Depends(get_sync_dns_records),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
+) -> ApiResponse[list[DnsRecordRead]]:
+    """Sync DNS records from Cloudflare API into local DB, then return the fresh list."""
+    records = await use_case.execute(environment_id)
+    return ApiResponse[list[DnsRecordRead]](success=True, data=records)
+
+
 @router.get("/environments/{environment_id}/cloudflare-audit-logs")
 async def list_cloudflare_audit_logs(
     environment_id: UUID,
@@ -417,6 +433,18 @@ async def list_environment_tunnels(
     _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
 ) -> ApiResponse[list[CloudflareTunnelRead]]:
     """List every tunnel bound to an environment (1:N)."""
+    tunnels = await use_case.execute(environment_id)
+    return ApiResponse[list[CloudflareTunnelRead]](success=True, data=tunnels)
+
+
+@router.post("/environments/{environment_id}/cloudflare-tunnels/sync")
+async def sync_environment_tunnels(
+    environment_id: UUID,
+    use_case: SyncTunnels = Depends(get_sync_tunnels),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
+) -> ApiResponse[list[CloudflareTunnelRead]]:
+    """Sync tunnels from Cloudflare API into local DB for an environment."""
     tunnels = await use_case.execute(environment_id)
     return ApiResponse[list[CloudflareTunnelRead]](success=True, data=tunnels)
 

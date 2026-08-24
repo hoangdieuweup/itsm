@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Cloud, Globe, Plus, Pencil, Trash2, ExternalLink } from "lucide-react";
 import { Button } from "@/shared/ui/button";
@@ -11,7 +11,7 @@ import { MANAGED_BY } from "@/shared/constants/cloudflare";
 import { useEnvironmentQuery } from "@/entities/environment";
 import { useCloudflareConfigQuery } from "@/entities/cloudflare-config";
 import { useDeleteCloudflareConfig } from "../hooks/use-cloudflare-config";
-import { useDnsRecordsQuery, useDeleteDnsRecord } from "../hooks/use-dns-records";
+import { useDnsRecordsQuery, useDeleteDnsRecord, useSyncDnsRecords } from "../hooks/use-dns-records";
 import type { DnsRecord } from "../model/schema";
 import { CloudflareBindingForm } from "./cloudflare-binding-form";
 import { DnsRecordFormDialog } from "./dns-record-form-dialog";
@@ -24,6 +24,15 @@ export function CloudflareDnsPageContent({ environmentId }: { environmentId: str
   const { data: records = [] } = useDnsRecordsQuery(environmentId, isBound);
   const deleteConfig = useDeleteCloudflareConfig(environmentId);
   const deleteRecord = useDeleteDnsRecord(environmentId);
+  const syncMutation = useSyncDnsRecords(environmentId);
+
+  const syncTriggered = useRef(false);
+  useEffect(() => {
+    if (isBound && !syncTriggered.current) {
+      syncTriggered.current = true;
+      syncMutation.mutate();
+    }
+  }, [isBound, syncMutation]);
 
   const [recordFormTarget, setRecordFormTarget] = useState<DnsRecord | "create" | null>(null);
   const [recordDeleteTarget, setRecordDeleteTarget] = useState<DnsRecord | null>(null);

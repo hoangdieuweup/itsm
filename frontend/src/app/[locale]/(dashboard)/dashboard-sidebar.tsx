@@ -173,9 +173,12 @@ function SidebarNavList({
                   isCollapsed && "justify-center px-0 h-11"
                 )}
               >
-                {item.active && (
-                  <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-blue-600 dark:bg-blue-400" />
-                )}
+                <span
+                  className={cn(
+                    "absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-blue-600 transition-opacity dark:bg-blue-400",
+                    item.active ? "opacity-100" : "opacity-0"
+                  )}
+                />
                 <Icon
                   className={cn(
                     "size-5 shrink-0 transition-transform group-hover:scale-105",
@@ -285,42 +288,44 @@ export function DashboardSidebar({
       href: ROUTES.adminUsers,
       label: t("users"),
       icon: Users,
-      active: pathname === ROUTES.adminUsers,
+      active: pathname.startsWith(ROUTES.adminUsers),
       permission: { action: ACTIONS.READ, resource: RESOURCES.USER },
     },
     {
       href: ROUTES.adminRoles,
       label: t("roles"),
       icon: Shield,
-      active: pathname === ROUTES.adminRoles,
+      active: pathname.startsWith(ROUTES.adminRoles),
       permission: { action: ACTIONS.READ, resource: RESOURCES.ROLE },
     },
     {
       href: ROUTES.adminProjects,
       label: t("projects"),
       icon: FolderKanban,
-      active: pathname === ROUTES.adminProjects,
+      active: pathname.startsWith(ROUTES.adminProjects),
       permission: { action: ACTIONS.READ, resource: RESOURCES.PROJECT },
     },
     {
       href: ROUTES.adminAuditLog,
       label: t("auditLog"),
       icon: ScrollText,
-      active: pathname === ROUTES.adminAuditLog,
+      active: pathname.startsWith(ROUTES.adminAuditLog),
       permission: { action: ACTIONS.READ, resource: RESOURCES.AUDIT_LOG },
     },
     {
       href: ROUTES.adminCloudflareAccounts,
       label: t("cloudflareAccounts"),
       icon: Cloud,
-      active: pathname === ROUTES.adminCloudflareAccounts,
+      active:
+        pathname.startsWith(ROUTES.adminCloudflareAccounts) ||
+        pathname.startsWith(ROUTES.adminEnvironments),
       permission: { action: ACTIONS.VIEW, resource: RESOURCES.CLOUDFLARE_ACCOUNT },
     },
     {
       href: ROUTES.adminIncidents,
       label: t("incidents"),
       icon: Siren,
-      active: pathname === ROUTES.adminIncidents,
+      active: pathname.startsWith(ROUTES.adminIncidents),
       permission: { action: ACTIONS.READ, resource: RESOURCES.INCIDENT },
     },
   ];

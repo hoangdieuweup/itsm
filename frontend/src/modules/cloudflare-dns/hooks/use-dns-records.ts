@@ -5,6 +5,7 @@ import {
   createDnsRecord,
   deleteDnsRecord,
   fetchDnsRecords,
+  syncDnsRecords,
   updateDnsRecord,
   type DnsRecordFormValues,
   type DnsRecordUpdateValues,
@@ -16,6 +17,16 @@ export function useDnsRecordsQuery(environmentId: string, enabled: boolean) {
     queryKey: cloudflareDnsKeys.records(environmentId),
     queryFn: () => fetchDnsRecords(environmentId),
     enabled,
+  });
+}
+
+export function useSyncDnsRecords(environmentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => syncDnsRecords(environmentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cloudflareDnsKeys.records(environmentId) });
+    },
   });
 }
 

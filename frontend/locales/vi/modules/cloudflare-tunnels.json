@@ -12,7 +12,7 @@
   },
   "tokenRevealed": {
     "title": "Token kết nối",
-    "hint": "Sao chép ngay bây giờ — sẽ không hiển thị lại. Sử dụng với `cloudflared tunnel run --token <token>`."
+    "hint": "Sao chép ngay bây giờ — sẽ không hiển thị lại. Sử dụng với `cloudflared tunnel run --token '<'token'>'`."
   },
   "deleteConfirm": {
     "action": "Xóa tunnel",
