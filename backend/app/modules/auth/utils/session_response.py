@@ -33,24 +33,25 @@ class AuthSessionResponses:
     def set_session_cookies(response: Response, tokens: AppTokenSet) -> None:
         """Set this app's own session as two HttpOnly cookies (docs section 5.5)."""
         samesite: AuthCookies.SameSite = "none" if auth_settings.COOKIE_SECURE else "lax"
-        common = {
-            "httponly": True,
-            "samesite": samesite,
-            "secure": auth_settings.COOKIE_SECURE,
-            "path": "/",
-            "domain": auth_settings.cookie_domain,
-        }
         response.set_cookie(
             AuthCookies.ACCESS_TOKEN,
             tokens.access_token,
             max_age=auth_settings.ACCESS_TOKEN_TTL_SECONDS,
-            **common,
+            httponly=True,
+            samesite=samesite,
+            secure=auth_settings.COOKIE_SECURE,
+            path="/",
+            domain=auth_settings.cookie_domain,
         )
         response.set_cookie(
             AuthCookies.REFRESH_TOKEN,
             tokens.refresh_token,
             max_age=auth_settings.REFRESH_TOKEN_TTL_SECONDS,
-            **common,
+            httponly=True,
+            samesite=samesite,
+            secure=auth_settings.COOKIE_SECURE,
+            path="/",
+            domain=auth_settings.cookie_domain,
         )
 
     @staticmethod

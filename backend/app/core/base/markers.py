@@ -15,7 +15,7 @@ than one job — split it instead of stacking markers.
 
 import functools
 from collections.abc import Callable
-from typing import Any, TypeVar, overload
+from typing import Any, TypeVar
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
@@ -25,10 +25,6 @@ class _MethodMarker:
 
     layer: str
 
-    @overload
-    def __new__(cls, func: _F) -> _F: ...  # type: ignore[misc]
-    @overload
-    def __new__(cls, func: Callable[..., Any]) -> "_MethodMarker": ...
     def __new__(cls, func: Callable[..., Any]) -> Any:
         instance = super().__new__(cls)
         instance._init(func)
@@ -38,6 +34,7 @@ class _MethodMarker:
         functools.update_wrapper(self, func)
         self._func = func
         setattr(func, "__layer__", self.layer)  # noqa: B010 -- dynamic attribute, not a fixed attr of Callable
+        setattr(self, "__layer__", self.layer)
 
     def __get__(self, obj: Any, objtype: type | None = None) -> Any:
         """Delegate binding to the wrapped function — sync and async both bind correctly this way."""
