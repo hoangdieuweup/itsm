@@ -59,6 +59,9 @@ class FakeConfigsRepo:
             if c.cloudflare_account_id == cloudflare_account_id
         ]
 
+    async def list_environment_ids_for_zone(self, zone_id):
+        return [c.environment_id for c in self._configs.values() if c.zone_id == zone_id]
+
 
 class FakeDnsRecordsRepo:
     def __init__(self) -> None:
@@ -81,27 +84,46 @@ class FakeDnsRecordsRepo:
         managed_by,
         last_synced_at,
     ):
-        row = DnsRecordRead(
-            id=uuid4(),
-            environment_id=environment_id,
-            cf_record_id=cf_record_id,
-            record_type=record_type,
-            name=name,
-            content=content,
-            priority=priority,
-            proxied=proxied,
-            ttl=ttl,
-            managed_by=managed_by,
-            created_by=None,
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
+        existing = self._rows.get(cf_record_id)
+        if existing is None:
+            row = DnsRecordRead(
+                id=uuid4(),
+                environment_id=environment_id,
+                cf_record_id=cf_record_id,
+                record_type=record_type,
+                name=name,
+                content=content,
+                priority=priority,
+                proxied=proxied,
+                ttl=ttl,
+                managed_by=managed_by,
+                created_by=None,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+        else:
+            # Only EXTERNAL rows self-heal environment_id on every sync —
+            # mirrors the real repository's SYSTEM-preserving behavior.
+            new_environment_id = (
+                environment_id if existing.managed_by == ManagedBy.EXTERNAL else existing.environment_id
+            )
+            row = existing.model_copy(
+                update={
+                    "environment_id": new_environment_id,
+                    "record_type": record_type,
+                    "name": name,
+                    "content": content,
+                    "priority": priority,
+                    "proxied": proxied,
+                    "ttl": ttl,
+                }
+            )
         self._rows[cf_record_id] = row
         return row
 
-    async def delete_not_in_cf_ids(self, environment_id, keep_cf_ids):
+    async def delete_not_in_cf_ids(self, environment_ids, keep_cf_ids):
         for cf_id, row in list(self._rows.items()):
-            if row.environment_id == environment_id and cf_id not in keep_cf_ids:
+            if row.environment_id in environment_ids and cf_id not in keep_cf_ids:
                 self._rows.pop(cf_id, None)
 
 
@@ -344,8 +366,11 @@ class TestReconcileDnsRecords:
         client.dns_records = [
             {"id": "rec-1", "type": "A", "name": "app", "content": "1.2.3.4", "proxied": False, "ttl": 1}
         ]
+        projects_api = FakeProjectsApi({env_id: SimpleNamespace(id=env_id, base_url="https://app")})
         api = CloudflareApi(
-            FakeUow(accounts_repo, FakeConfigsRepo({env_id: config})), client=client, projects_api=object()
+            FakeUow(accounts_repo, FakeConfigsRepo({env_id: config})),
+            client=client,
+            projects_api=projects_api,
         )
 
         diff = await api.reconcile_dns_records(env_id)
@@ -391,10 +416,11 @@ class TestReconcileDnsRecords:
         client.dns_records = [
             {"id": "rec-stays", "type": "A", "name": "app", "content": "1.2.3.4", "proxied": False, "ttl": 1}
         ]
+        projects_api = FakeProjectsApi({env_id: SimpleNamespace(id=env_id, base_url="https://app")})
         api = CloudflareApi(
             FakeUow(accounts_repo, FakeConfigsRepo({env_id: config}), dns_records=dns_records),
             client=client,
-            projects_api=object(),
+            projects_api=projects_api,
         )
 
         diff = await api.reconcile_dns_records(env_id)
@@ -423,10 +449,11 @@ class TestReconcileDnsRecords:
         client.dns_records = [
             {"id": "rec-1", "type": "A", "name": "app", "content": "1.2.3.4", "proxied": False, "ttl": 1}
         ]
+        projects_api = FakeProjectsApi({env_id: SimpleNamespace(id=env_id, base_url="https://app")})
         api = CloudflareApi(
             FakeUow(accounts_repo, FakeConfigsRepo({env_id: config}), dns_records=dns_records),
             client=client,
-            projects_api=object(),
+            projects_api=projects_api,
         )
 
         diff = await api.reconcile_dns_records(env_id)

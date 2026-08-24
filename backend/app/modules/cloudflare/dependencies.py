@@ -237,9 +237,10 @@ async def get_list_dns_records(uow: AbstractCloudflareUnitOfWork = Depends(get_u
 async def get_sync_dns_records(
     uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
     client: CloudflareClient = Depends(get_cloudflare_client),
+    projects_api: ProjectsApi = Depends(get_projects_api),
 ) -> SyncDnsRecords:
     """Provide the sync-dns-records use case."""
-    return SyncDnsRecords(uow, client)
+    return SyncDnsRecords(uow, client, projects_api)
 
 
 async def get_create_dns_record(

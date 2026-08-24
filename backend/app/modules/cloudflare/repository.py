@@ -358,6 +358,16 @@ class AbstractCloudflareConfigRepository(AbstractRepository[CloudflareConfigRead
         raise NotImplementedError
 
     @abstractmethod
+    async def list_environment_ids_for_zone(self, zone_id: str) -> list[UUID]:
+        """Return every environment_id currently bound to this Cloudflare
+        zone — used by SyncDnsRecords to match each record's name against
+        every sibling environment sharing the zone, not just the one that
+        triggered the sync. DNS records are zone-scoped, not account-scoped
+        like Tunnels, so this filters on zone_id rather than
+        cloudflare_account_id."""
+        raise NotImplementedError
+
+    @abstractmethod
     async def list_all(self) -> list[CloudflareConfigRead]:
         """Return every cloudflare_configs row, unfiltered — the full set
         of Cloudflare-bound environments the drift reconciliation job must
@@ -445,6 +455,13 @@ class CloudflareConfigRepository(AbstractCloudflareConfigRepository):
         return list(rows)
 
     @database
+    async def list_environment_ids_for_zone(self, zone_id: str) -> list[UUID]:
+        rows = await self._session.scalars(
+            select(CloudflareConfig.environment_id).where(CloudflareConfig.zone_id == zone_id)
+        )
+        return list(rows)
+
+    @database
     async def list_all(self) -> list[CloudflareConfigRead]:
         rows = await self._session.scalars(select(CloudflareConfig).order_by(CloudflareConfig.created_at))
         return [CloudflareConfigRead.model_validate(row) for row in rows]
@@ -491,7 +508,7 @@ class AbstractDnsRecordRepository(AbstractRepository[DnsRecordRead, UUID]):
     async def upsert_from_sync(
         self,
         *,
-        environment_id: UUID,
+        environment_id: UUID | None,
         cf_record_id: str,
         record_type: DnsRecordType,
         name: str,
@@ -502,13 +519,25 @@ class AbstractDnsRecordRepository(AbstractRepository[DnsRecordRead, UUID]):
         managed_by: ManagedBy,
         last_synced_at: datetime,
     ) -> DnsRecordRead:
-        """Insert or update a DNS record row from a Cloudflare API sync."""
+        """Insert or update a DNS record row from a Cloudflare API sync.
+        environment_id is the freshly-recomputed match for this pass (None
+        if no bound environment's base_url matches this record's name) —
+        applied on both insert AND update, so a record's attribution
+        self-heals on every sync rather than being fixed at first
+        discovery."""
         raise NotImplementedError
 
     @abstractmethod
-    async def delete_not_in_cf_ids(self, environment_id: UUID, keep_cf_ids: set[str]) -> None:
-        """Delete local records whose cf_record_id is NOT in the given set
-        (they were deleted on Cloudflare)."""
+    async def delete_not_in_cf_ids(self, environment_ids: list[UUID], keep_cf_ids: set[str]) -> None:
+        """Delete local records attributed to any of the given environments
+        whose cf_record_id is NOT in the given set (they were deleted on
+        Cloudflare). Takes every sibling environment sharing the synced
+        zone, not just the one that triggered the sync — otherwise a
+        record belonging to a sibling would only ever get cleaned up when
+        that specific sibling happens to sync. Records with
+        environment_id=None (matching no known environment) are not swept
+        by this — same accepted, disclosed gap as unmatched Tunnel
+        hostnames."""
         raise NotImplementedError
 
 
@@ -597,7 +626,7 @@ class DnsRecordRepository(AbstractDnsRecordRepository):
     async def upsert_from_sync(
         self,
         *,
-        environment_id: UUID,
+        environment_id: UUID | None,
         cf_record_id: str,
         record_type: DnsRecordType,
         name: str,
@@ -624,6 +653,8 @@ class DnsRecordRepository(AbstractDnsRecordRepository):
             )
             self._session.add(row)
         else:
+            if row.managed_by == ManagedBy.EXTERNAL:
+                row.environment_id = environment_id
             row.record_type = record_type
             row.name = name
             row.content = content
@@ -636,10 +667,10 @@ class DnsRecordRepository(AbstractDnsRecordRepository):
         return DnsRecordRead.model_validate(row)
 
     @database
-    async def delete_not_in_cf_ids(self, environment_id: UUID, keep_cf_ids: set[str]) -> None:
+    async def delete_not_in_cf_ids(self, environment_ids: list[UUID], keep_cf_ids: set[str]) -> None:
         stmt = (
             sa_delete(DnsRecord)
-            .where(DnsRecord.environment_id == environment_id)
+            .where(DnsRecord.environment_id.in_(environment_ids))
             .where(DnsRecord.cf_record_id.notin_(keep_cf_ids))
         )
         await self._session.execute(stmt)

@@ -74,6 +74,7 @@ from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccou
 from app.modules.cloudflare.services.remove_tunnel_hostname import RemoveTunnelHostname
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
 from app.modules.cloudflare.services.reveal_tunnel_token import RevealCloudflareTunnelToken
+from app.modules.cloudflare.services.sync_dns_records import SyncDnsRecords
 from app.modules.cloudflare.services.sync_tunnels import SyncTunnels
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
@@ -227,6 +228,9 @@ class FakeConfigsRepo:
             if row.cloudflare_account_id == cloudflare_account_id
         ]
 
+    async def list_environment_ids_for_zone(self, zone_id):
+        return [row.environment_id for row in self._rows.values() if row.zone_id == zone_id]
+
     async def list_all(self):
         return list(self._rows.values())
 
@@ -272,6 +276,68 @@ class FakeDnsRecordsRepo:
 
     async def delete(self, record_id):
         self._rows.pop(record_id, None)
+
+    async def upsert_from_sync(
+        self,
+        *,
+        environment_id,
+        cf_record_id,
+        record_type,
+        name,
+        content,
+        priority,
+        proxied,
+        ttl,
+        managed_by,
+        last_synced_at,
+    ):
+        existing = next((r for r in self._rows.values() if r.cf_record_id == cf_record_id), None)
+        if existing is None:
+            row = DnsRecordRead(
+                id=uuid4(),
+                environment_id=environment_id,
+                cf_record_id=cf_record_id,
+                record_type=record_type,
+                name=name,
+                content=content,
+                priority=priority,
+                proxied=proxied,
+                ttl=ttl,
+                managed_by=managed_by,
+                created_by=None,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+            self._rows[row.id] = row
+            return row
+        # Mirrors the real repository: only EXTERNAL rows self-heal their
+        # environment_id on every sync — a SYSTEM row's attribution was set
+        # deliberately by CreateDnsRecord and must never be overwritten.
+        new_environment_id = (
+            environment_id if existing.managed_by == ManagedBy.EXTERNAL else existing.environment_id
+        )
+        updated = existing.model_copy(
+            update={
+                "environment_id": new_environment_id,
+                "record_type": record_type,
+                "name": name,
+                "content": content,
+                "priority": priority,
+                "proxied": proxied,
+                "ttl": ttl,
+            }
+        )
+        self._rows[existing.id] = updated
+        return updated
+
+    async def delete_not_in_cf_ids(self, environment_ids, keep_cf_ids):
+        stale = [
+            r.id
+            for r in self._rows.values()
+            if r.environment_id in environment_ids and r.cf_record_id not in keep_cf_ids
+        ]
+        for record_id in stale:
+            self._rows.pop(record_id, None)
 
 
 class FakeCloudflareTunnelRepository:
@@ -1537,6 +1603,39 @@ class TestUpdateDnsRecord:
                 env_id, uuid4(), "x", None, False, 1, actor=actor
             )
 
+    async def test_rejects_record_owned_by_a_different_environment(self) -> None:
+        """The actual cross-project-edit fix: a record synced to a sibling
+        environment sharing the same zone must 404 for this environment's
+        caller, not succeed silently."""
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        env_id, other_env_id = uuid4(), uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+        other_record = await uow.dns_records.create(
+            environment_id=other_env_id,
+            cf_record_id="rec-other",
+            record_type=DnsRecordType.A,
+            name="backend",
+            content="1.2.3.4",
+            priority=None,
+            proxied=False,
+            ttl=1,
+            created_by=ACTOR_ID,
+        )
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(DnsRecordNotFound):
+            await UpdateDnsRecord(uow, FakeDnsClientForUpdate(), FakeAuditApi()).execute(
+                env_id, other_record.id, "9.9.9.9", None, False, 1, actor=actor
+            )
+
 
 class FakeDnsClientForDelete(FakeCloudflareClient):
     def __init__(self) -> None:
@@ -1637,6 +1736,195 @@ class TestDeleteDnsRecord:
             await DeleteDnsRecord(uow, FakeDnsClientForDelete(), FakeAuditApi()).execute(
                 env_id, uuid4(), actor=actor
             )
+
+    async def test_rejects_record_owned_by_a_different_environment(self) -> None:
+        """The actual cross-project-delete fix: a record synced to a sibling
+        environment sharing the same zone must 404 for this environment's
+        caller, not succeed silently."""
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="A",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            created_by=ACTOR_ID,
+        )
+        env_id, other_env_id = uuid4(), uuid4()
+        await uow.configs.create(
+            environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+        other_record = await uow.dns_records.create(
+            environment_id=other_env_id,
+            cf_record_id="rec-other",
+            record_type=DnsRecordType.A,
+            name="backend",
+            content="1.2.3.4",
+            priority=None,
+            proxied=False,
+            ttl=1,
+            created_by=ACTOR_ID,
+        )
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+        client = FakeDnsClientForDelete()
+
+        with pytest.raises(DnsRecordNotFound):
+            await DeleteDnsRecord(uow, client, FakeAuditApi()).execute(env_id, other_record.id, actor=actor)
+        # Never even attempted the Cloudflare call for a record this
+        # environment doesn't own.
+        assert client.deleted == []
+
+
+class FakeDnsSyncClient(FakeCloudflareClient):
+    """Fakes only list_dns_records — the one Cloudflare call SyncDnsRecords
+    makes."""
+
+    def __init__(self, records: list[dict]) -> None:
+        super().__init__()
+        self._records = records
+
+    async def list_dns_records(self, *, zone_id, api_token):
+        return self._records
+
+
+class TestSyncDnsRecords:
+    async def _setup(self, *, sibling_base_urls: dict[UUID, str | None] | None = None, cf_records=None):
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="acc",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            created_by=None,
+        )
+        triggering_env_id = uuid4()
+        await uow.configs.create(
+            environment_id=triggering_env_id,
+            cloudflare_account_id=account.id,
+            zone_id="shared-zone",
+            zone_name="agentsplatform.cloud",
+        )
+        environments: dict = {}
+        if sibling_base_urls:
+            for sibling_id, base_url in sibling_base_urls.items():
+                await uow.configs.create(
+                    environment_id=sibling_id,
+                    cloudflare_account_id=account.id,
+                    zone_id="shared-zone",
+                    zone_name="agentsplatform.cloud",
+                )
+                environments[sibling_id] = SimpleNamespace(id=sibling_id, base_url=base_url)
+        projects_api = FakeProjectsApi(environments)
+        client = FakeDnsSyncClient(cf_records or [])
+        return uow, triggering_env_id, projects_api, client
+
+    async def test_attributes_each_sibling_environments_own_records_correctly(self) -> None:
+        """The literal regression test for the bug: two environments sharing
+        one zone, sync triggered from one, records correctly split between
+        both rather than all claimed by whichever synced."""
+        agent_mkt_id, itsm_id = uuid4(), uuid4()
+        cf_records = [
+            {
+                "id": "rec-agent-mkt",
+                "type": "A",
+                "name": "agent-mkt.agentsplatform.cloud",
+                "content": "1.1.1.1",
+            },
+            {"id": "rec-itsm", "type": "A", "name": "itsm.agentsplatform.cloud", "content": "2.2.2.2"},
+        ]
+        uow, triggering_env_id, projects_api, client = await self._setup(
+            sibling_base_urls={
+                agent_mkt_id: "https://agent-mkt.agentsplatform.cloud",
+                itsm_id: "https://itsm.agentsplatform.cloud",
+            },
+            cf_records=cf_records,
+        )
+
+        await SyncDnsRecords(uow, client, projects_api).execute(triggering_env_id)
+
+        agent_mkt_records = await uow.dns_records.list_for_environment(agent_mkt_id)
+        itsm_records = await uow.dns_records.list_for_environment(itsm_id)
+        assert [r.cf_record_id for r in agent_mkt_records] == ["rec-agent-mkt"]
+        assert [r.cf_record_id for r in itsm_records] == ["rec-itsm"]
+
+    async def test_record_matching_no_environment_gets_none(self) -> None:
+        agent_mkt_id = uuid4()
+        cf_records = [
+            {"id": "rec-backend", "type": "CNAME", "name": "backend.agentsplatform.cloud", "content": "x"},
+        ]
+        uow, triggering_env_id, projects_api, client = await self._setup(
+            sibling_base_urls={agent_mkt_id: "https://agent-mkt.agentsplatform.cloud"},
+            cf_records=cf_records,
+        )
+
+        await SyncDnsRecords(uow, client, projects_api).execute(triggering_env_id)
+
+        assert await uow.dns_records.list_for_environment(agent_mkt_id) == []
+        assert await uow.dns_records.list_for_environment(triggering_env_id) == []
+        unmatched = [r for r in uow.dns_records._rows.values() if r.cf_record_id == "rec-backend"]
+        assert len(unmatched) == 1
+        assert unmatched[0].environment_id is None
+
+    async def test_system_record_attribution_is_never_overwritten_by_matching(self) -> None:
+        """A record CreateDnsRecord deliberately attributed to an
+        environment must survive a sync even if its name doesn't exactly
+        equal that environment's base_url (e.g. an "api." subdomain)."""
+        uow, triggering_env_id, projects_api, client = await self._setup(
+            cf_records=[
+                {
+                    "id": "rec-api",
+                    "type": "A",
+                    "name": "api.agent-mkt.agentsplatform.cloud",
+                    "content": "9.9.9.9",
+                }
+            ],
+        )
+        await uow.dns_records.create(
+            environment_id=triggering_env_id,
+            cf_record_id="rec-api",
+            record_type=DnsRecordType.A,
+            name="api.agent-mkt.agentsplatform.cloud",
+            content="1.2.3.4",
+            priority=None,
+            proxied=False,
+            ttl=1,
+            created_by=ACTOR_ID,
+        )
+
+        await SyncDnsRecords(uow, client, projects_api).execute(triggering_env_id)
+
+        records = await uow.dns_records.list_for_environment(triggering_env_id)
+        assert [r.cf_record_id for r in records] == ["rec-api"]
+        assert records[0].managed_by == ManagedBy.SYSTEM
+        assert records[0].content == "9.9.9.9"
+
+    async def test_deletes_stale_records_across_the_whole_sibling_set(self) -> None:
+        """A sibling's record deleted on Cloudflare gets cleaned up even
+        though this pass was triggered by a DIFFERENT sibling. Cloudflare's
+        live response is non-empty (one unrelated record present) since
+        SyncDnsRecords deliberately skips cleanup entirely on an empty
+        response — a guard against wiping every local record on a
+        transient empty/error response."""
+        sibling_id = uuid4()
+        uow, triggering_env_id, projects_api, client = await self._setup(
+            sibling_base_urls={sibling_id: "https://agent-mkt.agentsplatform.cloud"},
+            cf_records=[
+                {"id": "rec-unrelated", "type": "TXT", "name": "unrelated.example.com", "content": "x"}
+            ],
+        )
+        await uow.dns_records.upsert_from_sync(
+            environment_id=sibling_id,
+            cf_record_id="rec-stale",
+            record_type=DnsRecordType.A,
+            name="agent-mkt.agentsplatform.cloud",
+            content="1.1.1.1",
+            priority=None,
+            proxied=False,
+            ttl=1,
+            managed_by=ManagedBy.EXTERNAL,
+            last_synced_at=datetime.now(UTC),
+        )
+
+        await SyncDnsRecords(uow, client, projects_api).execute(triggering_env_id)
+
+        assert await uow.dns_records.list_for_environment(sibling_id) == []
 
 
 class TestCreateCloudflareTunnel:

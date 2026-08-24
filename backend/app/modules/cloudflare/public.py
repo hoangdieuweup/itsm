@@ -144,7 +144,7 @@ class CloudflareApi:
         this list exists purely so the caller can still raise an incident
         referencing what was removed)."""
         before = {r.cf_record_id: r for r in await self._uow.dns_records.list_for_environment(environment_id)}
-        after_list = await SyncDnsRecords(self._uow, self._client).execute(environment_id)
+        after_list = await SyncDnsRecords(self._uow, self._client, self._projects_api).execute(environment_id)
         after = {r.cf_record_id: r for r in after_list}
         new_external = [
             r for cf_id, r in after.items() if cf_id not in before and r.managed_by == ManagedBy.EXTERNAL
