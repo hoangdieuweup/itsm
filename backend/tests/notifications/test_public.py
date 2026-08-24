@@ -1,0 +1,75 @@
+"""Unit tests for app.modules.notifications.public — the facade other
+modules (observability, in Phase 9) reach notifications through."""
+
+from datetime import UTC, datetime
+from uuid import uuid4
+
+import pytest
+
+from app.modules.notifications.constants import NotificationChannelType
+from app.modules.notifications.exceptions import NotificationChannelNotFound
+from app.modules.notifications.public import NotificationsApi
+from app.modules.notifications.schemas import NotificationChannelRead
+
+
+class FakeChannelsRepo:
+    def __init__(self, channel=None, raw_config=None) -> None:
+        self._channel = channel
+        self._raw_config = raw_config or {}
+
+    async def get_by_id(self, channel_id):
+        return self._channel
+
+    async def get_config_ciphertext_fields(self, channel_id):
+        return self._raw_config
+
+
+class FakeUow:
+    def __init__(self, channels) -> None:
+        self.channels = channels
+
+
+class FakeEmailClient:
+    def __init__(self) -> None:
+        self.sent = []
+
+    async def send(self, *, recipients, subject, body):
+        self.sent.append((recipients, subject, body))
+
+
+def _email_channel(channel_id) -> NotificationChannelRead:
+    return NotificationChannelRead(
+        id=channel_id,
+        project_id=uuid4(),
+        environment_id=None,
+        type=NotificationChannelType.EMAIL,
+        name="Team",
+        config={"recipients": ["a@b.com"]},
+        is_active=True,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+
+
+class TestDispatch:
+    async def test_raises_not_found_for_missing_channel(self) -> None:
+        api = NotificationsApi(
+            FakeUow(FakeChannelsRepo(channel=None)),
+            telegram_client=None,
+            email_client=None,
+            base_vn_client=None,
+        )
+        with pytest.raises(NotificationChannelNotFound):
+            await api.dispatch(uuid4(), "hello")
+
+    async def test_dispatches_to_email(self) -> None:
+        channel = _email_channel(uuid4())
+        email_client = FakeEmailClient()
+        api = NotificationsApi(
+            FakeUow(FakeChannelsRepo(channel=channel, raw_config={"recipients": ["a@b.com"]})),
+            telegram_client=None,
+            email_client=email_client,
+            base_vn_client=None,
+        )
+        await api.dispatch(channel.id, "hello")
+        assert email_client.sent == [(["a@b.com"], "ITSM Notification", "hello")]
