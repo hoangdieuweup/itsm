@@ -14,7 +14,7 @@ is None. New named rules are inserted before any catch-all rule(s)."""
 import logging
 from uuid import UUID
 
-from app.core.base.markers import use_case
+from app.core.base.markers import helper, use_case
 from app.core.base.use_case import AbstractUseCase
 from app.core.crypto import FernetCodec
 from app.integrations.cache.client import CacheClient
@@ -38,10 +38,6 @@ from app.modules.users.public import UserRead
 logger = logging.getLogger(__name__)
 
 
-def _is_catch_all(rule: dict) -> bool:
-    return "hostname" not in rule or rule.get("hostname") is None
-
-
 class AddTunnelHostname(AbstractUseCase):
     def __init__(
         self,
@@ -54,6 +50,11 @@ class AddTunnelHostname(AbstractUseCase):
         self._client = client
         self._cache = cache
         self._audit_api = audit_api
+
+    @staticmethod
+    @helper
+    def _is_catch_all(rule: dict) -> bool:
+        return "hostname" not in rule or rule.get("hostname") is None
 
     @use_case
     async def execute(
@@ -88,8 +89,8 @@ class AddTunnelHostname(AbstractUseCase):
             current_ingress = await self._client.get_tunnel_configuration(
                 cf_account_id=account.cf_account_id, cf_tunnel_id=tunnel.cf_tunnel_id, api_token=plaintext
             )
-            named_rules = [r for r in current_ingress if not _is_catch_all(r)]
-            catch_all = [r for r in current_ingress if _is_catch_all(r)]
+            named_rules = [r for r in current_ingress if not self._is_catch_all(r)]
+            catch_all = [r for r in current_ingress if self._is_catch_all(r)]
             new_rule = {"hostname": hostname, "service": service}
             new_ingress = [*named_rules, new_rule, *catch_all]
 

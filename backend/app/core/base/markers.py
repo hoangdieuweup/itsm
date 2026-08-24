@@ -84,3 +84,10 @@ class integration(_MethodMarker):  # noqa: N801 -- lowercase by design, read as 
     """A method that calls an external system directly (Redis, RabbitMQ, object storage)."""
 
     layer = "integration"
+
+
+class sse_event(_MethodMarker):  # noqa: N801 -- lowercase by design, read as an annotation like @staticmethod
+    """A streaming / SSE generator method — yields events over time."""
+
+    layer = "sse_event"
+

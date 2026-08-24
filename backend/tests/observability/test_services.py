@@ -19,7 +19,6 @@ from app.modules.observability.exceptions import (
 )
 from app.modules.observability.repository import AbstractLokiConfigRepository
 from app.modules.observability.schemas import LokiConfigRead
-from app.modules.observability.services._auth import resolve_loki_auth_header
 from app.modules.observability.services.create_loki_config import CreateLokiConfig
 from app.modules.observability.services.delete_loki_config import DeleteLokiConfig
 from app.modules.observability.services.get_loki_config import GetLokiConfig
@@ -27,6 +26,7 @@ from app.modules.observability.services.run_log_query import RunLogQuery
 from app.modules.observability.services.stream_log_tail import StreamLogTail
 from app.modules.observability.services.update_loki_config import UpdateLokiConfig
 from app.modules.observability.uow import AbstractObservabilityUnitOfWork
+from app.modules.observability.utils import LokiAuthHelper
 from app.modules.users.public import UserRead
 
 ACTOR_ID = uuid4()
@@ -540,7 +540,7 @@ class TestResolveLokiAuthHeader:
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
-        assert resolve_loki_auth_header(config, None) is None
+        assert LokiAuthHelper.resolve_loki_auth_header(config, None) is None
 
     def test_bearer_builds_header(self) -> None:
         config = LokiConfigRead(
@@ -556,7 +556,7 @@ class TestResolveLokiAuthHeader:
             updated_at=datetime.now(UTC),
         )
         ciphertext = FernetCodec.encrypt("tok", key=TEST_FERNET_KEY)
-        assert resolve_loki_auth_header(config, ciphertext) == "Bearer tok"
+        assert LokiAuthHelper.resolve_loki_auth_header(config, ciphertext) == "Bearer tok"
 
     def test_basic_builds_base64_header(self) -> None:
         config = LokiConfigRead(
@@ -572,7 +572,7 @@ class TestResolveLokiAuthHeader:
             updated_at=datetime.now(UTC),
         )
         ciphertext = FernetCodec.encrypt("user:pass", key=TEST_FERNET_KEY)
-        header = resolve_loki_auth_header(config, ciphertext)
+        header = LokiAuthHelper.resolve_loki_auth_header(config, ciphertext)
         assert header is not None and header.startswith("Basic ")
 
     def test_missing_ciphertext_returns_none_even_if_auth_type_set(self) -> None:
@@ -588,7 +588,8 @@ class TestResolveLokiAuthHeader:
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
-        assert resolve_loki_auth_header(config, None) is None
+        assert LokiAuthHelper.resolve_loki_auth_header(config, None) is None
+
 
 
 class TestStreamLogTail:

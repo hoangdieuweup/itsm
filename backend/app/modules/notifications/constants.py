@@ -27,3 +27,15 @@ class NotificationsAuditActions(StrEnum):
     CHANNEL_UPDATED = "NOTIFICATION_CHANNEL_UPDATED"
     CHANNEL_DELETED = "NOTIFICATION_CHANNEL_DELETED"
     TEST_SENT = "NOTIFICATION_CHANNEL_TEST_SENT"
+
+
+class NotificationChannelSecrets:
+    FIELDS_BY_TYPE: dict[NotificationChannelType, str] = {
+        NotificationChannelType.TELEGRAM: "bot_token",
+        NotificationChannelType.BASE_VN: "webhook_url",
+    }
+
+
+class NotificationsDefaults:
+    TEST_MESSAGE = "Test notification from ITSM"
+
