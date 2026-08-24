@@ -15,6 +15,7 @@
     "manageTunnels": "Manage Tunnels",
     "closeDnsDrawer": "Close DNS panel",
     "closeTunnelsDrawer": "Close tunnels panel",
+    "closeLogsDrawer": "Close logs panel",
     "manageLogs": "View Logs",
     "manageAlerting": "Manage Alerting"
   },
