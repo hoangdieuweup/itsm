@@ -44,6 +44,14 @@ class RbacPermissionCatalog:
         ("notification_channel", "read", "permissions.notification_channel.read"),
         ("notification_channel", "update", "permissions.notification_channel.update"),
         ("notification_channel", "delete", "permissions.notification_channel.delete"),
+        ("alert_rule", "create", "permissions.alert_rule.create"),
+        ("alert_rule", "read", "permissions.alert_rule.read"),
+        ("alert_rule", "update", "permissions.alert_rule.update"),
+        ("alert_rule", "delete", "permissions.alert_rule.delete"),
+        ("incident", "create", "permissions.incident.create"),
+        ("incident", "read", "permissions.incident.read"),
+        ("incident", "acknowledge", "permissions.incident.acknowledge"),
+        ("incident", "resolve", "permissions.incident.resolve"),
     ]
 
 
@@ -62,6 +70,8 @@ class RbacResources:
     AUDIT_LOG = "audit_log"
     CLOUDFLARE_ACCOUNT = "cloudflare_account"
     NOTIFICATION_CHANNEL = "notification_channel"
+    ALERT_RULE = "alert_rule"
+    INCIDENT = "incident"
 
 
 class RbacActions:
@@ -78,6 +88,8 @@ class RbacActions:
     VIEW = "view"
     MANAGE = "manage"
     MANAGE_ALL = "manage_all"
+    ACKNOWLEDGE = "acknowledge"
+    RESOLVE = "resolve"
 
 
 class RbacDefaults:
