@@ -93,3 +93,10 @@ export async function deleteDnsRecord(environmentId: string, recordId: string): 
     method: "DELETE",
   });
 }
+
+export async function syncDnsRecords(environmentId: string): Promise<DnsRecord[]> {
+  const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_DNS.SYNC(environmentId), {
+    method: "POST",
+  });
+  return dnsRecordSchema.array().parse(raw);
+}

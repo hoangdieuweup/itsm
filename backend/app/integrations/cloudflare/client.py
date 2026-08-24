@@ -243,6 +243,49 @@ class CloudflareClient:
         await self._write(f"/accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}", "DELETE", api_token)
 
     @integration
+    async def list_tunnels(self, *, cf_account_id: str, api_token: str) -> list[dict]:
+        """GET /accounts/{cf_account_id}/cfd_tunnel — paginated. Returns the
+        raw result list; the sync service maps each tunnel's status field to
+        TunnelStatus. Follows the same pagination pattern as list_zones."""
+        tunnels: list[dict] = []
+        page = 1
+        while True:
+            body = await self._write(
+                f"/accounts/{cf_account_id}/cfd_tunnel",
+                "GET",
+                api_token,
+                params={"page": page, "per_page": 50, "is_deleted": "false"},
+            )
+            tunnels.extend(body.get("result", []))
+            info = body.get("result_info", {})
+            if page >= info.get("total_pages", 1):
+                break
+            page += 1
+        return tunnels
+
+    @integration
+    async def list_dns_records(self, *, zone_id: str, api_token: str) -> list[dict]:
+        """GET /zones/{zone_id}/dns_records — paginated. Returns the raw
+        result list; the sync service maps each record's type/fields into
+        local schema. Follows the same pagination pattern as list_tunnels."""
+        records: list[dict] = []
+        page = 1
+        while True:
+            body = await self._write(
+                f"/zones/{zone_id}/dns_records",
+                "GET",
+                api_token,
+                params={"page": page, "per_page": 100},
+            )
+            records.extend(body.get("result", []))
+            info = body.get("result_info", {})
+            if page >= info.get("total_pages", 1):
+                break
+            page += 1
+        return records
+
+
+    @integration
     async def get_account_audit_logs(
         self,
         *,

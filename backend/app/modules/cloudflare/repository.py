@@ -4,7 +4,7 @@ from abc import abstractmethod
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete as sa_delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database, helper
@@ -455,6 +455,21 @@ class AbstractDnsRecordRepository(AbstractRepository[DnsRecordRead, UUID]):
         """Delete a DNS record row."""
         raise NotImplementedError
 
+    @abstractmethod
+    async def upsert_from_sync(
+        self, *, environment_id: UUID, cf_record_id: str, record_type: DnsRecordType,
+        name: str, content: str, priority: int | None, proxied: bool, ttl: int,
+        managed_by: ManagedBy, last_synced_at: datetime,
+    ) -> DnsRecordRead:
+        """Insert or update a DNS record row from a Cloudflare API sync."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete_not_in_cf_ids(self, environment_id: UUID, keep_cf_ids: set[str]) -> None:
+        """Delete local records whose cf_record_id is NOT in the given set
+        (they were deleted on Cloudflare)."""
+        raise NotImplementedError
+
 
 class DnsRecordRepository(AbstractDnsRecordRepository):
     """SQLAlchemy implementation. No cache-aside — Decision #8."""
@@ -537,6 +552,45 @@ class DnsRecordRepository(AbstractDnsRecordRepository):
             await self._session.delete(row)
             await self._session.flush()
 
+    @database
+    async def upsert_from_sync(
+        self, *, environment_id: UUID, cf_record_id: str, record_type: DnsRecordType,
+        name: str, content: str, priority: int | None, proxied: bool, ttl: int,
+        managed_by: ManagedBy, last_synced_at: datetime,
+    ) -> DnsRecordRead:
+        row = await self._session.scalar(
+            select(DnsRecord).where(DnsRecord.cf_record_id == cf_record_id)
+        )
+        if row is None:
+            row = DnsRecord(
+                environment_id=environment_id, cf_record_id=cf_record_id,
+                record_type=record_type, name=name, content=content,
+                priority=priority, proxied=proxied, ttl=ttl,
+                managed_by=managed_by, last_synced_at=last_synced_at,
+            )
+            self._session.add(row)
+        else:
+            row.record_type = record_type
+            row.name = name
+            row.content = content
+            row.priority = priority
+            row.proxied = proxied
+            row.ttl = ttl
+            row.last_synced_at = last_synced_at
+        await self._session.flush()
+        await self._session.refresh(row)
+        return DnsRecordRead.model_validate(row)
+
+    @database
+    async def delete_not_in_cf_ids(self, environment_id: UUID, keep_cf_ids: set[str]) -> None:
+        stmt = (
+            sa_delete(DnsRecord)
+            .where(DnsRecord.environment_id == environment_id)
+            .where(DnsRecord.cf_record_id.notin_(keep_cf_ids))
+        )
+        await self._session.execute(stmt)
+        await self._session.flush()
+
 
 class AbstractCloudflareTunnelRepository(AbstractRepository[CloudflareTunnelRead, UUID]):
     """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
@@ -556,6 +610,19 @@ class AbstractCloudflareTunnelRepository(AbstractRepository[CloudflareTunnelRead
         self, tunnel_id: UUID, *, status: TunnelStatus, last_synced_at: datetime
     ) -> CloudflareTunnelRead:
         """Persist a fresh status reading from refresh-status."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_by_cf_tunnel_id(self, cf_tunnel_id: str) -> CloudflareTunnelRead | None:
+        """Lookup by Cloudflare's tunnel UUID (not our internal UUID)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def upsert_from_sync(
+        self, *, environment_id: UUID, cf_tunnel_id: str, name: str,
+        status: TunnelStatus, last_synced_at: datetime,
+    ) -> CloudflareTunnelRead:
+        """Insert or update a tunnel row from a Cloudflare API sync."""
         raise NotImplementedError
 
     @abstractmethod
@@ -612,6 +679,35 @@ class CloudflareTunnelRepository(AbstractCloudflareTunnelRepository):
             raise ValueError(f"cloudflare tunnel {tunnel_id} does not exist")
         row.status = status
         row.last_synced_at = last_synced_at
+        await self._session.flush()
+        await self._session.refresh(row)
+        return CloudflareTunnelRead.model_validate(row)
+
+    @database
+    async def get_by_cf_tunnel_id(self, cf_tunnel_id: str) -> CloudflareTunnelRead | None:
+        row = await self._session.scalar(
+            select(CloudflareTunnel).where(CloudflareTunnel.cf_tunnel_id == cf_tunnel_id)
+        )
+        return CloudflareTunnelRead.model_validate(row) if row else None
+
+    @database
+    async def upsert_from_sync(
+        self, *, environment_id: UUID, cf_tunnel_id: str, name: str,
+        status: TunnelStatus, last_synced_at: datetime,
+    ) -> CloudflareTunnelRead:
+        row = await self._session.scalar(
+            select(CloudflareTunnel).where(CloudflareTunnel.cf_tunnel_id == cf_tunnel_id)
+        )
+        if row is None:
+            row = CloudflareTunnel(
+                environment_id=environment_id, cf_tunnel_id=cf_tunnel_id,
+                name=name, status=status, last_synced_at=last_synced_at,
+            )
+            self._session.add(row)
+        else:
+            row.name = name
+            row.status = status
+            row.last_synced_at = last_synced_at
         await self._session.flush()
         await self._session.refresh(row)
         return CloudflareTunnelRead.model_validate(row)
