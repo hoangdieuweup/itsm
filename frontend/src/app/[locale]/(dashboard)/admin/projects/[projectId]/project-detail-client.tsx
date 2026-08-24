@@ -2,24 +2,26 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Globe, Waypoints } from "lucide-react";
+import { Globe, ScrollText, Waypoints } from "lucide-react";
 import { Drawer } from "@/shared/ui/drawer";
 import { ProjectDetailView } from "@/modules/projects";
 import { DnsManager } from "@/modules/cloudflare-dns";
 import { TunnelsManager } from "@/modules/cloudflare-tunnels";
+import { LogViewerManager } from "@/modules/log-viewer";
 import type { Environment } from "@/entities/environment";
 
 /**
- * Client wrapper composing `modules/projects` with `modules/cloudflare-dns`
- * and `modules/cloudflare-tunnels` — modules may not import each other
- * directly (enforced by eslint-plugin-boundaries), so this cross-module
- * wiring lives here, at the `app` layer, which is allowed to depend on any
- * module.
+ * Client wrapper composing `modules/projects` with `modules/cloudflare-dns`,
+ * `modules/cloudflare-tunnels`, and `modules/log-viewer` — modules may not
+ * import each other directly (enforced by eslint-plugin-boundaries), so this
+ * cross-module wiring lives here, at the `app` layer, which is allowed to
+ * depend on any module.
  */
 export function ProjectDetailClient({ projectId }: { projectId: string }) {
   const t = useTranslations("projects");
   const [dnsDrawerTarget, setDnsDrawerTarget] = useState<Environment | null>(null);
   const [tunnelsDrawerTarget, setTunnelsDrawerTarget] = useState<Environment | null>(null);
+  const [logsDrawerTarget, setLogsDrawerTarget] = useState<Environment | null>(null);
 
   return (
     <>
@@ -27,6 +29,7 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
         projectId={projectId}
         onManageDns={setDnsDrawerTarget}
         onManageTunnels={setTunnelsDrawerTarget}
+        onManageLogs={setLogsDrawerTarget}
       />
       {dnsDrawerTarget && (
         <Drawer
@@ -46,6 +49,16 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
           closeLabel={t("actions.closeTunnelsDrawer")}
         >
           <TunnelsManager environmentId={tunnelsDrawerTarget.id} />
+        </Drawer>
+      )}
+      {logsDrawerTarget && (
+        <Drawer
+          icon={ScrollText}
+          title={logsDrawerTarget.name}
+          onClose={() => setLogsDrawerTarget(null)}
+          closeLabel={t("actions.closeLogsDrawer")}
+        >
+          <LogViewerManager environmentId={logsDrawerTarget.id} />
         </Drawer>
       )}
     </>

@@ -22,12 +22,15 @@ export function ProjectDetailView({
   projectId,
   onManageDns,
   onManageTunnels,
+  onManageLogs,
 }: {
   projectId: string;
   /** Opens the environment's DNS management inline instead of navigating away. */
   onManageDns: (environment: Environment) => void;
   /** Opens the environment's Tunnels management inline instead of navigating away. */
   onManageTunnels: (environment: Environment) => void;
+  /** Opens the environment's Log Viewer inline instead of navigating away. */
+  onManageLogs: (environment: Environment) => void;
 }) {
   const t = useTranslations("projects");
   const { data: project } = useProjectQuery(projectId);
@@ -97,13 +100,14 @@ export function ProjectDetailView({
                 </button>
               </Can>
               <Can I={ACTIONS.READ} a={RESOURCES.ENVIRONMENT}>
-                <Link
-                  href={`/admin/environments/${env.id}/logs`}
-                  className="text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                <button
+                  type="button"
+                  onClick={() => onManageLogs(env)}
+                  className="cursor-pointer text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   aria-label={t("actions.manageLogs")}
                 >
                   <ScrollText className="size-3.5" />
-                </Link>
+                </button>
               </Can>
               <Can I={ACTIONS.READ} a={RESOURCES.ALERT_RULE}>
                 <Link

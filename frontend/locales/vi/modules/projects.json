@@ -15,6 +15,7 @@
     "manageTunnels": "Quản lý Tunnel",
     "closeDnsDrawer": "Đóng bảng điều khiển DNS",
     "closeTunnelsDrawer": "Đóng bảng điều khiển Tunnel",
+    "closeLogsDrawer": "Đóng bảng điều khiển Log",
     "manageLogs": "Xem Log",
     "manageAlerting": "Quản lý Cảnh báo"
   },
