@@ -40,12 +40,12 @@ from app.modules.cloudflare.dependencies import (
     get_list_visible_accounts,
     get_list_zones,
     get_refresh_tunnel_status,
-    get_sync_dns_records,
-    get_sync_tunnels,
     get_remove_manager,
     get_remove_tunnel_hostname,
     get_reveal_token,
     get_reveal_tunnel_token,
+    get_sync_dns_records,
+    get_sync_tunnels,
     get_test_connection,
     get_uow,
     get_update_account,
@@ -98,12 +98,12 @@ from app.modules.cloudflare.services.list_tunnels import ListTunnels
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
 from app.modules.cloudflare.services.list_zones import ListZones
 from app.modules.cloudflare.services.refresh_tunnel_status import RefreshTunnelStatus
-from app.modules.cloudflare.services.sync_dns_records import SyncDnsRecords
-from app.modules.cloudflare.services.sync_tunnels import SyncTunnels
 from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
 from app.modules.cloudflare.services.remove_tunnel_hostname import RemoveTunnelHostname
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
 from app.modules.cloudflare.services.reveal_tunnel_token import RevealCloudflareTunnelToken
+from app.modules.cloudflare.services.sync_dns_records import SyncDnsRecords
+from app.modules.cloudflare.services.sync_tunnels import SyncTunnels
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
 from app.modules.cloudflare.services.update_config import UpdateCloudflareConfig
@@ -441,10 +441,13 @@ async def list_environment_tunnels(
 async def sync_environment_tunnels(
     environment_id: UUID,
     use_case: SyncTunnels = Depends(get_sync_tunnels),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
 ) -> ApiResponse[list[CloudflareTunnelRead]]:
-    """Sync tunnels from Cloudflare API into local DB for an environment."""
+    """Sync tunnels from Cloudflare API into local DB for the account this
+    environment is bound to (account-wide, not environment-scoped — see
+    SyncTunnels). Gated at manage/EDITOR, not view/VIEWER — this is a real
+    write action, not a read."""
     tunnels = await use_case.execute(environment_id)
     return ApiResponse[list[CloudflareTunnelRead]](success=True, data=tunnels)
 

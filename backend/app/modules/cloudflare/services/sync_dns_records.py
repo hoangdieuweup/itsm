@@ -63,7 +63,8 @@ class SyncDnsRecords(AbstractUseCase):
         plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
 
         cf_records = await self._client.list_dns_records(
-            zone_id=config.zone_id, api_token=plaintext,
+            zone_id=config.zone_id,
+            api_token=plaintext,
         )
 
         cf_record_ids: set[str] = set()

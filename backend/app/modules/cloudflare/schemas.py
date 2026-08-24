@@ -149,10 +149,10 @@ class DnsRecordUpdate(CustomModel):
 
 
 class CloudflareTunnelRead(FrozenModel):
-    """One Cloudflare Tunnel."""
+    """One Cloudflare Tunnel, account-scoped — see the model docstring."""
 
     id: UUID
-    environment_id: UUID
+    cloudflare_account_id: UUID
     cf_tunnel_id: str
     name: str
     status: TunnelStatus
@@ -185,10 +185,13 @@ class CloudflareTunnelCreateResponse(FrozenModel):
 
 
 class TunnelPublicHostnameRead(FrozenModel):
-    """One public hostname published through a Tunnel."""
+    """One public hostname published through a Tunnel. environment_id is
+    None when the hostname didn't match any bound environment's base_url
+    (see TunnelHostnameRules.match_environment_id)."""
 
     id: UUID
     tunnel_id: UUID
+    environment_id: UUID | None = None
     hostname: str
     service: str
     managed_by: ManagedBy

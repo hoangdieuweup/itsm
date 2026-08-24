@@ -53,7 +53,7 @@ class CreateCloudflareTunnel(AbstractUseCase):
         )
 
         tunnel = await self._uow.tunnels.create(
-            environment_id=environment_id, cf_tunnel_id=cf_tunnel_id, name=name
+            cloudflare_account_id=config.cloudflare_account_id, cf_tunnel_id=cf_tunnel_id, name=name
         )
         await self._uow.commit()
 

@@ -11,7 +11,7 @@ export type TunnelStatus = (typeof TUNNEL_STATUS)[keyof typeof TUNNEL_STATUS];
 
 export const cloudflareTunnelSchema = z.object({
   id: z.uuid(),
-  environmentId: z.uuid(),
+  cloudflareAccountId: z.uuid(),
   cfTunnelId: z.string(),
   name: z.string(),
   status: z.enum([TUNNEL_STATUS.HEALTHY, TUNNEL_STATUS.DEGRADED, TUNNEL_STATUS.DOWN, TUNNEL_STATUS.UNKNOWN]),
@@ -34,6 +34,7 @@ export const tunnelTokenResponseSchema = z.object({
 export const tunnelPublicHostnameSchema = z.object({
   id: z.uuid(),
   tunnelId: z.uuid(),
+  environmentId: z.uuid().nullable(),
   hostname: z.string(),
   service: z.string(),
   managedBy: z.enum([MANAGED_BY.SYSTEM, MANAGED_BY.EXTERNAL]),

@@ -107,14 +107,17 @@ class DnsRecord(Base):
 
 
 class CloudflareTunnel(Base):
-    """A Cloudflare Tunnel bound to an environment. One environment may have
-    many tunnels (1:N, unlike CloudflareConfig's 1:1 binding)."""
+    """A Cloudflare Tunnel, scoped to the account it belongs to on Cloudflare.
+    A tunnel is an account-level resource that commonly serves many
+    environments/projects at once through different public hostnames — see
+    TunnelPublicHostname.environment_id for the actual per-environment
+    scoping point."""
 
     __tablename__ = "cloudflare_tunnels"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    environment_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("environments.id", ondelete="CASCADE"), index=True
+    cloudflare_account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cloudflare_accounts.id", ondelete="CASCADE"), index=True
     )
     cf_tunnel_id: Mapped[str] = mapped_column(String(64), unique=True)
     name: Mapped[str] = mapped_column(String(255))
@@ -131,13 +134,22 @@ class CloudflareTunnel(Base):
 class TunnelPublicHostname(Base):
     """One public hostname (ingress rule) published through a Tunnel. Only
     hostname+service are persisted (Decision #2) — path/originRequest live
-    only in Cloudflare's own ingress array, never modeled here."""
+    only in Cloudflare's own ingress array, never modeled here.
+
+    environment_id is the actual per-environment scoping point (a tunnel
+    itself is account-scoped, see CloudflareTunnel) — nullable because a
+    hostname only matches an environment when that environment has a
+    base_url that exactly matches it; an unmatched hostname (or one on an
+    environment with no base_url configured) has environment_id=None."""
 
     __tablename__ = "tunnel_public_hostnames"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tunnel_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("cloudflare_tunnels.id", ondelete="CASCADE"), index=True
+    )
+    environment_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("environments.id", ondelete="SET NULL"), nullable=True, index=True
     )
     hostname: Mapped[str] = mapped_column(String(255), unique=True)
     service: Mapped[str] = mapped_column(String(255))

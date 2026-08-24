@@ -204,57 +204,137 @@ class TestDnsRecordRepository:
 
 class TestCloudflareTunnelRepository:
     async def test_create_and_get_by_id(self, _session: AsyncSession) -> None:
-        env = await _make_environment(_session)
+        account = await _make_account(_session)
         repo = CloudflareTunnelRepository(_session)
-        created = await repo.create(environment_id=env.id, cf_tunnel_id="tun-1", name="prod-tunnel")
+        created = await repo.create(
+            cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="prod-tunnel"
+        )
         assert created.status == "unknown"
         fetched = await repo.get_by_id(created.id)
         assert fetched is not None
         assert fetched.cf_tunnel_id == "tun-1"
 
-    async def test_list_for_environment_supports_many_tunnels(self, _session: AsyncSession) -> None:
-        env = await _make_environment(_session)
+    async def test_list_for_account_supports_many_tunnels(self, _session: AsyncSession) -> None:
+        account = await _make_account(_session)
         repo = CloudflareTunnelRepository(_session)
-        await repo.create(environment_id=env.id, cf_tunnel_id="tun-a", name="a")
-        await repo.create(environment_id=env.id, cf_tunnel_id="tun-b", name="b")
-        tunnels = await repo.list_for_environment(env.id)
+        await repo.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-a", name="a")
+        await repo.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-b", name="b")
+        tunnels = await repo.list_for_account(account.id)
         assert len(tunnels) == 2
 
-    async def test_update_status(self, _session: AsyncSession) -> None:
+    async def test_list_for_environment_via_hostnames_only_returns_matched_tunnels(
+        self, _session: AsyncSession
+    ) -> None:
+        account = await _make_account(_session)
         env = await _make_environment(_session)
+        tunnel_repo = CloudflareTunnelRepository(_session)
+        hostname_repo = TunnelHostnameRepository(_session)
+        matched = await tunnel_repo.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-a", name="a")
+        unmatched = await tunnel_repo.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-b", name="b")
+        await hostname_repo.create(
+            tunnel_id=matched.id,
+            hostname="app.example.com",
+            service="http://x",
+            created_by=None,
+            environment_id=env.id,
+        )
+        await hostname_repo.create(
+            tunnel_id=unmatched.id, hostname="other.example.com", service="http://y", created_by=None
+        )
+
+        tunnels = await tunnel_repo.list_for_environment_via_hostnames(env.id)
+
+        assert [t.id for t in tunnels] == [matched.id]
+
+    async def test_update_status(self, _session: AsyncSession) -> None:
+        account = await _make_account(_session)
         repo = CloudflareTunnelRepository(_session)
-        created = await repo.create(environment_id=env.id, cf_tunnel_id="tun-1", name="prod-tunnel")
+        created = await repo.create(
+            cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="prod-tunnel"
+        )
         updated = await repo.update_status(created.id, status="healthy", last_synced_at=datetime.now(UTC))
         assert updated.status == "healthy"
         assert updated.last_synced_at is not None
 
-    async def test_delete(self, _session: AsyncSession) -> None:
-        env = await _make_environment(_session)
+    async def test_upsert_from_sync_inserts_then_updates(self, _session: AsyncSession) -> None:
+        account = await _make_account(_session)
+        other_account = await _make_account(_session)
         repo = CloudflareTunnelRepository(_session)
-        created = await repo.create(environment_id=env.id, cf_tunnel_id="tun-1", name="prod-tunnel")
+        now = datetime.now(UTC)
+
+        inserted = await repo.upsert_from_sync(
+            cloudflare_account_id=account.id,
+            cf_tunnel_id="tun-1",
+            name="prod-tunnel",
+            status="healthy",
+            last_synced_at=now,
+        )
+        assert inserted.cloudflare_account_id == account.id
+
+        updated = await repo.upsert_from_sync(
+            cloudflare_account_id=other_account.id,
+            cf_tunnel_id="tun-1",
+            name="renamed",
+            status="down",
+            last_synced_at=now,
+        )
+        assert updated.id == inserted.id
+        assert updated.cloudflare_account_id == other_account.id
+        assert updated.name == "renamed"
+        assert updated.status == "down"
+
+    async def test_delete(self, _session: AsyncSession) -> None:
+        account = await _make_account(_session)
+        repo = CloudflareTunnelRepository(_session)
+        created = await repo.create(
+            cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="prod-tunnel"
+        )
         await repo.delete(created.id)
         assert await repo.get_by_id(created.id) is None
 
 
 class TestTunnelHostnameRepository:
     async def test_create_and_list_for_tunnel(self, _session: AsyncSession) -> None:
-        env = await _make_environment(_session)
+        account = await _make_account(_session)
         tunnel = await CloudflareTunnelRepository(_session).create(
-            environment_id=env.id, cf_tunnel_id="tun-1", name="prod-tunnel"
+            cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="prod-tunnel"
         )
         repo = TunnelHostnameRepository(_session)
         created = await repo.create(
             tunnel_id=tunnel.id, hostname="app.example.com", service="http://localhost:8080", created_by=None
         )
         assert created.managed_by == "system"
+        assert created.environment_id is None
         hostnames = await repo.list_for_tunnel(tunnel.id)
         assert len(hostnames) == 1
         assert hostnames[0].hostname == "app.example.com"
 
-    async def test_update_service(self, _session: AsyncSession) -> None:
+    async def test_list_for_tunnel_filters_by_environment_id(self, _session: AsyncSession) -> None:
+        account = await _make_account(_session)
         env = await _make_environment(_session)
         tunnel = await CloudflareTunnelRepository(_session).create(
-            environment_id=env.id, cf_tunnel_id="tun-1", name="prod-tunnel"
+            cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="prod-tunnel"
+        )
+        repo = TunnelHostnameRepository(_session)
+        await repo.create(
+            tunnel_id=tunnel.id,
+            hostname="matched.example.com",
+            service="http://x",
+            created_by=None,
+            environment_id=env.id,
+        )
+        await repo.create(
+            tunnel_id=tunnel.id, hostname="unmatched.example.com", service="http://y", created_by=None
+        )
+
+        hostnames = await repo.list_for_tunnel(tunnel.id, environment_id=env.id)
+
+        assert [h.hostname for h in hostnames] == ["matched.example.com"]
+
+    async def test_update_service(self, _session: AsyncSession) -> None:
+        account = await _make_account(_session)
+        tunnel = await CloudflareTunnelRepository(_session).create(
+            cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="prod-tunnel"
         )
         repo = TunnelHostnameRepository(_session)
         created = await repo.create(
@@ -263,10 +343,57 @@ class TestTunnelHostnameRepository:
         updated = await repo.update_service(created.id, service="http://localhost:9090")
         assert updated.service == "http://localhost:9090"
 
-    async def test_delete(self, _session: AsyncSession) -> None:
+    async def test_upsert_from_sync_inserts_then_updates(self, _session: AsyncSession) -> None:
+        account = await _make_account(_session)
         env = await _make_environment(_session)
         tunnel = await CloudflareTunnelRepository(_session).create(
-            environment_id=env.id, cf_tunnel_id="tun-1", name="prod-tunnel"
+            cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="prod-tunnel"
+        )
+        repo = TunnelHostnameRepository(_session)
+        now = datetime.now(UTC)
+
+        inserted = await repo.upsert_from_sync(
+            tunnel_id=tunnel.id,
+            hostname="app.example.com",
+            service="http://old",
+            environment_id=None,
+            last_synced_at=now,
+        )
+        assert inserted.environment_id is None
+
+        updated = await repo.upsert_from_sync(
+            tunnel_id=tunnel.id,
+            hostname="app.example.com",
+            service="http://new",
+            environment_id=env.id,
+            last_synced_at=now,
+        )
+        assert updated.id == inserted.id
+        assert updated.service == "http://new"
+        assert updated.environment_id == env.id
+
+    async def test_delete_not_in_hostnames_removes_stale_rows_only(self, _session: AsyncSession) -> None:
+        account = await _make_account(_session)
+        tunnel = await CloudflareTunnelRepository(_session).create(
+            cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="prod-tunnel"
+        )
+        repo = TunnelHostnameRepository(_session)
+        keep = await repo.create(
+            tunnel_id=tunnel.id, hostname="keep.example.com", service="http://x", created_by=None
+        )
+        stale = await repo.create(
+            tunnel_id=tunnel.id, hostname="stale.example.com", service="http://y", created_by=None
+        )
+
+        await repo.delete_not_in_hostnames(tunnel.id, {"keep.example.com"})
+
+        assert await repo.get_by_id(keep.id) is not None
+        assert await repo.get_by_id(stale.id) is None
+
+    async def test_delete(self, _session: AsyncSession) -> None:
+        account = await _make_account(_session)
+        tunnel = await CloudflareTunnelRepository(_session).create(
+            cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="prod-tunnel"
         )
         repo = TunnelHostnameRepository(_session)
         created = await repo.create(

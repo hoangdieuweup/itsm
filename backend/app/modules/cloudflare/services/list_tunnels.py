@@ -1,5 +1,8 @@
-"""List every tunnel for an environment. One environment may have MANY
-tunnels (1:N, unlike cloudflare_configs' 1:1 binding to an account/zone)."""
+"""List every tunnel actually serving an environment. Tunnels are
+account-scoped (many environments/projects may share one), so "serving this
+environment" means at least one of the tunnel's public hostnames matched
+this environment's base_url — see list_for_environment_via_hostnames and
+TunnelHostnameRules.match_environment_id."""
 
 from uuid import UUID
 
@@ -15,4 +18,4 @@ class ListTunnels(AbstractUseCase):
 
     @use_case
     async def execute(self, environment_id: UUID) -> list[CloudflareTunnelRead]:
-        return await self._uow.tunnels.list_for_environment(environment_id)
+        return await self._uow.tunnels.list_for_environment_via_hostnames(environment_id)

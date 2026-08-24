@@ -3,9 +3,13 @@
 Everything here is a pure decision: no I/O, no framework, no database.
 """
 
+from urllib.parse import urlparse
+from uuid import UUID
+
 from app.core.base.markers import rule
 from app.modules.cloudflare.constants import AccessLevel, AccessLevelRanking, DnsRecordType
 from app.modules.cloudflare.exceptions import MissingDnsRecordPriority
+from app.modules.cloudflare.schemas import CloudflareTunnelRead
 
 
 class CloudflareAccountRules:
@@ -60,3 +64,40 @@ class CloudflareDnsRules:
                 raise MissingDnsRecordPriority()
             return priority
         return None
+
+
+class TunnelHostnameRules:
+    """Pure decision rules for matching a Tunnel's public hostnames to the
+    environments they actually serve. No I/O."""
+
+    @staticmethod
+    @rule
+    def match_environment_id(hostname: str, candidates: list[tuple[UUID, str | None]]) -> UUID | None:
+        """Return the id of the candidate environment whose base_url's host
+        exactly matches hostname, or None if no candidate matches (including
+        when every candidate has no base_url configured). Deterministic,
+        exact-host comparison only — never a fuzzy/prefix match, since a
+        wrong match here would leak one project's internal service URL onto
+        another project's Tunnels page."""
+        for environment_id, base_url in candidates:
+            if base_url is None:
+                continue
+            if urlparse(base_url).hostname == hostname:
+                return environment_id
+        return None
+
+
+class TunnelOwnershipRules:
+    """Pure decision rules for whether a Tunnel belongs to the Cloudflare
+    account an environment is bound to. Tunnels are account-scoped (many
+    environments on the same account may legitimately manage the same
+    tunnel's hostnames), so ownership is checked one level up from where it
+    used to be checked (directly against environment_id, pre-fix)."""
+
+    @staticmethod
+    @rule
+    def verify_tunnel_belongs_to_environment(
+        tunnel: CloudflareTunnelRead | None, cloudflare_account_id: UUID
+    ) -> bool:
+        """True iff tunnel exists and is on the given Cloudflare account."""
+        return tunnel is not None and tunnel.cloudflare_account_id == cloudflare_account_id
