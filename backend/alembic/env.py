@@ -12,6 +12,9 @@ from app.core.database import Base
 from app.integrations.dx_core import (
     models as dx_core_models,  # noqa: F401 -- registers dx_tokens on Base.metadata for autogenerate
 )
+from app.modules.notifications import (
+    models as notifications_models,  # noqa: F401 -- registers notification_channels on Base.metadata for autogenerate
+)
 from app.modules.observability import (
     models as observability_models,  # noqa: F401 -- registers loki_configs on Base.metadata for autogenerate
 )

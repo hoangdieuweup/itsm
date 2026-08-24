@@ -8,7 +8,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
-import { LOKI_AUTH_TYPES, type LokiAuthType, type LokiConfig } from "../model/schema";
+import { LOKI_AUTH_TYPE, type LokiAuthType, type LokiConfig } from "../model/schema";
 import { useCreateLokiConfig, useUpdateLokiConfig } from "../hooks/use-loki-config";
 
 interface LokiConfigFormDialogProps {
@@ -23,8 +23,10 @@ function submitLabel(t: ReturnType<typeof useTranslations>, isSaving: boolean, i
 }
 
 function credentialHint(t: ReturnType<typeof useTranslations>, authType: LokiAuthType, isEditing: boolean): string {
-  if (authType === "basic") return t("config.credentialHintBasic");
-  if (authType === "bearer") return isEditing ? t("config.credentialKeepHint") : t("config.credentialHintBearer");
+  if (authType === LOKI_AUTH_TYPE.BASIC) return t("config.credentialHintBasic");
+  if (authType === LOKI_AUTH_TYPE.BEARER) {
+    return isEditing ? t("config.credentialKeepHint") : t("config.credentialHintBearer");
+  }
   return "";
 }
 
@@ -93,7 +95,7 @@ export function LokiConfigFormDialog({ environmentId, config, onClose }: LokiCon
 
   const [endpointUrl, setEndpointUrl] = useState(config?.endpointUrl ?? "");
   const [tenantId, setTenantId] = useState(config?.tenantId ?? "");
-  const [authType, setAuthType] = useState<LokiAuthType>(config?.authType ?? "none");
+  const [authType, setAuthType] = useState<LokiAuthType>(config?.authType ?? LOKI_AUTH_TYPE.NONE);
   const [credential, setCredential] = useState("");
   const [defaultQuery, setDefaultQuery] = useState(config?.defaultQuery ?? "");
   const [defaultRangeMinutes, setDefaultRangeMinutes] = useState(config?.defaultRangeMinutes ?? 60);
@@ -102,7 +104,7 @@ export function LokiConfigFormDialog({ environmentId, config, onClose }: LokiCon
   const create = useCreateLokiConfig(environmentId);
   const update = useUpdateLokiConfig(environmentId);
   const isSaving = create.isPending || update.isPending;
-  const needsCredential = authType !== "none";
+  const needsCredential = authType !== LOKI_AUTH_TYPE.NONE;
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -161,7 +163,7 @@ export function LokiConfigFormDialog({ environmentId, config, onClose }: LokiCon
             onChange={(event) => setAuthType(event.target.value as LokiAuthType)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            {LOKI_AUTH_TYPES.map((type) => (
+            {Object.values(LOKI_AUTH_TYPE).map((type) => (
               <option key={type} value={type}>
                 {t(`config.authType${type.charAt(0).toUpperCase()}${type.slice(1)}`)}
               </option>

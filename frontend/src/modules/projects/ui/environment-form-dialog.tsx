@@ -8,7 +8,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
-import { ENVIRONMENT_TYPES, type Environment, type EnvironmentType } from "@/entities/environment";
+import { ENVIRONMENT_TYPE, type Environment, type EnvironmentType } from "@/entities/environment";
 import { useCreateEnvironment } from "../hooks/use-create-environment";
 import { useUpdateEnvironment } from "../hooks/use-update-environment";
 
@@ -33,7 +33,7 @@ export function EnvironmentFormDialog({
   const updateEnvironment = useUpdateEnvironment(projectId);
 
   const isEditing = Boolean(environment);
-  const [type, setType] = useState<EnvironmentType>(environment?.type ?? "dev");
+  const [type, setType] = useState<EnvironmentType>(environment?.type ?? ENVIRONMENT_TYPE.DEV);
   const [name, setName] = useState(() => environment?.name ?? "");
   const [baseUrl, setBaseUrl] = useState(() => environment?.baseUrl ?? "");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export function EnvironmentFormDialog({
   if (!isOpen) return null;
 
   const isPending = createEnvironment.isPending || updateEnvironment.isPending;
-  const availableTypes = ENVIRONMENT_TYPES.filter(
+  const availableTypes = Object.values(ENVIRONMENT_TYPE).filter(
     (envType) => envType === environment?.type || !existingTypes.includes(envType),
   );
 

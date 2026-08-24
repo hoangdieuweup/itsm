@@ -39,7 +39,12 @@ export async function revealCloudflareAccountToken(id: string): Promise<string> 
   return result.apiToken;
 }
 
-export type AccessLevel = "owner" | "editor" | "viewer";
+export const ACCESS_LEVEL = {
+  OWNER: "owner",
+  EDITOR: "editor",
+  VIEWER: "viewer",
+} as const;
+export type AccessLevel = (typeof ACCESS_LEVEL)[keyof typeof ACCESS_LEVEL];
 
 export interface CloudflareAccountManager {
   userId: string;

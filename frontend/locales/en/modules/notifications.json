@@ -1,0 +1,69 @@
+{
+  "section": {
+    "title": "Notification Channels",
+    "empty": "No notification channels yet.",
+    "inactive": "Inactive",
+    "deleteConfirm": {
+      "title": "Delete this notification channel?",
+      "description": "This removes \"{name}\" and cannot be undone."
+    }
+  },
+  "actions": {
+    "add": "Add Channel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "sendTest": "Send test",
+    "testSendSuccess": "Test message sent"
+  },
+  "types": {
+    "email": "Email",
+    "base_vn": "Base.vn",
+    "telegram": "Telegram",
+    "other": "Other"
+  },
+  "fields": {
+    "name": "Name",
+    "type": "Type",
+    "recipients": "Recipients",
+    "recipientsHint": "Comma-separated email addresses.",
+    "botToken": "Bot Token",
+    "chatId": "Chat ID",
+    "webhookUrl": "Webhook URL",
+    "botName": "Bot Name",
+    "messageTemplate": "Message Template",
+    "messageTemplateHint": "Use {message} as a placeholder — falls back to the raw message if left empty.",
+    "otherConfig": "Config (JSON)",
+    "typeImmutableHint": "Type cannot be changed after creation.",
+    "secretKeepHint": "Leave blank to keep the current value."
+  },
+  "form": {
+    "saving": "Saving...",
+    "create": "Create",
+    "save": "Save",
+    "cancel": "Cancel",
+    "createTitle": "Create Notification Channel",
+    "editTitle": "Edit Notification Channel",
+    "hideSecret": "Hide value",
+    "showSecret": "Show value",
+    "errors": {
+      "botTokenRequired": "Bot token is required.",
+      "webhookUrlRequired": "Webhook URL is required.",
+      "invalidJson": "Config must be valid JSON."
+    }
+  },
+  "errors": {
+    "notification_channel_not_found": "This notification channel no longer exists.",
+    "notifications_project_not_found": "Project not found.",
+    "notifications_environment_not_found": "Environment not found.",
+    "notification_channel_invalid_config": "This channel's config is missing required fields for its type.",
+    "notification_channel_unsupported_type": "This channel type does not support sending yet.",
+    "email_unavailable": "SMTP relay unavailable — please try again later.",
+    "email_invalid_credential": "SMTP relay rejected the configured credentials.",
+    "email_rejected": "SMTP relay rejected this message.",
+    "telegram_unavailable": "Telegram Bot API unavailable — please try again later.",
+    "telegram_invalid_credential": "Telegram rejected the provided bot token.",
+    "telegram_rejected": "Telegram rejected this message.",
+    "base_vn_unavailable": "Base.vn webhook unavailable — please try again later.",
+    "base_vn_rejected": "Base.vn webhook rejected this message."
+  }
+}

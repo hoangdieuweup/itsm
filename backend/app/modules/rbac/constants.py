@@ -40,6 +40,10 @@ class RbacPermissionCatalog:
         ("cloudflare_account", "manage", "permissions.cloudflare_account.manage"),
         ("cloudflare_account", "view", "permissions.cloudflare_account.view"),
         ("cloudflare_account", "manage_all", "permissions.cloudflare_account.manage_all"),
+        ("notification_channel", "create", "permissions.notification_channel.create"),
+        ("notification_channel", "read", "permissions.notification_channel.read"),
+        ("notification_channel", "update", "permissions.notification_channel.update"),
+        ("notification_channel", "delete", "permissions.notification_channel.delete"),
     ]
 
 
@@ -57,6 +61,7 @@ class RbacResources:
     ENVIRONMENT = "environment"
     AUDIT_LOG = "audit_log"
     CLOUDFLARE_ACCOUNT = "cloudflare_account"
+    NOTIFICATION_CHANNEL = "notification_channel"
 
 
 class RbacActions:

@@ -1,0 +1,69 @@
+{
+  "section": {
+    "title": "Kênh thông báo",
+    "empty": "Chưa có kênh thông báo nào.",
+    "inactive": "Ngừng hoạt động",
+    "deleteConfirm": {
+      "title": "Xoá kênh thông báo này?",
+      "description": "Thao tác này sẽ xoá \"{name}\" và không thể hoàn tác."
+    }
+  },
+  "actions": {
+    "add": "Thêm kênh",
+    "edit": "Sửa",
+    "delete": "Xoá",
+    "sendTest": "Gửi thử",
+    "testSendSuccess": "Đã gửi tin nhắn thử"
+  },
+  "types": {
+    "email": "Email",
+    "base_vn": "Base.vn",
+    "telegram": "Telegram",
+    "other": "Khác"
+  },
+  "fields": {
+    "name": "Tên",
+    "type": "Loại",
+    "recipients": "Người nhận",
+    "recipientsHint": "Danh sách email cách nhau bằng dấu phẩy.",
+    "botToken": "Bot Token",
+    "chatId": "Chat ID",
+    "webhookUrl": "Webhook URL",
+    "botName": "Tên Bot",
+    "messageTemplate": "Mẫu tin nhắn",
+    "messageTemplateHint": "Dùng {message} làm placeholder — nếu để trống sẽ dùng nguyên nội dung tin nhắn.",
+    "otherConfig": "Config (JSON)",
+    "typeImmutableHint": "Không thể đổi loại sau khi tạo.",
+    "secretKeepHint": "Để trống để giữ nguyên giá trị hiện tại."
+  },
+  "form": {
+    "saving": "Đang lưu...",
+    "create": "Tạo",
+    "save": "Lưu",
+    "cancel": "Huỷ",
+    "createTitle": "Tạo kênh thông báo",
+    "editTitle": "Sửa kênh thông báo",
+    "hideSecret": "Ẩn giá trị",
+    "showSecret": "Hiện giá trị",
+    "errors": {
+      "botTokenRequired": "Bot token là bắt buộc.",
+      "webhookUrlRequired": "Webhook URL là bắt buộc.",
+      "invalidJson": "Config phải là JSON hợp lệ."
+    }
+  },
+  "errors": {
+    "notification_channel_not_found": "Kênh thông báo này không còn tồn tại.",
+    "notifications_project_not_found": "Không tìm thấy dự án.",
+    "notifications_environment_not_found": "Không tìm thấy môi trường.",
+    "notification_channel_invalid_config": "Config của kênh này thiếu trường bắt buộc cho loại kênh.",
+    "notification_channel_unsupported_type": "Loại kênh này chưa hỗ trợ gửi tin nhắn.",
+    "email_unavailable": "SMTP relay không khả dụng — vui lòng thử lại sau.",
+    "email_invalid_credential": "SMTP relay từ chối thông tin xác thực đã cấu hình.",
+    "email_rejected": "SMTP relay từ chối tin nhắn này.",
+    "telegram_unavailable": "Telegram Bot API không khả dụng — vui lòng thử lại sau.",
+    "telegram_invalid_credential": "Telegram từ chối bot token đã cung cấp.",
+    "telegram_rejected": "Telegram từ chối tin nhắn này.",
+    "base_vn_unavailable": "Webhook Base.vn không khả dụng — vui lòng thử lại sau.",
+    "base_vn_rejected": "Webhook Base.vn từ chối tin nhắn này."
+  }
+}

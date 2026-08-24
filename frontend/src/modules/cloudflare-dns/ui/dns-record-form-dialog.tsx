@@ -8,7 +8,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
-import { DNS_RECORD_TYPES, type DnsRecord, type DnsRecordType } from "../model/schema";
+import { DNS_RECORD_TYPE, type DnsRecord, type DnsRecordType } from "../model/schema";
 import { useCreateDnsRecord, useUpdateDnsRecord } from "../hooks/use-dns-records";
 
 interface DnsRecordFormDialogProps {
@@ -19,7 +19,7 @@ interface DnsRecordFormDialogProps {
 
 function initialFormState(record: DnsRecord | null) {
   return {
-    recordType: (record?.recordType ?? "A") as DnsRecordType,
+    recordType: record?.recordType ?? DNS_RECORD_TYPE.A,
     name: record?.name ?? "",
     content: record?.content ?? "",
     priority: record?.priority?.toString() ?? "",
@@ -54,7 +54,7 @@ function RecordTypeField({
         aria-describedby={isEditing ? "record-type-hint" : undefined}
         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
-        {DNS_RECORD_TYPES.map((type) => (
+        {Object.values(DNS_RECORD_TYPE).map((type) => (
           <option key={type} value={type}>
             {type}
           </option>
@@ -112,7 +112,7 @@ export function DnsRecordFormDialog({ environmentId, record, onClose }: DnsRecor
   const create = useCreateDnsRecord(environmentId);
   const update = useUpdateDnsRecord(environmentId);
   const isSaving = create.isPending || update.isPending;
-  const requiresPriority = recordType === "MX";
+  const requiresPriority = recordType === DNS_RECORD_TYPE.MX;
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();

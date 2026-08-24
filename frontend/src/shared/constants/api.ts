@@ -70,5 +70,10 @@ export const API_CONFIG = {
       LOKI_QUERY: (environmentId: string) => `/environments/${environmentId}/loki-config/query`,
       LOKI_TAIL: (environmentId: string) => `/environments/${environmentId}/loki-config/tail`,
     },
+    NOTIFICATION_CHANNELS: {
+      ROOT: "/notification-channels",
+      DETAIL: (id: string) => `/notification-channels/${id}`,
+      TEST_SEND: (id: string) => `/notification-channels/${id}/test-send`,
+    },
   },
 } as const;

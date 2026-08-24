@@ -25,6 +25,7 @@ source_modules =
     app.modules.common
     app.modules.cloudflare
     app.modules.observability
+    app.modules.notifications
 forbidden_modules =
     app.modules.rbac.repository
     app.modules.rbac.models
@@ -41,6 +42,7 @@ source_modules =
     app.modules.common
     app.modules.cloudflare
     app.modules.observability
+    app.modules.notifications
 forbidden_modules =
     app.modules.users.repository
     app.modules.users.models
@@ -59,6 +61,7 @@ source_modules =
     app.modules.common
     app.modules.cloudflare
     app.modules.observability
+    app.modules.notifications
 forbidden_modules =
     app.modules.projects.repository
     app.modules.projects.models
@@ -77,6 +80,7 @@ source_modules =
     app.modules.common
     app.modules.cloudflare
     app.modules.observability
+    app.modules.notifications
 forbidden_modules =
     app.modules.audit.repository
 allow_indirect_imports = True
@@ -116,6 +120,25 @@ forbidden_modules =
     app.modules.observability.services
 allow_indirect_imports = True
 
+[importlinter:contract:notifications-facade]
+name = Other modules reach notifications only through public.py
+type = forbidden
+source_modules =
+    app.modules.auth
+    app.modules.rbac
+    app.modules.users
+    app.modules.projects
+    app.modules.audit
+    app.modules.cloudflare
+    app.modules.observability
+    app.modules.common
+forbidden_modules =
+    app.modules.notifications.repository
+    app.modules.notifications.models
+    app.modules.notifications.uow
+    app.modules.notifications.services
+allow_indirect_imports = True
+
 [importlinter:contract:common-is-a-leaf-module]
 name = common is a promotion target, not a hub — it never imports another domain module
 type = forbidden
@@ -143,6 +166,9 @@ forbidden_modules =
     app.integrations.mongo
     app.integrations.cloudflare
     app.integrations.loki
+    app.integrations.email
+    app.integrations.telegram
+    app.integrations.base_vn
 
 [importlinter:contract:integrations-are-leaves]
 name = Integrations never import a domain module
@@ -155,5 +181,8 @@ source_modules =
     app.integrations.mongo
     app.integrations.cloudflare
     app.integrations.loki
+    app.integrations.email
+    app.integrations.telegram
+    app.integrations.base_vn
 forbidden_modules =
     app.modules
