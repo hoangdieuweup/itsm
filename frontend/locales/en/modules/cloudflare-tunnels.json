@@ -30,7 +30,8 @@
   "hostnames": {
     "title": "Public Hostnames",
     "add": "Add Hostname",
-    "empty": "No hostnames published yet.",
+    "empty": "No hostnames matched to this environment. Either this environment's Base URL doesn't exactly match a hostname this tunnel routes, or none exist on Cloudflare yet — use \"Add Hostname\" above to create one.",
+    "noneMatched": "No public host matched to this environment yet",
     "edit": "Edit hostname",
     "remove": "Remove hostname",
     "addTitle": "Add Hostname",

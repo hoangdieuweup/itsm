@@ -14,10 +14,38 @@ import {
   useRevealTunnelToken,
   useSyncTunnels,
 } from "../hooks/use-tunnels";
+import { useTunnelHostnamesQuery } from "../hooks/use-tunnel-hostnames";
 import type { CloudflareTunnel } from "../model/schema";
 import { TunnelStatusBadge } from "./tunnel-status-badge";
 import { CreateTunnelDialog } from "./create-tunnel-dialog";
 import { TunnelHostnamesPanel } from "./tunnel-hostnames-panel";
+
+/**
+ * Always-visible preview of the hostname(s) this tunnel routes for the
+ * current environment — shown directly on the collapsed row so the mapping
+ * is visible without clicking into the row first. Reuses the same query the
+ * expanded `TunnelHostnamesPanel` uses; React Query dedupes/caches it.
+ */
+function TunnelHostnamePreview({ environmentId, tunnelId }: { environmentId: string; tunnelId: string }) {
+  const t = useTranslations("cloudflareTunnels");
+  const { data: hostnames = [], isLoading } = useTunnelHostnamesQuery(environmentId, tunnelId, true);
+
+  if (isLoading) {
+    return null;
+  }
+  if (hostnames.length === 0) {
+    return <span className="text-xs italic text-muted-foreground">{t("hostnames.noneMatched")}</span>;
+  }
+  return (
+    <span className="flex flex-wrap gap-x-3 gap-y-0.5">
+      {hostnames.map((hostname) => (
+        <span key={hostname.id} className="font-mono text-xs text-muted-foreground">
+          {hostname.hostname} → {hostname.service}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 /**
  * The reusable tunnel-management surface — list, status, hostnames — with no
@@ -74,10 +102,13 @@ export function TunnelsManager({ environmentId }: { environmentId: string }) {
                 <button
                   type="button"
                   onClick={() => setSelectedTunnelId(tunnel.id)}
-                  className="flex flex-1 items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="flex flex-1 flex-col items-start gap-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
-                  <span className="font-medium text-foreground">{tunnel.name}</span>
-                  <TunnelStatusBadge status={tunnel.status} />
+                  <span className="flex items-center gap-3">
+                    <span className="font-medium text-foreground">{tunnel.name}</span>
+                    <TunnelStatusBadge status={tunnel.status} />
+                  </span>
+                  <TunnelHostnamePreview environmentId={environmentId} tunnelId={tunnel.id} />
                 </button>
                 <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
                   <div className="flex items-center gap-2">

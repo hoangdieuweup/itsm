@@ -30,7 +30,8 @@
   "hostnames": {
     "title": "Hostname công khai",
     "add": "Thêm Hostname",
-    "empty": "Chưa có hostname nào được công bố.",
+    "empty": "Chưa có hostname nào khớp với môi trường này. Có thể do Base URL của môi trường chưa khớp chính xác với hostname mà tunnel này định tuyến, hoặc trên Cloudflare chưa có hostname nào — dùng \"Thêm Hostname\" ở trên để tạo mới.",
+    "noneMatched": "Chưa có public host nào khớp với môi trường này",
     "edit": "Sửa hostname",
     "remove": "Xóa hostname",
     "addTitle": "Thêm Hostname",
