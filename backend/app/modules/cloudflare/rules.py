@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from uuid import UUID
 
 from app.core.base.markers import rule
-from app.modules.cloudflare.constants import AccessLevel, AccessLevelRanking, DnsRecordType
+from app.modules.cloudflare.constants import AccessLevel, AccessLevelRanking, DnsRecordType, TunnelStatus
 from app.modules.cloudflare.exceptions import MissingDnsRecordPriority
 from app.modules.cloudflare.schemas import CloudflareTunnelRead
 
@@ -66,6 +66,24 @@ class CloudflareDnsRules:
         return None
 
 
+class DnsRecordSyncRules:
+    """Pure mapping rules for Cloudflare → local DNS record type."""
+
+    _CF_TYPE_MAP: dict[str, DnsRecordType] = {
+        "A": DnsRecordType.A,
+        "AAAA": DnsRecordType.AAAA,
+        "CNAME": DnsRecordType.CNAME,
+        "TXT": DnsRecordType.TXT,
+        "MX": DnsRecordType.MX,
+    }
+
+    @staticmethod
+    @rule
+    def map_cf_type(cf_type: str) -> DnsRecordType:
+        """Map a Cloudflare API record type string to local DnsRecordType enum."""
+        return DnsRecordSyncRules._CF_TYPE_MAP.get(cf_type, DnsRecordType.OTHER)
+
+
 class TunnelHostnameRules:
     """Pure decision rules for matching a Tunnel's public hostnames to the
     environments they actually serve. No I/O."""
@@ -101,3 +119,21 @@ class TunnelOwnershipRules:
     ) -> bool:
         """True iff tunnel exists and is on the given Cloudflare account."""
         return tunnel is not None and tunnel.cloudflare_account_id == cloudflare_account_id
+
+
+class TunnelSyncRules:
+    """Pure mapping rules for Cloudflare → local tunnel status."""
+
+    CF_STATUS_MAP: dict[str, TunnelStatus] = {
+        "healthy": TunnelStatus.HEALTHY,
+        "degraded": TunnelStatus.DEGRADED,
+        "down": TunnelStatus.DOWN,
+        "inactive": TunnelStatus.UNKNOWN,
+    }
+
+    @staticmethod
+    @rule
+    def map_cf_status(cf_status: str) -> TunnelStatus:
+        """Map a Cloudflare API status string to local TunnelStatus enum."""
+        return TunnelSyncRules.CF_STATUS_MAP.get(cf_status, TunnelStatus.UNKNOWN)
+
