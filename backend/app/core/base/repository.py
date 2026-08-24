@@ -5,7 +5,7 @@ from typing import Any, Generic, TypeVar
 from uuid import UUID
 
 EntityT = TypeVar("EntityT")
-IdT = TypeVar("IdT", UUID, int, str, Any)
+IdT = TypeVar("IdT")
 
 
 class AbstractRepository(ABC, Generic[EntityT, IdT]):

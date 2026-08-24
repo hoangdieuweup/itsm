@@ -13,6 +13,7 @@ from app.modules.observability.constants import (
     IncidentSource,
     IncidentStatus,
     LokiAuthType,
+    ObservabilityDefaults,
     ObservabilityLimits,
 )
 
@@ -36,7 +37,7 @@ class LokiConfigCreate(CustomModel):
     auth_type: LokiAuthType
     credential: str | None = None
     default_query: str = Field(default="", max_length=ObservabilityLimits.MAX_QUERY_LENGTH)
-    default_range_minutes: int = 60
+    default_range_minutes: int = ObservabilityDefaults.DEFAULT_RANGE_MINUTES
 
 
 class LokiConfigUpdate(CustomModel):

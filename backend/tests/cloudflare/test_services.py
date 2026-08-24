@@ -347,6 +347,18 @@ class FakeCloudflareTunnelRepository:
         self._rows[tunnel_id] = updated
         return updated
 
+    async def mark_missing_tunnels_down(
+        self, *, cloudflare_account_id: UUID, active_cf_tunnel_ids: set[str], synced_at
+    ) -> None:
+        for tunnel_id, tunnel in list(self._rows.items()):
+            if (
+                tunnel.cloudflare_account_id == cloudflare_account_id
+                and tunnel.cf_tunnel_id not in active_cf_tunnel_ids
+            ):
+                self._rows[tunnel_id] = tunnel.model_copy(
+                    update={"status": TunnelStatus.DOWN, "last_synced_at": synced_at}
+                )
+
     async def delete(self, tunnel_id: UUID) -> None:
         self._rows.pop(tunnel_id, None)
 

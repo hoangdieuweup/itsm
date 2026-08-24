@@ -14,6 +14,7 @@ from app.modules.audit.public import AuditApi, get_audit_api
 from app.modules.cloudflare.public import CloudflareApi, get_cloudflare_api
 from app.modules.notifications.public import NotificationsApi, get_notifications_api
 from app.modules.observability.config import observability_settings
+from app.modules.observability.constants import ObservabilityDefaults
 from app.modules.observability.exceptions import InvalidWebhookSecret
 from app.modules.observability.services.acknowledge_incident import AcknowledgeIncident
 from app.modules.observability.services.create_alert_rule import CreateAlertRule
@@ -200,7 +201,9 @@ async def get_get_incident(
 async def verify_loki_webhook_secret(authorization: str | None = Header(default=None)) -> None:
     """Bearer-token check against one app-wide shared secret (Decision #11) —
     Alertmanager's http_config.authorization sends this natively."""
-    expected = f"Bearer {observability_settings.LOKI_WEBHOOK_SECRET}"
+    expected = (
+        f"{ObservabilityDefaults.AUTH_HEADER_BEARER_PREFIX}{observability_settings.LOKI_WEBHOOK_SECRET}"
+    )
     if (
         not authorization
         or not observability_settings.LOKI_WEBHOOK_SECRET

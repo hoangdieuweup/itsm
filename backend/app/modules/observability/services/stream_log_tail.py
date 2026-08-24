@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from uuid import UUID
 
 from app.core.base.markers import sse_event
+from app.core.base.use_case import AbstractUseCase
 from app.integrations.loki.client import LokiClient
 from app.integrations.loki.schemas import LokiLogEntry
 from app.modules.observability.exceptions import LokiConfigNotFound
@@ -12,7 +13,7 @@ from app.modules.observability.uow import AbstractObservabilityUnitOfWork
 from app.modules.observability.utils import LokiAuthHelper
 
 
-class StreamLogTail:
+class StreamLogTail(AbstractUseCase):
     def __init__(self, uow: AbstractObservabilityUnitOfWork, client: LokiClient) -> None:
         self._uow = uow
         self._client = client

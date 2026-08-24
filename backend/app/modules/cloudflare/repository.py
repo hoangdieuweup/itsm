@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import exists as sa_exists
 from sqlalchemy import func, select
+from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database, helper
@@ -684,6 +685,14 @@ class AbstractCloudflareTunnelRepository(AbstractRepository[CloudflareTunnelRead
         raise NotImplementedError
 
     @abstractmethod
+    async def mark_missing_tunnels_down(
+        self, *, cloudflare_account_id: UUID, active_cf_tunnel_ids: set[str], synced_at: datetime
+    ) -> None:
+        """Mark tunnels belonging to this account whose cf_tunnel_id is NOT in
+        active_cf_tunnel_ids as DOWN."""
+        raise NotImplementedError
+
+    @abstractmethod
     async def delete(self, tunnel_id: UUID) -> None:
         """Delete a tunnel. tunnel_public_hostnames rows cascade at the DB level."""
         raise NotImplementedError
@@ -796,6 +805,19 @@ class CloudflareTunnelRepository(AbstractCloudflareTunnelRepository):
         await self._session.flush()
         await self._session.refresh(row)
         return CloudflareTunnelRead.model_validate(row)
+
+    @database
+    async def mark_missing_tunnels_down(
+        self, *, cloudflare_account_id: UUID, active_cf_tunnel_ids: set[str], synced_at: datetime
+    ) -> None:
+        stmt = (
+            sa_update(CloudflareTunnel)
+            .where(CloudflareTunnel.cloudflare_account_id == cloudflare_account_id)
+            .where(CloudflareTunnel.cf_tunnel_id.notin_(active_cf_tunnel_ids))
+            .values(status=TunnelStatus.DOWN, last_synced_at=synced_at)
+        )
+        await self._session.execute(stmt)
+        await self._session.flush()
 
     @database
     async def delete(self, tunnel_id: UUID) -> None:

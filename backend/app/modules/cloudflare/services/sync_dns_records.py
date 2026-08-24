@@ -13,34 +13,17 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
-from app.core.base.markers import rule, use_case
+from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
 from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.client import CloudflareClient
 from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import DnsRecordType, ManagedBy
+from app.modules.cloudflare.rules import DnsRecordSyncRules
 from app.modules.cloudflare.schemas import DnsRecordRead
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 
 logger = logging.getLogger(__name__)
-
-
-class DnsRecordSyncRules:
-    """Pure mapping rules for Cloudflare → local DNS record type."""
-
-    _CF_TYPE_MAP: dict[str, DnsRecordType] = {
-        "A": DnsRecordType.A,
-        "AAAA": DnsRecordType.AAAA,
-        "CNAME": DnsRecordType.CNAME,
-        "TXT": DnsRecordType.TXT,
-        "MX": DnsRecordType.MX,
-    }
-
-    @staticmethod
-    @rule
-    def map_cf_type(cf_type: str) -> DnsRecordType:
-        """Map a Cloudflare API record type string to local DnsRecordType enum."""
-        return DnsRecordSyncRules._CF_TYPE_MAP.get(cf_type, DnsRecordType.OTHER)
 
 
 class SyncDnsRecords(AbstractUseCase):

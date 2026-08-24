@@ -56,7 +56,7 @@ class UpdateCloudflareAccount(AbstractUseCase):
             raise InsufficientAccountAccess()
 
         ciphertext = None
-        if rotates_token:
+        if api_token is not None:
             await self._client.test_connection(cf_account_id=existing.cf_account_id, api_token=api_token)
             ciphertext = FernetCodec.encrypt(api_token, key=cloudflare_settings.FERNET_KEY)
 

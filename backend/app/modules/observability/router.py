@@ -16,7 +16,7 @@ from app.core.models import ApiResponse, ErrorPayload
 from app.integrations.loki.schemas import LokiLogEntry
 from app.modules.cloudflare.constants import AccessLevel
 from app.modules.cloudflare.public import require_account_access
-from app.modules.observability.constants import IncidentStatus
+from app.modules.observability.constants import IncidentStatus, ObservabilityDefaults
 from app.modules.observability.dependencies import (
     get_acknowledge_incident,
     get_create_alert_rule,
@@ -157,13 +157,23 @@ async def stream_log_tail(
         try:
             async for entry in use_case.execute(environment_id=environment_id, query=query, limit=limit):
                 payload: ApiResponse[LokiLogEntry] = ApiResponse(success=True, data=entry)
-                yield {"event": "message", "data": payload.model_dump_json(by_alias=True)}
+                yield {
+                    "event": ObservabilityDefaults.SSE_EVENT_MESSAGE,
+                    "data": payload.model_dump_json(by_alias=True),
+                }
         except Exception as exc:  # noqa: BLE001 -- mid-stream errors must become a final SSE event, not propagate
-            error = ErrorPayload(code=getattr(exc, "code", "loki_unavailable"), message=str(exc))
+            error = ErrorPayload(
+                code=getattr(exc, "code", ObservabilityDefaults.ERROR_LOKI_UNAVAILABLE), message=str(exc)
+            )
             payload_err: ApiResponse[None] = ApiResponse(success=False, error=error)
-            yield {"event": "message", "data": payload_err.model_dump_json(by_alias=True)}
+            yield {
+                "event": ObservabilityDefaults.SSE_EVENT_MESSAGE,
+                "data": payload_err.model_dump_json(by_alias=True),
+            }
 
-    return EventSourceResponse(event_stream(), headers={"X-Accel-Buffering": "no"})
+    return EventSourceResponse(
+        event_stream(), headers={"X-Accel-Buffering": ObservabilityDefaults.SSE_HEADER_NO_BUFFERING}
+    )
 
 
 @router.get("/cloudflare-accounts/{account_id}/available-alerts")
