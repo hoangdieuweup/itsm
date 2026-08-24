@@ -1,19 +1,25 @@
 import { z } from "zod";
+import { MANAGED_BY } from "@/shared/constants/cloudflare";
 
-export const TUNNEL_STATUSES = ["healthy", "degraded", "down", "unknown"] as const;
+export const TUNNEL_STATUS = {
+  HEALTHY: "healthy",
+  DEGRADED: "degraded",
+  DOWN: "down",
+  UNKNOWN: "unknown",
+} as const;
+export type TunnelStatus = (typeof TUNNEL_STATUS)[keyof typeof TUNNEL_STATUS];
 
 export const cloudflareTunnelSchema = z.object({
   id: z.uuid(),
   environmentId: z.uuid(),
   cfTunnelId: z.string(),
   name: z.string(),
-  status: z.enum(TUNNEL_STATUSES),
+  status: z.enum([TUNNEL_STATUS.HEALTHY, TUNNEL_STATUS.DEGRADED, TUNNEL_STATUS.DOWN, TUNNEL_STATUS.UNKNOWN]),
   lastSyncedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type CloudflareTunnel = z.infer<typeof cloudflareTunnelSchema>;
-export type TunnelStatus = (typeof TUNNEL_STATUSES)[number];
 
 export const cloudflareTunnelCreateResponseSchema = z.object({
   tunnel: cloudflareTunnelSchema,
@@ -30,7 +36,7 @@ export const tunnelPublicHostnameSchema = z.object({
   tunnelId: z.uuid(),
   hostname: z.string(),
   service: z.string(),
-  managedBy: z.enum(["system", "external"]),
+  managedBy: z.enum([MANAGED_BY.SYSTEM, MANAGED_BY.EXTERNAL]),
   createdBy: z.uuid().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),

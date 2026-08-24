@@ -7,6 +7,7 @@ import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
+import { MANAGED_BY } from "@/shared/constants/cloudflare";
 import { useEnvironmentQuery } from "@/entities/environment";
 import { useCloudflareConfigQuery, useDeleteCloudflareConfig } from "../hooks/use-cloudflare-config";
 import { useDnsRecordsQuery, useDeleteDnsRecord } from "../hooks/use-dns-records";
@@ -86,7 +87,7 @@ export function CloudflareDnsPageContent({ environmentId }: { environmentId: str
                         <td className="py-2 pr-4">{record.name}</td>
                         <td className="py-2 pr-4 text-muted-foreground">{record.content}</td>
                         <td className="py-2 pr-4">
-                          {record.managedBy === "external" ? (
+                          {record.managedBy === MANAGED_BY.EXTERNAL ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
                               <ExternalLink className="size-3" aria-hidden="true" /> {t("records.external")}
                             </span>

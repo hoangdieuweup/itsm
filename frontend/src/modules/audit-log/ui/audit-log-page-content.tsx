@@ -6,7 +6,7 @@ import { ScrollText } from "lucide-react";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { useAuditLogsQuery } from "../hooks/use-audit-logs";
-import { AUDIT_EVENT_TYPES, type AuditLogFilters } from "../api/fetchers";
+import { AUDIT_EVENT_TYPE, type AuditLogFilters } from "../api/fetchers";
 
 export function AuditLogPageContent() {
   const t = useTranslations("auditLog");
@@ -47,7 +47,7 @@ export function AuditLogPageContent() {
             className="h-9 rounded-md border bg-background px-3 text-sm"
           >
             <option value="">{t("filters.allTypes")}</option>
-            {AUDIT_EVENT_TYPES.map((type) => (
+            {Object.values(AUDIT_EVENT_TYPE).map((type) => (
               <option key={type} value={type}>
                 {type}
               </option>

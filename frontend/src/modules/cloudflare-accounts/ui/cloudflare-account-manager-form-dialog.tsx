@@ -11,7 +11,7 @@ import { apiFetch } from "@/shared/lib/api-client";
 import { API_CONFIG } from "@/shared/constants/api";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useAssignCloudflareAccountManager } from "../hooks/use-assign-cloudflare-account-manager";
-import type { AccessLevel } from "../api/fetchers";
+import { ACCESS_LEVEL, type AccessLevel } from "../api/fetchers";
 
 interface CloudflareAccountManagerFormDialogProps {
   accountId: string;
@@ -40,7 +40,7 @@ export function CloudflareAccountManagerFormDialog({
 }: CloudflareAccountManagerFormDialogProps) {
   const t = useTranslations("cloudflareAccounts");
   const [userId, setUserId] = useState("");
-  const [accessLevel, setAccessLevel] = useState<AccessLevel>("viewer");
+  const [accessLevel, setAccessLevel] = useState<AccessLevel>(ACCESS_LEVEL.VIEWER);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const getErrorMessage = useApiErrorMessage("cloudflareAccounts");
 
@@ -96,9 +96,11 @@ export function CloudflareAccountManagerFormDialog({
             onChange={(e) => setAccessLevel(e.target.value as AccessLevel)}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
-            <option value="viewer">{t("managers.levels.viewer")}</option>
-            <option value="editor">{t("managers.levels.editor")}</option>
-            <option value="owner">{t("managers.levels.owner")}</option>
+            {Object.values(ACCESS_LEVEL).map((level) => (
+              <option key={level} value={level}>
+                {t(`managers.levels.${level}`)}
+              </option>
+            ))}
           </select>
         </div>
 
