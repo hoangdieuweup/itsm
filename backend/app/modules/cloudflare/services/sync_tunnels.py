@@ -38,7 +38,6 @@ from app.core.base.use_case import AbstractUseCase
 from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.client import CloudflareClient
 from app.modules.cloudflare.config import cloudflare_settings
-from app.modules.cloudflare.constants import TunnelStatus
 from app.modules.cloudflare.rules import TunnelHostnameRules, TunnelSyncRules
 from app.modules.cloudflare.schemas import CloudflareTunnelRead
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork

@@ -226,6 +226,9 @@ class FakeConfigsRepo:
             if row.cloudflare_account_id == cloudflare_account_id
         ]
 
+    async def list_all(self):
+        return list(self._rows.values())
+
 
 class FakeDnsRecordsRepo:
     def __init__(self) -> None:
@@ -447,6 +450,9 @@ class FakeTunnelHostnameRepository:
         for row_id, row in list(self._rows.items()):
             if row.tunnel_id == tunnel_id and row.hostname not in keep_hostnames:
                 self._rows.pop(row_id, None)
+
+    async def list_for_environment(self, environment_id: UUID) -> list[TunnelPublicHostnameRead]:
+        return [h for h in self._rows.values() if h.environment_id == environment_id]
 
 
 class FakeCloudflareUnitOfWork(AbstractCloudflareUnitOfWork):

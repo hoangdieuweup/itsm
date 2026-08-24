@@ -3,8 +3,11 @@
 from datetime import datetime
 from uuid import UUID
 
+from pydantic import ConfigDict, SkipValidation
+
 from app.core.models import CustomModel, FrozenModel
-from app.modules.cloudflare.constants import AccessLevel, DnsRecordType, ManagedBy, TunnelStatus
+from app.integrations.cloudflare.client import CloudflareClient
+from app.modules.cloudflare.constants import AccessLevel, DnsRecordType, DriftKind, ManagedBy, TunnelStatus
 from app.modules.users.public import UserRead
 
 
@@ -213,3 +216,41 @@ class TunnelPublicHostnameUpdate(CustomModel):
     immutability."""
 
     service: str
+
+
+class DnsReconciliationDiff(FrozenModel):
+    """Result of CloudflareApi.reconcile_dns_records: what changed on
+    Cloudflare's side since the last known local state for one environment."""
+
+    new_external: list[DnsRecordRead]
+    vanished: list[DnsRecordRead]
+
+
+class TunnelDriftEntry(FrozenModel):
+    """One drifted tunnel hostname from CloudflareApi.reconcile_tunnels_for_account,
+    carrying the specific environment it was matched to — a single
+    account-wide reconciliation pass can produce entries for several
+    different sibling environments."""
+
+    kind: DriftKind
+    environment_id: UUID
+    hostname: TunnelPublicHostnameRead
+
+
+class ReadyCloudflareClient(FrozenModel):
+    """Everything another module needs to call the Cloudflare API on behalf
+    of one environment's bound account.
+
+    client uses SkipValidation rather than a plain CloudflareClient
+    annotation: this field only ever carries a live object reference
+    constructed internally (never parsed from external input), so there is
+    nothing meaningful to validate — a strict isinstance check here would
+    only exist to reject legitimate duck-typed substitutes (test fakes, a
+    future wrapper/decorator around the real client) that behave identically."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    client: SkipValidation[CloudflareClient]
+    cf_account_id: str
+    api_token: str
+    cloudflare_account_id: UUID

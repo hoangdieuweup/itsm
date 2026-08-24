@@ -112,6 +112,26 @@ class TestCloudflareConfigRepository:
         repo = CloudflareConfigRepository(_session)
         assert await repo.get_by_environment_id(uuid4()) is None
 
+    async def test_list_all_returns_every_binding(self, _session: AsyncSession) -> None:
+        account = await _make_account(_session)
+        env_a = await _make_environment(_session)
+        env_b = await _make_environment(_session)
+        repo = CloudflareConfigRepository(_session)
+        await repo.create(
+            environment_id=env_a.id, cloudflare_account_id=account.id, zone_id="z1", zone_name="a.com"
+        )
+        await repo.create(
+            environment_id=env_b.id, cloudflare_account_id=account.id, zone_id="z2", zone_name="b.com"
+        )
+
+        configs = await repo.list_all()
+
+        assert {c.environment_id for c in configs} == {env_a.id, env_b.id}
+
+    async def test_list_all_returns_empty_when_no_bindings(self, _session: AsyncSession) -> None:
+        repo = CloudflareConfigRepository(_session)
+        assert await repo.list_all() == []
+
     async def test_update_and_delete_by_environment_id(self, _session: AsyncSession) -> None:
         account = await _make_account(_session)
         env = await _make_environment(_session)
@@ -330,6 +350,49 @@ class TestTunnelHostnameRepository:
         hostnames = await repo.list_for_tunnel(tunnel.id, environment_id=env.id)
 
         assert [h.hostname for h in hostnames] == ["matched.example.com"]
+
+    async def test_list_for_environment_spans_every_tunnel_on_the_account(
+        self, _session: AsyncSession
+    ) -> None:
+        """Distinct from list_for_tunnel — this is the query the drift
+        reconciliation job's account-wide before/after snapshot needs, since
+        a single environment's matched hostnames can live on more than one
+        tunnel sharing the same Cloudflare account."""
+        account = await _make_account(_session)
+        env = await _make_environment(_session)
+        other_env = await _make_environment(_session)
+        tunnel_a = await CloudflareTunnelRepository(_session).create(
+            cloudflare_account_id=account.id, cf_tunnel_id="tun-a", name="a"
+        )
+        tunnel_b = await CloudflareTunnelRepository(_session).create(
+            cloudflare_account_id=account.id, cf_tunnel_id="tun-b", name="b"
+        )
+        repo = TunnelHostnameRepository(_session)
+        await repo.create(
+            tunnel_id=tunnel_a.id,
+            hostname="on-a.example.com",
+            service="http://a",
+            created_by=None,
+            environment_id=env.id,
+        )
+        await repo.create(
+            tunnel_id=tunnel_b.id,
+            hostname="on-b.example.com",
+            service="http://b",
+            created_by=None,
+            environment_id=env.id,
+        )
+        await repo.create(
+            tunnel_id=tunnel_a.id,
+            hostname="other-env.example.com",
+            service="http://c",
+            created_by=None,
+            environment_id=other_env.id,
+        )
+
+        hostnames = await repo.list_for_environment(env.id)
+
+        assert {h.hostname for h in hostnames} == {"on-a.example.com", "on-b.example.com"}
 
     async def test_update_service(self, _session: AsyncSession) -> None:
         account = await _make_account(_session)
