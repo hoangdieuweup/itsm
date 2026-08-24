@@ -75,5 +75,16 @@ export const API_CONFIG = {
       DETAIL: (id: string) => `/notification-channels/${id}`,
       TEST_SEND: (id: string) => `/notification-channels/${id}/test-send`,
     },
+    ALERT_RULES: {
+      AVAILABLE_ALERTS: (accountId: string) => `/cloudflare-accounts/${accountId}/available-alerts`,
+      ROOT: (environmentId: string) => `/environments/${environmentId}/alert-rules`,
+      DETAIL: (alertRuleId: string) => `/alert-rules/${alertRuleId}`,
+    },
+    INCIDENTS: {
+      ROOT: "/incidents",
+      DETAIL: (id: string) => `/incidents/${id}`,
+      ACKNOWLEDGE: (id: string) => `/incidents/${id}/acknowledge`,
+      RESOLVE: (id: string) => `/incidents/${id}/resolve`,
+    },
   },
 } as const;

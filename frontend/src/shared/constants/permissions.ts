@@ -7,6 +7,8 @@ export const RESOURCES = {
   AUDIT_LOG: "audit_log",
   CLOUDFLARE_ACCOUNT: "cloudflare_account",
   NOTIFICATION_CHANNEL: "notification_channel",
+  ALERT_RULE: "alert_rule",
+  INCIDENT: "incident",
 } as const;
 
 export type Resource = (typeof RESOURCES)[keyof typeof RESOURCES];
@@ -20,6 +22,8 @@ export const ACTIONS = {
   ASSIGN_ROLE: "assign_role",
   VIEW: "view",
   MANAGE: "manage",
+  ACKNOWLEDGE: "acknowledge",
+  RESOLVE: "resolve",
 } as const;
 
 export type Action = (typeof ACTIONS)[keyof typeof ACTIONS];
@@ -71,5 +75,19 @@ export const PERMISSIONS = {
     READ: `${RESOURCES.NOTIFICATION_CHANNEL}.${ACTIONS.READ}` as const,
     UPDATE: `${RESOURCES.NOTIFICATION_CHANNEL}.${ACTIONS.UPDATE}` as const,
     DELETE: `${RESOURCES.NOTIFICATION_CHANNEL}.${ACTIONS.DELETE}` as const,
+  },
+  ALERT_RULE: {
+    RESOURCE: RESOURCES.ALERT_RULE,
+    CREATE: `${RESOURCES.ALERT_RULE}.${ACTIONS.CREATE}` as const,
+    READ: `${RESOURCES.ALERT_RULE}.${ACTIONS.READ}` as const,
+    UPDATE: `${RESOURCES.ALERT_RULE}.${ACTIONS.UPDATE}` as const,
+    DELETE: `${RESOURCES.ALERT_RULE}.${ACTIONS.DELETE}` as const,
+  },
+  INCIDENT: {
+    RESOURCE: RESOURCES.INCIDENT,
+    CREATE: `${RESOURCES.INCIDENT}.${ACTIONS.CREATE}` as const,
+    READ: `${RESOURCES.INCIDENT}.${ACTIONS.READ}` as const,
+    ACKNOWLEDGE: `${RESOURCES.INCIDENT}.${ACTIONS.ACKNOWLEDGE}` as const,
+    RESOLVE: `${RESOURCES.INCIDENT}.${ACTIONS.RESOLVE}` as const,
   },
 } as const;

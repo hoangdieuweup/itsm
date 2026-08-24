@@ -6,4 +6,5 @@ export const ROUTES = {
   adminProjects: "/admin/projects",
   adminAuditLog: "/admin/audit-log",
   adminCloudflareAccounts: "/admin/cloudflare-accounts",
+  adminIncidents: "/admin/incidents",
 } as const;
