@@ -136,6 +136,18 @@ class TunnelHostnameAlreadyExists(ConflictError):
     message = "This hostname is already published on this tunnel"
 
 
+class TunnelHostnameDomainMismatch(ValidationFailedError):
+    """Raised when the submitted hostname's domain does not match the
+    environment's bound Cloudflare zone. The frontend only offers a
+    subdomain field and appends the bound zone itself, but that's a UX
+    constraint, not a security boundary — this is the server-side check
+    that actually enforces it, mirroring ZoneNotOwnedByAccount's role for
+    DNS record binding."""
+
+    code = ErrorCode.TUNNEL_HOSTNAME_DOMAIN_MISMATCH
+    message = "This hostname's domain does not match the environment's bound Cloudflare zone"
+
+
 class TunnelIngressSyncFailed(IntegrationError):
     """Raised when Cloudflare's side of an ingress PUT succeeded but the
     local Postgres write then failed. Decision #5: a compensating PUT-back

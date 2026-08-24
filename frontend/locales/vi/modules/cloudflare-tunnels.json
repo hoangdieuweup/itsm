@@ -32,19 +32,22 @@
     "add": "Thêm Hostname",
     "empty": "Chưa có hostname nào khớp với môi trường này. Có thể do Base URL của môi trường chưa khớp chính xác với hostname mà tunnel này định tuyến, hoặc trên Cloudflare chưa có hostname nào — dùng \"Thêm Hostname\" ở trên để tạo mới.",
     "noneMatched": "Chưa có public host nào khớp với môi trường này",
+    "mapping": "{hostname} → {service}",
     "edit": "Sửa hostname",
     "remove": "Xóa hostname",
     "addTitle": "Thêm Hostname",
     "editTitle": "Sửa Hostname",
-    "hostnameLabel": "Hostname",
+    "subdomainLabel": "Subdomain",
     "serviceLabel": "Service",
+    "domainRequiresBinding": "Môi trường này chưa liên kết zone Cloudflare nào — hãy liên kết ở tab DNS trước khi thêm hostname, để hệ thống biết domain.",
     "cancel": "Hủy",
     "save": "Lưu",
     "saving": "Đang lưu...",
     "deleteConfirm": {
       "title": "Xóa hostname này?",
       "description": "\"{hostname}\" sẽ không còn được định tuyến qua tunnel này."
-    }
+    },
+    "renameFailedAfterRemove": "Hostname cũ đã bị xóa, nhưng thêm hostname mới thất bại: {error}. Dùng \"Thêm Hostname\" để thêm lại."
   },
   "environmentTypes": {
     "dev": "Phát triển",
@@ -57,6 +60,7 @@
     "cloudflare_tunnel_hostname_not_found": "Không tìm thấy hostname.",
     "cloudflare_tunnel_config_locked": "Có người khác đang chỉnh sửa tunnel này — vui lòng thử lại sau.",
     "cloudflare_tunnel_hostname_already_exists": "Hostname này đã được công bố trên tunnel này.",
-    "cloudflare_tunnel_ingress_sync_failed": "Cloudflare đã được cập nhật nhưng lưu cục bộ thất bại — vui lòng tải lại và kiểm tra."
+    "cloudflare_tunnel_ingress_sync_failed": "Cloudflare đã được cập nhật nhưng lưu cục bộ thất bại — vui lòng tải lại và kiểm tra.",
+    "cloudflare_tunnel_hostname_domain_mismatch": "Domain của hostname này không khớp với zone Cloudflare mà môi trường đã liên kết."
   }
 }

@@ -90,6 +90,17 @@ class TunnelHostnameRules:
 
     @staticmethod
     @rule
+    def belongs_to_zone(hostname: str, zone_name: str) -> bool:
+        """True iff hostname is the zone's apex or a subdomain of it — exact
+        suffix match only, same discipline as match_environment_id below.
+        The frontend only lets a user type the subdomain part and always
+        appends the environment's bound zone, but that's UX, not
+        enforcement — this is the actual server-side check, called before
+        any hostname is written to Cloudflare or persisted."""
+        return hostname == zone_name or hostname.endswith(f".{zone_name}")
+
+    @staticmethod
+    @rule
     def match_environment_id(hostname: str, candidates: list[tuple[UUID, str | None]]) -> UUID | None:
         """Return the id of the candidate environment whose base_url's host
         exactly matches hostname, or None if no candidate matches (including

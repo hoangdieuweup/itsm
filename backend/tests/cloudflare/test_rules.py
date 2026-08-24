@@ -73,6 +73,33 @@ class TestNormalizePriority:
         assert CloudflareDnsRules.normalize_priority(DnsRecordType.A, None) is None
 
 
+class TestBelongsToZone:
+    def test_exact_apex_match(self) -> None:
+        assert TunnelHostnameRules.belongs_to_zone("agentsplatform.cloud", "agentsplatform.cloud") is True
+
+    def test_subdomain_match(self) -> None:
+        assert (
+            TunnelHostnameRules.belongs_to_zone("agent-mkt-stg.agentsplatform.cloud", "agentsplatform.cloud")
+            is True
+        )
+
+    def test_different_domain_rejected(self) -> None:
+        assert (
+            TunnelHostnameRules.belongs_to_zone("agent-mkt-stg.example.com", "agentsplatform.cloud") is False
+        )
+
+    def test_never_a_suffix_match_without_dot_boundary(self) -> None:
+        """A wrong match here would let a hostname on notagentsplatform.cloud
+        pass as if it belonged to agentsplatform.cloud — must be an exact
+        apex or a real `.zone` subdomain, never a bare string suffix."""
+        assert (
+            TunnelHostnameRules.belongs_to_zone(
+                "agent-mkt-stg.notagentsplatform.cloud", "agentsplatform.cloud"
+            )
+            is False
+        )
+
+
 class TestMatchEnvironmentId:
     def test_exact_host_match(self) -> None:
         env_id = uuid4()

@@ -35,6 +35,7 @@ from app.modules.cloudflare.exceptions import (
     MissingDnsRecordPriority,
     TunnelConfigLocked,
     TunnelHostnameAlreadyExists,
+    TunnelHostnameDomainMismatch,
     TunnelIngressSyncFailed,
     ZoneNotOwnedByAccount,
 )
@@ -1965,6 +1966,17 @@ class TestAddTunnelHostname:
         with pytest.raises(TunnelHostnameAlreadyExists):
             await use_case.execute(
                 config.environment_id, tunnel.id, "app.example.com", "http://new", actor=actor
+            )
+        assert client.put_calls == []
+
+    async def test_hostname_on_wrong_domain_rejected_before_calling_cloudflare(self) -> None:
+        uow, config, tunnel, client = await self._setup(ingress=[])
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(TunnelHostnameDomainMismatch):
+            await use_case.execute(
+                config.environment_id, tunnel.id, "app.otherdomain.com", "http://x", actor=actor
             )
         assert client.put_calls == []
 

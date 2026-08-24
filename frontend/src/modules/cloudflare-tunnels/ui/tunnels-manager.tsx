@@ -40,7 +40,7 @@ function TunnelHostnamePreview({ environmentId, tunnelId }: { environmentId: str
     <span className="flex flex-wrap gap-x-3 gap-y-0.5">
       {hostnames.map((hostname) => (
         <span key={hostname.id} className="font-mono text-xs text-muted-foreground">
-          {hostname.hostname} → {hostname.service}
+          {t("hostnames.mapping", { hostname: hostname.hostname, service: hostname.service })}
         </span>
       ))}
     </span>

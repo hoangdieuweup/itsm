@@ -32,19 +32,22 @@
     "add": "Add Hostname",
     "empty": "No hostnames matched to this environment. Either this environment's Base URL doesn't exactly match a hostname this tunnel routes, or none exist on Cloudflare yet — use \"Add Hostname\" above to create one.",
     "noneMatched": "No public host matched to this environment yet",
+    "mapping": "{hostname} → {service}",
     "edit": "Edit hostname",
     "remove": "Remove hostname",
     "addTitle": "Add Hostname",
     "editTitle": "Edit Hostname",
-    "hostnameLabel": "Hostname",
+    "subdomainLabel": "Subdomain",
     "serviceLabel": "Service",
+    "domainRequiresBinding": "This environment has no Cloudflare zone bound yet — bind one on the DNS tab before adding a hostname, so the domain is known.",
     "cancel": "Cancel",
     "save": "Save",
     "saving": "Saving...",
     "deleteConfirm": {
       "title": "Remove this hostname?",
       "description": "\"{hostname}\" will stop being routed through this tunnel."
-    }
+    },
+    "renameFailedAfterRemove": "The old hostname was removed, but adding the new one failed: {error}. Use \"Add Hostname\" to add it again."
   },
   "environmentTypes": {
     "dev": "Development",
@@ -57,6 +60,7 @@
     "cloudflare_tunnel_hostname_not_found": "Hostname not found.",
     "cloudflare_tunnel_config_locked": "Someone else is editing this tunnel right now — try again in a moment.",
     "cloudflare_tunnel_hostname_already_exists": "This hostname is already published on this tunnel.",
-    "cloudflare_tunnel_ingress_sync_failed": "Cloudflare was updated but saving locally failed — please refresh and verify."
+    "cloudflare_tunnel_ingress_sync_failed": "Cloudflare was updated but saving locally failed — please refresh and verify.",
+    "cloudflare_tunnel_hostname_domain_mismatch": "This hostname's domain does not match the environment's bound Cloudflare zone."
   }
 }

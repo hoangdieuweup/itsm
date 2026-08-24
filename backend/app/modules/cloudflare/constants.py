@@ -56,6 +56,7 @@ class ErrorCode(StrEnum):
     TUNNEL_CONFIG_LOCKED = "cloudflare_tunnel_config_locked"
     TUNNEL_HOSTNAME_ALREADY_EXISTS = "cloudflare_tunnel_hostname_already_exists"
     TUNNEL_INGRESS_SYNC_FAILED = "cloudflare_tunnel_ingress_sync_failed"
+    TUNNEL_HOSTNAME_DOMAIN_MISMATCH = "cloudflare_tunnel_hostname_domain_mismatch"
 
 
 class CloudflareAccountAuditActions(StrEnum):
