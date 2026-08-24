@@ -35,12 +35,12 @@ from app.modules.cloudflare.services.list_tunnels import ListTunnels
 from app.modules.cloudflare.services.list_visible_accounts import ListVisibleCloudflareAccounts
 from app.modules.cloudflare.services.list_zones import ListZones
 from app.modules.cloudflare.services.refresh_tunnel_status import RefreshTunnelStatus
-from app.modules.cloudflare.services.sync_dns_records import SyncDnsRecords
-from app.modules.cloudflare.services.sync_tunnels import SyncTunnels
 from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccountManager
 from app.modules.cloudflare.services.remove_tunnel_hostname import RemoveTunnelHostname
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
 from app.modules.cloudflare.services.reveal_tunnel_token import RevealCloudflareTunnelToken
+from app.modules.cloudflare.services.sync_dns_records import SyncDnsRecords
+from app.modules.cloudflare.services.sync_tunnels import SyncTunnels
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
 from app.modules.cloudflare.services.update_config import UpdateCloudflareConfig
@@ -312,9 +312,10 @@ async def get_list_tunnels(uow: AbstractCloudflareUnitOfWork = Depends(get_uow))
 async def get_sync_tunnels(
     uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
     client: CloudflareClient = Depends(get_cloudflare_client),
+    projects_api: ProjectsApi = Depends(get_projects_api),
 ) -> SyncTunnels:
     """Provide the sync-tunnels use case."""
-    return SyncTunnels(uow, client)
+    return SyncTunnels(uow, client, projects_api)
 
 
 async def get_list_tunnel_hostnames(

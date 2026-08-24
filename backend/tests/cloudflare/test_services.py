@@ -2,6 +2,7 @@
 no real Cloudflare API calls."""
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
@@ -72,6 +73,7 @@ from app.modules.cloudflare.services.remove_manager import RemoveCloudflareAccou
 from app.modules.cloudflare.services.remove_tunnel_hostname import RemoveTunnelHostname
 from app.modules.cloudflare.services.reveal_token import RevealCloudflareAccountToken
 from app.modules.cloudflare.services.reveal_tunnel_token import RevealCloudflareTunnelToken
+from app.modules.cloudflare.services.sync_tunnels import SyncTunnels
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
 from app.modules.cloudflare.services.update_config import UpdateCloudflareConfig
@@ -217,6 +219,13 @@ class FakeConfigsRepo:
     async def delete_by_environment_id(self, environment_id):
         self._rows.pop(environment_id, None)
 
+    async def list_environment_ids_for_account(self, cloudflare_account_id):
+        return [
+            row.environment_id
+            for row in self._rows.values()
+            if row.cloudflare_account_id == cloudflare_account_id
+        ]
+
 
 class FakeDnsRecordsRepo:
     def __init__(self) -> None:
@@ -264,6 +273,10 @@ class FakeDnsRecordsRepo:
 class FakeCloudflareTunnelRepository:
     def __init__(self) -> None:
         self._rows: dict[UUID, CloudflareTunnelRead] = {}
+        # Wired by FakeCloudflareUnitOfWork.__init__ right after both fakes
+        # are constructed — mirrors the real repository's EXISTS join
+        # against tunnel_public_hostnames without a shared session.
+        self.hostnames_repo: FakeTunnelHostnameRepository | None = None
 
     async def get_by_id(self, entity_id: UUID) -> CloudflareTunnelRead | None:
         return self._rows.get(entity_id)
@@ -272,13 +285,22 @@ class FakeCloudflareTunnelRepository:
         items = list(self._rows.values())[offset : offset + limit]
         return items, len(self._rows)
 
-    async def list_for_environment(self, environment_id: UUID) -> list[CloudflareTunnelRead]:
-        return [t for t in self._rows.values() if t.environment_id == environment_id]
+    async def list_for_account(self, cloudflare_account_id: UUID) -> list[CloudflareTunnelRead]:
+        return [t for t in self._rows.values() if t.cloudflare_account_id == cloudflare_account_id]
 
-    async def create(self, *, environment_id: UUID, cf_tunnel_id: str, name: str) -> CloudflareTunnelRead:
+    async def list_for_environment_via_hostnames(self, environment_id: UUID) -> list[CloudflareTunnelRead]:
+        assert self.hostnames_repo is not None
+        tunnel_ids = {
+            h.tunnel_id for h in self.hostnames_repo._rows.values() if h.environment_id == environment_id
+        }
+        return [t for t in self._rows.values() if t.id in tunnel_ids]
+
+    async def create(
+        self, *, cloudflare_account_id: UUID, cf_tunnel_id: str, name: str
+    ) -> CloudflareTunnelRead:
         tunnel = CloudflareTunnelRead(
             id=uuid4(),
-            environment_id=environment_id,
+            cloudflare_account_id=cloudflare_account_id,
             cf_tunnel_id=cf_tunnel_id,
             name=name,
             status=TunnelStatus.UNKNOWN,
@@ -286,6 +308,36 @@ class FakeCloudflareTunnelRepository:
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
+        self._rows[tunnel.id] = tunnel
+        return tunnel
+
+    async def get_by_cf_tunnel_id(self, cf_tunnel_id: str) -> CloudflareTunnelRead | None:
+        return next((t for t in self._rows.values() if t.cf_tunnel_id == cf_tunnel_id), None)
+
+    async def upsert_from_sync(
+        self, *, cloudflare_account_id: UUID, cf_tunnel_id: str, name: str, status, last_synced_at
+    ) -> CloudflareTunnelRead:
+        existing = await self.get_by_cf_tunnel_id(cf_tunnel_id)
+        if existing is None:
+            tunnel = CloudflareTunnelRead(
+                id=uuid4(),
+                cloudflare_account_id=cloudflare_account_id,
+                cf_tunnel_id=cf_tunnel_id,
+                name=name,
+                status=status,
+                last_synced_at=last_synced_at,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+        else:
+            tunnel = existing.model_copy(
+                update={
+                    "cloudflare_account_id": cloudflare_account_id,
+                    "name": name,
+                    "status": status,
+                    "last_synced_at": last_synced_at,
+                }
+            )
         self._rows[tunnel.id] = tunnel
         return tunnel
 
@@ -310,15 +362,27 @@ class FakeTunnelHostnameRepository:
         items = list(self._rows.values())[offset : offset + limit]
         return items, len(self._rows)
 
-    async def list_for_tunnel(self, tunnel_id: UUID) -> list[TunnelPublicHostnameRead]:
-        return [h for h in self._rows.values() if h.tunnel_id == tunnel_id]
+    async def list_for_tunnel(
+        self, tunnel_id: UUID, *, environment_id: UUID | None = None
+    ) -> list[TunnelPublicHostnameRead]:
+        rows = [h for h in self._rows.values() if h.tunnel_id == tunnel_id]
+        if environment_id is not None:
+            rows = [h for h in rows if h.environment_id == environment_id]
+        return rows
 
     async def create(
-        self, *, tunnel_id: UUID, hostname: str, service: str, created_by: UUID | None
+        self,
+        *,
+        tunnel_id: UUID,
+        hostname: str,
+        service: str,
+        created_by: UUID | None,
+        environment_id: UUID | None = None,
     ) -> TunnelPublicHostnameRead:
         row = TunnelPublicHostnameRead(
             id=uuid4(),
             tunnel_id=tunnel_id,
+            environment_id=environment_id,
             hostname=hostname,
             service=service,
             managed_by=ManagedBy.SYSTEM,
@@ -338,6 +402,40 @@ class FakeTunnelHostnameRepository:
     async def delete(self, hostname_id: UUID) -> None:
         self._rows.pop(hostname_id, None)
 
+    async def upsert_from_sync(
+        self, *, tunnel_id: UUID, hostname: str, service: str, environment_id: UUID | None, last_synced_at
+    ) -> TunnelPublicHostnameRead:
+        existing = next((h for h in self._rows.values() if h.hostname == hostname), None)
+        if existing is None:
+            row = TunnelPublicHostnameRead(
+                id=uuid4(),
+                tunnel_id=tunnel_id,
+                environment_id=environment_id,
+                hostname=hostname,
+                service=service,
+                managed_by=ManagedBy.EXTERNAL,
+                created_by=None,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+        else:
+            # last_synced_at is not exposed on TunnelPublicHostnameRead —
+            # accepted here only to mirror the real repository's signature.
+            row = existing.model_copy(
+                update={
+                    "tunnel_id": tunnel_id,
+                    "service": service,
+                    "environment_id": environment_id,
+                }
+            )
+        self._rows[row.id] = row
+        return row
+
+    async def delete_not_in_hostnames(self, tunnel_id: UUID, keep_hostnames: set[str]) -> None:
+        for row_id, row in list(self._rows.items()):
+            if row.tunnel_id == tunnel_id and row.hostname not in keep_hostnames:
+                self._rows.pop(row_id, None)
+
 
 class FakeCloudflareUnitOfWork(AbstractCloudflareUnitOfWork):
     """In-memory unit of work. commit/rollback are no-ops that just count calls."""
@@ -347,8 +445,11 @@ class FakeCloudflareUnitOfWork(AbstractCloudflareUnitOfWork):
         self.account_managers = FakeCloudflareAccountManagerRepository()
         self.configs = FakeConfigsRepo()
         self.dns_records = FakeDnsRecordsRepo()
-        self.tunnels = FakeCloudflareTunnelRepository()
-        self.tunnel_hostnames = FakeTunnelHostnameRepository()
+        tunnels_repo = FakeCloudflareTunnelRepository()
+        hostnames_repo = FakeTunnelHostnameRepository()
+        tunnels_repo.hostnames_repo = hostnames_repo
+        self.tunnels = tunnels_repo
+        self.tunnel_hostnames = hostnames_repo
         self.commits = 0
         self.rollbacks = 0
         self.stale: list[tuple[str, UUID]] = []
@@ -1564,9 +1665,7 @@ class TestDeleteCloudflareTunnel:
         config = await uow.configs.create(
             environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
         )
-        tunnel = await uow.tunnels.create(
-            environment_id=config.environment_id, cf_tunnel_id="tun-1", name="t"
-        )
+        tunnel = await uow.tunnels.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="t")
         await uow.tunnel_hostnames.create(
             tunnel_id=tunnel.id, hostname="a.example.com", service="http://x", created_by=None
         )
@@ -1579,7 +1678,7 @@ class TestDeleteCloudflareTunnel:
         assert client.deleted_tunnel_ids == ["tun-1"]
         assert await uow.tunnels.get_by_id(tunnel.id) is None
 
-    async def test_raises_not_found_for_tunnel_in_different_environment(self) -> None:
+    async def test_raises_not_found_for_tunnel_on_a_different_account(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
             label="acc",
@@ -1590,12 +1689,38 @@ class TestDeleteCloudflareTunnel:
         config = await uow.configs.create(
             environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
         )
-        other_tunnel = await uow.tunnels.create(environment_id=uuid4(), cf_tunnel_id="tun-x", name="x")
+        other_tunnel = await uow.tunnels.create(cloudflare_account_id=uuid4(), cf_tunnel_id="tun-x", name="x")
         use_case = DeleteCloudflareTunnel(uow, FakeCloudflareTunnelClient(), FakeAuditApi())
         actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
 
         with pytest.raises(CloudflareTunnelNotFound):
             await use_case.execute(config.environment_id, other_tunnel.id, actor=actor)
+
+    async def test_accepts_tunnel_shared_by_a_sibling_environment_on_the_same_account(self) -> None:
+        """The literal regression case this fix targets: a tunnel that was
+        originally synced while a DIFFERENT environment triggered the sync
+        must still be manageable from any environment sharing the same
+        Cloudflare account — ownership is account-scoped, not environment-scoped."""
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="acc",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            created_by=None,
+        )
+        config = await uow.configs.create(
+            environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
+        )
+        shared_tunnel = await uow.tunnels.create(
+            cloudflare_account_id=account.id, cf_tunnel_id="tun-shared", name="shared"
+        )
+        client = FakeCloudflareTunnelClient()
+        use_case = DeleteCloudflareTunnel(uow, client, FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        await use_case.execute(config.environment_id, shared_tunnel.id, actor=actor)
+
+        assert client.deleted_tunnel_ids == ["tun-shared"]
 
 
 class TestRevealCloudflareTunnelToken:
@@ -1610,9 +1735,7 @@ class TestRevealCloudflareTunnelToken:
         config = await uow.configs.create(
             environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
         )
-        tunnel = await uow.tunnels.create(
-            environment_id=config.environment_id, cf_tunnel_id="tun-1", name="t"
-        )
+        tunnel = await uow.tunnels.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="t")
         client = FakeCloudflareTunnelClient(token="fresh-token-123")
         use_case = RevealCloudflareTunnelToken(uow, client, FakeAuditApi())
         actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
@@ -1634,9 +1757,7 @@ class TestRefreshTunnelStatus:
         config = await uow.configs.create(
             environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
         )
-        tunnel = await uow.tunnels.create(
-            environment_id=config.environment_id, cf_tunnel_id="tun-1", name="t"
-        )
+        tunnel = await uow.tunnels.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="t")
         client = FakeCloudflareTunnelClient(connections=[])
         use_case = RefreshTunnelStatus(uow, client)
 
@@ -1656,9 +1777,7 @@ class TestRefreshTunnelStatus:
         config = await uow.configs.create(
             environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
         )
-        tunnel = await uow.tunnels.create(
-            environment_id=config.environment_id, cf_tunnel_id="tun-1", name="t"
-        )
+        tunnel = await uow.tunnels.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="t")
         client = FakeCloudflareTunnelClient(connections=[{"id": "c1"}, {"id": "c2"}])
         use_case = RefreshTunnelStatus(uow, client)
 
@@ -1668,33 +1787,97 @@ class TestRefreshTunnelStatus:
 
 
 class TestListTunnels:
-    async def test_returns_every_tunnel_for_environment(self) -> None:
+    async def test_returns_only_tunnels_matched_to_the_environment_via_hostnames(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         environment_id = uuid4()
-        await uow.tunnels.create(environment_id=environment_id, cf_tunnel_id="tun-a", name="a")
-        await uow.tunnels.create(environment_id=environment_id, cf_tunnel_id="tun-b", name="b")
+        other_environment_id = uuid4()
+        matched = await uow.tunnels.create(cloudflare_account_id=uuid4(), cf_tunnel_id="tun-a", name="a")
+        unmatched = await uow.tunnels.create(cloudflare_account_id=uuid4(), cf_tunnel_id="tun-b", name="b")
+        await uow.tunnel_hostnames.create(
+            tunnel_id=matched.id,
+            hostname="app.example.com",
+            service="http://x",
+            created_by=None,
+            environment_id=environment_id,
+        )
+        await uow.tunnel_hostnames.create(
+            tunnel_id=unmatched.id,
+            hostname="other.example.com",
+            service="http://y",
+            created_by=None,
+            environment_id=other_environment_id,
+        )
         use_case = ListTunnels(uow)
+
         tunnels = await use_case.execute(environment_id)
-        assert len(tunnels) == 2
+
+        assert [t.id for t in tunnels] == [matched.id]
+
+    async def test_tunnel_with_no_matched_hostname_never_appears(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        await uow.tunnels.create(cloudflare_account_id=uuid4(), cf_tunnel_id="tun-a", name="a")
+        use_case = ListTunnels(uow)
+
+        tunnels = await use_case.execute(uuid4())
+
+        assert tunnels == []
 
 
 class TestListTunnelHostnames:
-    async def test_returns_every_hostname_for_tunnel(self) -> None:
+    async def test_returns_only_hostnames_matched_to_the_environment(self) -> None:
         uow = FakeCloudflareUnitOfWork()
-        environment_id = uuid4()
-        tunnel = await uow.tunnels.create(environment_id=environment_id, cf_tunnel_id="tun-1", name="t")
+        account = await uow.accounts.create(
+            label="acc",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            created_by=None,
+        )
+        config = await uow.configs.create(
+            environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
+        )
+        other_environment_id = uuid4()
+        tunnel = await uow.tunnels.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="t")
         await uow.tunnel_hostnames.create(
-            tunnel_id=tunnel.id, hostname="a.example.com", service="http://x", created_by=None
+            tunnel_id=tunnel.id,
+            hostname="a.example.com",
+            service="http://x",
+            created_by=None,
+            environment_id=config.environment_id,
+        )
+        await uow.tunnel_hostnames.create(
+            tunnel_id=tunnel.id,
+            hostname="b.example.com",
+            service="http://y",
+            created_by=None,
+            environment_id=other_environment_id,
         )
         use_case = ListTunnelHostnames(uow)
-        hostnames = await use_case.execute(environment_id, tunnel.id)
-        assert len(hostnames) == 1
 
-    async def test_raises_not_found_for_tunnel_in_different_environment(self) -> None:
+        hostnames = await use_case.execute(config.environment_id, tunnel.id)
+
+        assert [h.hostname for h in hostnames] == ["a.example.com"]
+
+    async def test_raises_not_found_for_tunnel_on_a_different_account(self) -> None:
         uow = FakeCloudflareUnitOfWork()
-        tunnel = await uow.tunnels.create(environment_id=uuid4(), cf_tunnel_id="tun-1", name="t")
+        account = await uow.accounts.create(
+            label="acc",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            created_by=None,
+        )
+        config = await uow.configs.create(
+            environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
+        )
+        other_tunnel = await uow.tunnels.create(cloudflare_account_id=uuid4(), cf_tunnel_id="tun-1", name="t")
         use_case = ListTunnelHostnames(uow)
         with pytest.raises(CloudflareTunnelNotFound):
+            await use_case.execute(config.environment_id, other_tunnel.id)
+
+    async def test_raises_config_not_found_when_environment_unbound(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        tunnel = await uow.tunnels.create(cloudflare_account_id=uuid4(), cf_tunnel_id="tun-1", name="t")
+        use_case = ListTunnelHostnames(uow)
+        with pytest.raises(CloudflareConfigNotFound):
             await use_case.execute(uuid4(), tunnel.id)
 
 
@@ -1710,9 +1893,7 @@ class TestAddTunnelHostname:
         config = await uow.configs.create(
             environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
         )
-        tunnel = await uow.tunnels.create(
-            environment_id=config.environment_id, cf_tunnel_id="tun-1", name="t"
-        )
+        tunnel = await uow.tunnels.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="t")
         client = FakeCloudflareTunnelClient(**client_kwargs)
         return uow, config, tunnel, client
 
@@ -1842,9 +2023,7 @@ class TestUpdateTunnelHostname:
         config = await uow.configs.create(
             environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
         )
-        tunnel = await uow.tunnels.create(
-            environment_id=config.environment_id, cf_tunnel_id="tun-1", name="t"
-        )
+        tunnel = await uow.tunnels.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="t")
         hostname_row = await uow.tunnel_hostnames.create(
             tunnel_id=tunnel.id, hostname="app.example.com", service="http://old", created_by=None
         )
@@ -1912,9 +2091,7 @@ class TestRemoveTunnelHostname:
         config = await uow.configs.create(
             environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
         )
-        tunnel = await uow.tunnels.create(
-            environment_id=config.environment_id, cf_tunnel_id="tun-1", name="t"
-        )
+        tunnel = await uow.tunnels.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="t")
         hostname_row = await uow.tunnel_hostnames.create(
             tunnel_id=tunnel.id, hostname="app.example.com", service="http://x", created_by=None
         )
@@ -1964,6 +2141,146 @@ class TestRemoveTunnelHostname:
 
         assert client.put_calls[0] == [catch_all]
         assert client.put_calls[-1] == starting_ingress
+
+
+class FakeSyncTunnelsClient(FakeCloudflareClient):
+    """Fakes only the 2 methods SyncTunnels calls: list_tunnels (account-wide)
+    and get_tunnel_configuration (per tunnel, keyed by cf_tunnel_id)."""
+
+    def __init__(
+        self,
+        tunnels: list[dict] | None = None,
+        ingress_by_id: dict[str, list[dict]] | None = None,
+        raises: Exception | None = None,
+    ) -> None:
+        super().__init__(raises=raises)
+        self._tunnels = tunnels if tunnels is not None else []
+        self._ingress_by_id = ingress_by_id if ingress_by_id is not None else {}
+
+    async def list_tunnels(self, *, cf_account_id: str, api_token: str) -> list[dict]:
+        return self._tunnels
+
+    async def get_tunnel_configuration(
+        self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str
+    ) -> list[dict]:
+        return self._ingress_by_id.get(cf_tunnel_id, [])
+
+
+def _fake_environment(environment_id: UUID, base_url: str | None) -> SimpleNamespace:
+    """Minimal stand-in for projects.public.EnvironmentRead — SyncTunnels
+    only ever reads .id/.base_url off what FakeProjectsApi returns."""
+    return SimpleNamespace(id=environment_id, base_url=base_url)
+
+
+class TestSyncTunnels:
+    async def _setup(self, *, sibling_base_urls: dict[UUID, str | None] | None = None, **client_kwargs):
+        uow = FakeCloudflareUnitOfWork()
+        account = await uow.accounts.create(
+            label="acc",
+            cf_account_id="cf-1",
+            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            created_by=None,
+        )
+        triggering_config = await uow.configs.create(
+            environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="a.example.com"
+        )
+        environments = {
+            triggering_config.environment_id: _fake_environment(triggering_config.environment_id, None)
+        }
+        for env_id, base_url in (sibling_base_urls or {}).items():
+            await uow.configs.create(
+                environment_id=env_id,
+                cloudflare_account_id=account.id,
+                zone_id="z2",
+                zone_name="b.example.com",
+            )
+            environments[env_id] = _fake_environment(env_id, base_url)
+        client = FakeSyncTunnelsClient(**client_kwargs)
+        projects_api = FakeProjectsApi(environments)
+        return uow, triggering_config, client, projects_api
+
+    async def test_syncing_from_one_environment_matches_a_sibling_environments_hostname(self) -> None:
+        """The literal regression test for the bug: triggering a sync from
+        environment A must correctly populate hostname->environment
+        associations for environment B too, sharing the same account —
+        never corrupting or ignoring B's data."""
+        env_b_id = uuid4()
+        uow, triggering_config, client, projects_api = await self._setup(
+            sibling_base_urls={env_b_id: "https://b.agentsplatform.cloud"},
+            tunnels=[{"id": "tun-1", "name": "shared", "status": "healthy"}],
+            ingress_by_id={
+                "tun-1": [
+                    {"hostname": "b.agentsplatform.cloud", "service": "http://localhost:5173"},
+                    {"service": "http_status:404"},
+                ]
+            },
+        )
+        use_case = SyncTunnels(uow, client, projects_api)
+
+        await use_case.execute(triggering_config.environment_id)
+
+        tunnel = await uow.tunnels.get_by_cf_tunnel_id("tun-1")
+        assert tunnel is not None
+        hostnames = await uow.tunnel_hostnames.list_for_tunnel(tunnel.id)
+        matched = next(h for h in hostnames if h.hostname == "b.agentsplatform.cloud")
+        assert matched.environment_id == env_b_id
+
+    async def test_environment_with_no_base_url_never_gets_a_hostname_matched(self) -> None:
+        uow, triggering_config, client, projects_api = await self._setup(
+            tunnels=[{"id": "tun-1", "name": "t", "status": "healthy"}],
+            ingress_by_id={"tun-1": [{"hostname": "unmatched.example.com", "service": "http://x"}]},
+        )
+        use_case = SyncTunnels(uow, client, projects_api)
+
+        await use_case.execute(triggering_config.environment_id)
+
+        tunnel = await uow.tunnels.get_by_cf_tunnel_id("tun-1")
+        assert tunnel is not None
+        hostnames = await uow.tunnel_hostnames.list_for_tunnel(tunnel.id)
+        assert hostnames[0].environment_id is None
+
+    async def test_removes_local_hostname_no_longer_reported_by_cloudflare(self) -> None:
+        uow, triggering_config, client, projects_api = await self._setup(
+            tunnels=[{"id": "tun-1", "name": "t", "status": "healthy"}],
+            ingress_by_id={"tun-1": []},
+        )
+        stale_tunnel = await uow.tunnels.upsert_from_sync(
+            cloudflare_account_id=triggering_config.cloudflare_account_id,
+            cf_tunnel_id="tun-1",
+            name="t",
+            status=TunnelStatus.HEALTHY,
+            last_synced_at=datetime.now(UTC),
+        )
+        await uow.tunnel_hostnames.create(
+            tunnel_id=stale_tunnel.id, hostname="gone.example.com", service="http://x", created_by=None
+        )
+        use_case = SyncTunnels(uow, client, projects_api)
+
+        await use_case.execute(triggering_config.environment_id)
+
+        hostnames = await uow.tunnel_hostnames.list_for_tunnel(stale_tunnel.id)
+        assert hostnames == []
+
+    async def test_marks_local_only_tunnel_as_down(self) -> None:
+        uow, triggering_config, client, projects_api = await self._setup(tunnels=[])
+        local_only = await uow.tunnels.create(
+            cloudflare_account_id=triggering_config.cloudflare_account_id, cf_tunnel_id="tun-gone", name="t"
+        )
+        use_case = SyncTunnels(uow, client, projects_api)
+
+        await use_case.execute(triggering_config.environment_id)
+
+        updated = await uow.tunnels.get_by_id(local_only.id)
+        assert updated is not None
+        assert updated.status == "down"
+
+    async def test_gracefully_degrades_when_environment_unbound(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        use_case = SyncTunnels(uow, FakeSyncTunnelsClient(), FakeProjectsApi({}))
+
+        tunnels = await use_case.execute(uuid4())
+
+        assert tunnels == []
 
 
 class FakeAuditLogClient(FakeCloudflareClient):

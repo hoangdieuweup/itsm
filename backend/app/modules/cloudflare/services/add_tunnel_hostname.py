@@ -31,6 +31,7 @@ from app.modules.cloudflare.exceptions import (
     TunnelHostnameAlreadyExists,
     TunnelIngressSyncFailed,
 )
+from app.modules.cloudflare.rules import TunnelOwnershipRules
 from app.modules.cloudflare.schemas import TunnelPublicHostnameRead
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 from app.modules.users.public import UserRead
@@ -64,7 +65,9 @@ class AddTunnelHostname(AbstractUseCase):
         if config is None:
             raise CloudflareConfigNotFound()
         tunnel = await self._uow.tunnels.get_by_id(tunnel_id)
-        if tunnel is None or tunnel.environment_id != environment_id:
+        if tunnel is None or not TunnelOwnershipRules.verify_tunnel_belongs_to_environment(
+            tunnel, config.cloudflare_account_id
+        ):
             raise CloudflareTunnelNotFound()
         existing_on_tunnel = await self._uow.tunnel_hostnames.list_for_tunnel(tunnel_id)
         if any(h.hostname == hostname for h in existing_on_tunnel):
@@ -103,7 +106,11 @@ class AddTunnelHostname(AbstractUseCase):
 
             try:
                 created = await self._uow.tunnel_hostnames.create(
-                    tunnel_id=tunnel_id, hostname=hostname, service=service, created_by=actor.id
+                    tunnel_id=tunnel_id,
+                    hostname=hostname,
+                    service=service,
+                    created_by=actor.id,
+                    environment_id=environment_id,
                 )
                 await self._uow.commit()
             except Exception:

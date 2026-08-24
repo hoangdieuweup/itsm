@@ -4,7 +4,9 @@ from abc import abstractmethod
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import delete as sa_delete, func, select
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import exists as sa_exists
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database, helper
@@ -346,6 +348,14 @@ class AbstractCloudflareConfigRepository(AbstractRepository[CloudflareConfigRead
         """Remove an environment's binding."""
         raise NotImplementedError
 
+    @abstractmethod
+    async def list_environment_ids_for_account(self, cloudflare_account_id: UUID) -> list[UUID]:
+        """Return every environment_id currently bound to this Cloudflare
+        account — used by SyncTunnels to match hostnames against every
+        sibling environment sharing the account, not just the one that
+        triggered the sync."""
+        raise NotImplementedError
+
 
 class CloudflareConfigRepository(AbstractCloudflareConfigRepository):
     """SQLAlchemy implementation. No cache-aside — Decision #8: low-traffic,
@@ -417,6 +427,15 @@ class CloudflareConfigRepository(AbstractCloudflareConfigRepository):
             await self._session.delete(row)
             await self._session.flush()
 
+    @database
+    async def list_environment_ids_for_account(self, cloudflare_account_id: UUID) -> list[UUID]:
+        rows = await self._session.scalars(
+            select(CloudflareConfig.environment_id).where(
+                CloudflareConfig.cloudflare_account_id == cloudflare_account_id
+            )
+        )
+        return list(rows)
+
 
 class AbstractDnsRecordRepository(AbstractRepository[DnsRecordRead, UUID]):
     """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
@@ -457,9 +476,18 @@ class AbstractDnsRecordRepository(AbstractRepository[DnsRecordRead, UUID]):
 
     @abstractmethod
     async def upsert_from_sync(
-        self, *, environment_id: UUID, cf_record_id: str, record_type: DnsRecordType,
-        name: str, content: str, priority: int | None, proxied: bool, ttl: int,
-        managed_by: ManagedBy, last_synced_at: datetime,
+        self,
+        *,
+        environment_id: UUID,
+        cf_record_id: str,
+        record_type: DnsRecordType,
+        name: str,
+        content: str,
+        priority: int | None,
+        proxied: bool,
+        ttl: int,
+        managed_by: ManagedBy,
+        last_synced_at: datetime,
     ) -> DnsRecordRead:
         """Insert or update a DNS record row from a Cloudflare API sync."""
         raise NotImplementedError
@@ -554,19 +582,32 @@ class DnsRecordRepository(AbstractDnsRecordRepository):
 
     @database
     async def upsert_from_sync(
-        self, *, environment_id: UUID, cf_record_id: str, record_type: DnsRecordType,
-        name: str, content: str, priority: int | None, proxied: bool, ttl: int,
-        managed_by: ManagedBy, last_synced_at: datetime,
+        self,
+        *,
+        environment_id: UUID,
+        cf_record_id: str,
+        record_type: DnsRecordType,
+        name: str,
+        content: str,
+        priority: int | None,
+        proxied: bool,
+        ttl: int,
+        managed_by: ManagedBy,
+        last_synced_at: datetime,
     ) -> DnsRecordRead:
-        row = await self._session.scalar(
-            select(DnsRecord).where(DnsRecord.cf_record_id == cf_record_id)
-        )
+        row = await self._session.scalar(select(DnsRecord).where(DnsRecord.cf_record_id == cf_record_id))
         if row is None:
             row = DnsRecord(
-                environment_id=environment_id, cf_record_id=cf_record_id,
-                record_type=record_type, name=name, content=content,
-                priority=priority, proxied=proxied, ttl=ttl,
-                managed_by=managed_by, last_synced_at=last_synced_at,
+                environment_id=environment_id,
+                cf_record_id=cf_record_id,
+                record_type=record_type,
+                name=name,
+                content=content,
+                priority=priority,
+                proxied=proxied,
+                ttl=ttl,
+                managed_by=managed_by,
+                last_synced_at=last_synced_at,
             )
             self._session.add(row)
         else:
@@ -596,12 +637,24 @@ class AbstractCloudflareTunnelRepository(AbstractRepository[CloudflareTunnelRead
     """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
 
     @abstractmethod
-    async def list_for_environment(self, environment_id: UUID) -> list[CloudflareTunnelRead]:
-        """Return every tunnel for an environment — one environment may have MANY (1:N)."""
+    async def list_for_account(self, cloudflare_account_id: UUID) -> list[CloudflareTunnelRead]:
+        """Return every tunnel belonging to a Cloudflare account — used by
+        SyncTunnels, which is account-wide, not environment-scoped."""
         raise NotImplementedError
 
     @abstractmethod
-    async def create(self, *, environment_id: UUID, cf_tunnel_id: str, name: str) -> CloudflareTunnelRead:
+    async def list_for_environment_via_hostnames(self, environment_id: UUID) -> list[CloudflareTunnelRead]:
+        """Return every tunnel with at least one hostname matched to this
+        environment — used by the environment's Tunnels page. A tunnel with
+        no hostname matched to this environment never appears here, even if
+        it belongs to the same Cloudflare account (it may be serving a
+        sibling environment/project entirely)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def create(
+        self, *, cloudflare_account_id: UUID, cf_tunnel_id: str, name: str
+    ) -> CloudflareTunnelRead:
         """Create a new tunnel row, status defaults to UNKNOWN."""
         raise NotImplementedError
 
@@ -619,8 +672,13 @@ class AbstractCloudflareTunnelRepository(AbstractRepository[CloudflareTunnelRead
 
     @abstractmethod
     async def upsert_from_sync(
-        self, *, environment_id: UUID, cf_tunnel_id: str, name: str,
-        status: TunnelStatus, last_synced_at: datetime,
+        self,
+        *,
+        cloudflare_account_id: UUID,
+        cf_tunnel_id: str,
+        name: str,
+        status: TunnelStatus,
+        last_synced_at: datetime,
     ) -> CloudflareTunnelRead:
         """Insert or update a tunnel row from a Cloudflare API sync."""
         raise NotImplementedError
@@ -645,7 +703,7 @@ class CloudflareTunnelRepository(AbstractCloudflareTunnelRepository):
 
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[CloudflareTunnelRead], int]:
-        """Required by AbstractRepository; tunnels are listed per-environment in practice."""
+        """Required by AbstractRepository; tunnels are listed per-account in practice."""
         rows = await self._session.scalars(
             select(CloudflareTunnel).order_by(CloudflareTunnel.id).limit(limit).offset(offset)
         )
@@ -654,17 +712,35 @@ class CloudflareTunnelRepository(AbstractCloudflareTunnelRepository):
         return items, total or 0
 
     @database
-    async def list_for_environment(self, environment_id: UUID) -> list[CloudflareTunnelRead]:
+    async def list_for_account(self, cloudflare_account_id: UUID) -> list[CloudflareTunnelRead]:
         rows = await self._session.scalars(
             select(CloudflareTunnel)
-            .where(CloudflareTunnel.environment_id == environment_id)
+            .where(CloudflareTunnel.cloudflare_account_id == cloudflare_account_id)
             .order_by(CloudflareTunnel.created_at)
         )
         return [CloudflareTunnelRead.model_validate(row) for row in rows]
 
     @database
-    async def create(self, *, environment_id: UUID, cf_tunnel_id: str, name: str) -> CloudflareTunnelRead:
-        row = CloudflareTunnel(environment_id=environment_id, cf_tunnel_id=cf_tunnel_id, name=name)
+    async def list_for_environment_via_hostnames(self, environment_id: UUID) -> list[CloudflareTunnelRead]:
+        rows = await self._session.scalars(
+            select(CloudflareTunnel)
+            .where(
+                sa_exists().where(
+                    TunnelPublicHostname.tunnel_id == CloudflareTunnel.id,
+                    TunnelPublicHostname.environment_id == environment_id,
+                )
+            )
+            .order_by(CloudflareTunnel.created_at)
+        )
+        return [CloudflareTunnelRead.model_validate(row) for row in rows]
+
+    @database
+    async def create(
+        self, *, cloudflare_account_id: UUID, cf_tunnel_id: str, name: str
+    ) -> CloudflareTunnelRead:
+        row = CloudflareTunnel(
+            cloudflare_account_id=cloudflare_account_id, cf_tunnel_id=cf_tunnel_id, name=name
+        )
         self._session.add(row)
         await self._session.flush()
         await self._session.refresh(row)
@@ -692,19 +768,28 @@ class CloudflareTunnelRepository(AbstractCloudflareTunnelRepository):
 
     @database
     async def upsert_from_sync(
-        self, *, environment_id: UUID, cf_tunnel_id: str, name: str,
-        status: TunnelStatus, last_synced_at: datetime,
+        self,
+        *,
+        cloudflare_account_id: UUID,
+        cf_tunnel_id: str,
+        name: str,
+        status: TunnelStatus,
+        last_synced_at: datetime,
     ) -> CloudflareTunnelRead:
         row = await self._session.scalar(
             select(CloudflareTunnel).where(CloudflareTunnel.cf_tunnel_id == cf_tunnel_id)
         )
         if row is None:
             row = CloudflareTunnel(
-                environment_id=environment_id, cf_tunnel_id=cf_tunnel_id,
-                name=name, status=status, last_synced_at=last_synced_at,
+                cloudflare_account_id=cloudflare_account_id,
+                cf_tunnel_id=cf_tunnel_id,
+                name=name,
+                status=status,
+                last_synced_at=last_synced_at,
             )
             self._session.add(row)
         else:
+            row.cloudflare_account_id = cloudflare_account_id
             row.name = name
             row.status = status
             row.last_synced_at = last_synced_at
@@ -724,16 +809,31 @@ class AbstractTunnelHostnameRepository(AbstractRepository[TunnelPublicHostnameRe
     """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
 
     @abstractmethod
-    async def list_for_tunnel(self, tunnel_id: UUID) -> list[TunnelPublicHostnameRead]:
-        """Return every hostname published through a tunnel."""
+    async def list_for_tunnel(
+        self, tunnel_id: UUID, *, environment_id: UUID | None = None
+    ) -> list[TunnelPublicHostnameRead]:
+        """Return every hostname published through a tunnel. When
+        environment_id is given, narrow to only the hostnames matched to
+        that environment — used by the per-environment hostnames panel so a
+        tunnel shared with another project never leaks that project's
+        internal service URL onto this page."""
         raise NotImplementedError
 
     @abstractmethod
     async def create(
-        self, *, tunnel_id: UUID, hostname: str, service: str, created_by: UUID | None
+        self,
+        *,
+        tunnel_id: UUID,
+        hostname: str,
+        service: str,
+        created_by: UUID | None,
+        environment_id: UUID | None = None,
     ) -> TunnelPublicHostnameRead:
         """Create a new hostname row. Caller must have already confirmed the
-        Cloudflare ingress PUT succeeded."""
+        Cloudflare ingress PUT succeeded. environment_id, when given, is the
+        environment the caller was managing this tunnel from — set eagerly
+        so a freshly-created hostname shows up immediately on that
+        environment's Tunnels page instead of waiting for the next sync."""
         raise NotImplementedError
 
     @abstractmethod
@@ -744,6 +844,27 @@ class AbstractTunnelHostnameRepository(AbstractRepository[TunnelPublicHostnameRe
     @abstractmethod
     async def delete(self, hostname_id: UUID) -> None:
         """Delete a hostname row."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def upsert_from_sync(
+        self,
+        *,
+        tunnel_id: UUID,
+        hostname: str,
+        service: str,
+        environment_id: UUID | None,
+        last_synced_at: datetime,
+    ) -> TunnelPublicHostnameRead:
+        """Insert or update a hostname row from a Cloudflare API sync,
+        matching it to environment_id (may be None — no bound environment's
+        base_url matched this hostname)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete_not_in_hostnames(self, tunnel_id: UUID, keep_hostnames: set[str]) -> None:
+        """Delete local hostname rows for this tunnel whose hostname is NOT
+        in the given set (they were removed on Cloudflare)."""
         raise NotImplementedError
 
 
@@ -769,22 +890,30 @@ class TunnelHostnameRepository(AbstractTunnelHostnameRepository):
         return items, total or 0
 
     @database
-    async def list_for_tunnel(self, tunnel_id: UUID) -> list[TunnelPublicHostnameRead]:
-        rows = await self._session.scalars(
-            select(TunnelPublicHostname)
-            .where(TunnelPublicHostname.tunnel_id == tunnel_id)
-            .order_by(TunnelPublicHostname.created_at)
-        )
+    async def list_for_tunnel(
+        self, tunnel_id: UUID, *, environment_id: UUID | None = None
+    ) -> list[TunnelPublicHostnameRead]:
+        stmt = select(TunnelPublicHostname).where(TunnelPublicHostname.tunnel_id == tunnel_id)
+        if environment_id is not None:
+            stmt = stmt.where(TunnelPublicHostname.environment_id == environment_id)
+        rows = await self._session.scalars(stmt.order_by(TunnelPublicHostname.created_at))
         return [TunnelPublicHostnameRead.model_validate(row) for row in rows]
 
     @database
     async def create(
-        self, *, tunnel_id: UUID, hostname: str, service: str, created_by: UUID | None
+        self,
+        *,
+        tunnel_id: UUID,
+        hostname: str,
+        service: str,
+        created_by: UUID | None,
+        environment_id: UUID | None = None,
     ) -> TunnelPublicHostnameRead:
         row = TunnelPublicHostname(
             tunnel_id=tunnel_id,
             hostname=hostname,
             service=service,
+            environment_id=environment_id,
             managed_by=ManagedBy.SYSTEM,
             created_by=created_by,
         )
@@ -809,3 +938,45 @@ class TunnelHostnameRepository(AbstractTunnelHostnameRepository):
         if row is not None:
             await self._session.delete(row)
             await self._session.flush()
+
+    @database
+    async def upsert_from_sync(
+        self,
+        *,
+        tunnel_id: UUID,
+        hostname: str,
+        service: str,
+        environment_id: UUID | None,
+        last_synced_at: datetime,
+    ) -> TunnelPublicHostnameRead:
+        row = await self._session.scalar(
+            select(TunnelPublicHostname).where(TunnelPublicHostname.hostname == hostname)
+        )
+        if row is None:
+            row = TunnelPublicHostname(
+                tunnel_id=tunnel_id,
+                hostname=hostname,
+                service=service,
+                environment_id=environment_id,
+                managed_by=ManagedBy.EXTERNAL,
+                last_synced_at=last_synced_at,
+            )
+            self._session.add(row)
+        else:
+            row.tunnel_id = tunnel_id
+            row.service = service
+            row.environment_id = environment_id
+            row.last_synced_at = last_synced_at
+        await self._session.flush()
+        await self._session.refresh(row)
+        return TunnelPublicHostnameRead.model_validate(row)
+
+    @database
+    async def delete_not_in_hostnames(self, tunnel_id: UUID, keep_hostnames: set[str]) -> None:
+        stmt = (
+            sa_delete(TunnelPublicHostname)
+            .where(TunnelPublicHostname.tunnel_id == tunnel_id)
+            .where(TunnelPublicHostname.hostname.notin_(keep_hostnames))
+        )
+        await self._session.execute(stmt)
+        await self._session.flush()

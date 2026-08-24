@@ -42,6 +42,7 @@ class FakeCloudflareClient:
         tunnel_token: str = "token-fake",
         tunnel_connections: list | None = None,
         tunnel_ingress: list | None = None,
+        list_tunnels_result: list | None = None,
     ) -> None:
         self._raises = raises
         self._zones = zones or []
@@ -50,6 +51,7 @@ class FakeCloudflareClient:
         self._tunnel_token = tunnel_token
         self._tunnel_connections = tunnel_connections if tunnel_connections is not None else []
         self._tunnel_ingress = tunnel_ingress if tunnel_ingress is not None else []
+        self._list_tunnels_result = list_tunnels_result if list_tunnels_result is not None else []
         self.deleted_record_ids: list[str] = []
         self.deleted_tunnel_ids: list[str] = []
         self.put_calls: list[list[dict]] = []
@@ -99,6 +101,9 @@ class FakeCloudflareClient:
 
     async def delete_tunnel(self, *, cf_account_id: str, cf_tunnel_id: str, api_token: str) -> None:
         self.deleted_tunnel_ids.append(cf_tunnel_id)
+
+    async def list_tunnels(self, *, cf_account_id: str, api_token: str) -> list:
+        return self._list_tunnels_result
 
 
 async def _login_with_permissions(
@@ -654,5 +659,57 @@ class TestTunnelRouterFullDemoScript:
             json={"hostname": "a.example.com", "service": "http://x"},
         )
         assert response.status_code == 403
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+
+class TestSyncTunnelsRouter:
+    """Decision #7: sync is a real write action (previously account-wide,
+    now narrower per Decision #3 — but still a write), so it's gated at
+    manage/EDITOR now, not view/VIEWER like a plain read endpoint."""
+
+    async def test_viewer_manager_gets_403_on_sync(self, client: AsyncClient, engine: AsyncEngine) -> None:
+        cf_client = FakeCloudflareClient(zones=[ZoneOption(id="z1", name="example.com")])
+        environment_id, account_id, owner_id = await _bind_environment(client, engine, cf_client=cf_client)
+
+        viewer_id = await _login_with_permissions(
+            client,
+            engine,
+            permissions=[("cloudflare_account", "manage"), ("cloudflare_account", "view")],
+            email="viewer-sync@example.com",
+        )
+        owner_token = JwtCodec.encode(
+            {"sub": str(owner_id), "type": "access", "jti": "owner-assign-viewer-sync"},
+            secret=auth_settings.JWT_SECRET,
+            ttl_seconds=3600,
+        )
+        client.cookies.set(AuthCookies.ACCESS_TOKEN, owner_token)
+        assign_resp = await client.post(
+            f"/api/v1/cloudflare-accounts/{account_id}/managers",
+            json={"userId": str(viewer_id), "accessLevel": "viewer"},
+        )
+        assert assign_resp.status_code == 200, assign_resp.text
+
+        viewer_token = JwtCodec.encode(
+            {"sub": str(viewer_id), "type": "access", "jti": "viewer-sync-attempt"},
+            secret=auth_settings.JWT_SECRET,
+            ttl_seconds=3600,
+        )
+        client.cookies.set(AuthCookies.ACCESS_TOKEN, viewer_token)
+
+        response = await client.post(f"/api/v1/environments/{environment_id}/cloudflare-tunnels/sync")
+        assert response.status_code == 403
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+    async def test_editor_can_sync(self, client: AsyncClient, engine: AsyncEngine) -> None:
+        cf_client = FakeCloudflareClient(
+            zones=[ZoneOption(id="z1", name="example.com")],
+            list_tunnels_result=[{"id": "tun-synced", "name": "synced", "status": "healthy"}],
+        )
+        environment_id, _account_id, _owner_id = await _bind_environment(client, engine, cf_client=cf_client)
+
+        response = await client.post(f"/api/v1/environments/{environment_id}/cloudflare-tunnels/sync")
+        assert response.status_code == 200, response.text
 
         del app.dependency_overrides[get_cloudflare_client]

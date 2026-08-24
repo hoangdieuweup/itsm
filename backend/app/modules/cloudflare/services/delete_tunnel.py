@@ -15,6 +15,7 @@ from app.modules.audit.public import AuditActor, AuditApi
 from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import CloudflareTunnelAuditActions
 from app.modules.cloudflare.exceptions import CloudflareConfigNotFound, CloudflareTunnelNotFound
+from app.modules.cloudflare.rules import TunnelOwnershipRules
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 from app.modules.users.public import UserRead
 
@@ -33,7 +34,9 @@ class DeleteCloudflareTunnel(AbstractUseCase):
         if config is None:
             raise CloudflareConfigNotFound()
         tunnel = await self._uow.tunnels.get_by_id(tunnel_id)
-        if tunnel is None or tunnel.environment_id != environment_id:
+        if tunnel is None or not TunnelOwnershipRules.verify_tunnel_belongs_to_environment(
+            tunnel, config.cloudflare_account_id
+        ):
             raise CloudflareTunnelNotFound()
 
         ciphertext = await self._uow.accounts.get_token_ciphertext(config.cloudflare_account_id)

@@ -32,6 +32,7 @@ from app.modules.cloudflare.exceptions import (
     TunnelIngressSyncFailed,
     TunnelPublicHostnameNotFound,
 )
+from app.modules.cloudflare.rules import TunnelOwnershipRules
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 from app.modules.users.public import UserRead
 
@@ -59,7 +60,9 @@ class RemoveTunnelHostname(AbstractUseCase):
         if config is None:
             raise CloudflareConfigNotFound()
         tunnel = await self._uow.tunnels.get_by_id(tunnel_id)
-        if tunnel is None or tunnel.environment_id != environment_id:
+        if tunnel is None or not TunnelOwnershipRules.verify_tunnel_belongs_to_environment(
+            tunnel, config.cloudflare_account_id
+        ):
             raise CloudflareTunnelNotFound()
         existing = await self._uow.tunnel_hostnames.get_by_id(hostname_id)
         if existing is None or existing.tunnel_id != tunnel_id:
