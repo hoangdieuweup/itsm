@@ -23,6 +23,8 @@ class ErrorCode(StrEnum):
     INCIDENT_NOT_FOUND = "incident_not_found"
     INVALID_INCIDENT_TRANSITION = "invalid_incident_transition"
     INVALID_WEBHOOK_SECRET = "invalid_webhook_secret"
+    CLOUDFLARE_NOT_BOUND = "cloudflare_not_bound_for_alerting"
+    MISSING_CF_ALERT_TYPE = "missing_cf_alert_type"
 
 
 class ObservabilityAuditActions(StrEnum):

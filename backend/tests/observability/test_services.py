@@ -3,27 +3,40 @@ tests/cloudflare/test_services.py's exact Fake shape (FakeCloudflareUnitOfWork,
 FakeProjectsApi, FakeAuditApi, FakeCloudflareClient)."""
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
 
 from app.core.crypto import FernetCodec
+from app.integrations.cloudflare.exceptions import CloudflareDnsOperationRejected
 from app.integrations.loki.exceptions import LokiApiUnavailable
 from app.integrations.loki.schemas import LokiLogEntry, LokiQueryResult
 from app.modules.observability.config import observability_settings
-from app.modules.observability.constants import LokiAuthType
+from app.modules.observability.constants import AlertRuleSource, AlertSeverity, LokiAuthType
 from app.modules.observability.exceptions import (
+    AlertRuleNotFound,
+    CloudflareNotBoundForAlerting,
     LokiConfigAlreadyExists,
     LokiConfigNotFound,
     ObservabilityEnvironmentNotFound,
 )
-from app.modules.observability.repository import AbstractLokiConfigRepository
-from app.modules.observability.schemas import LokiConfigRead
+from app.modules.observability.repository import (
+    AbstractAlertRuleRepository,
+    AbstractIncidentRepository,
+    AbstractLokiConfigRepository,
+)
+from app.modules.observability.schemas import AlertRuleRead, LokiConfigRead
+from app.modules.observability.services.create_alert_rule import CreateAlertRule
 from app.modules.observability.services.create_loki_config import CreateLokiConfig
+from app.modules.observability.services.delete_alert_rule import DeleteAlertRule
 from app.modules.observability.services.delete_loki_config import DeleteLokiConfig
 from app.modules.observability.services.get_loki_config import GetLokiConfig
+from app.modules.observability.services.list_alert_rules import ListAlertRules
+from app.modules.observability.services.list_available_alerts import ListAvailableAlerts
 from app.modules.observability.services.run_log_query import RunLogQuery
 from app.modules.observability.services.stream_log_tail import StreamLogTail
+from app.modules.observability.services.update_alert_rule import UpdateAlertRule
 from app.modules.observability.services.update_loki_config import UpdateLokiConfig
 from app.modules.observability.uow import AbstractObservabilityUnitOfWork
 from app.modules.observability.utils import LokiAuthHelper
@@ -117,9 +130,104 @@ class FakeLokiConfigRepo(AbstractLokiConfigRepository):
         self._ciphertexts.pop(environment_id, None)
 
 
+class FakeAlertRuleRepo(AbstractAlertRuleRepository):
+    def __init__(self) -> None:
+        self._rows: dict[UUID, AlertRuleRead] = {}
+        self._channels: dict[UUID, list[UUID]] = {}
+
+    async def get_by_id(self, entity_id):
+        return self._rows.get(entity_id)
+
+    async def list_page(self, limit, offset):
+        raise NotImplementedError
+
+    async def get_by_cf_policy_id(self, cf_policy_id):
+        for row in self._rows.values():
+            if row.cf_policy_id == cf_policy_id:
+                return row
+        return None
+
+    async def list_for_environment(self, environment_id):
+        return [row for row in self._rows.values() if row.environment_id == environment_id]
+
+    async def create(self, *, environment_id, name, source, cf_alert_type=None, condition=None, severity):
+        row = AlertRuleRead(
+            id=uuid4(),
+            environment_id=environment_id,
+            name=name,
+            source=source,
+            cf_alert_type=cf_alert_type,
+            cf_policy_id=None,
+            condition=condition,
+            severity=severity,
+            is_active=True,
+            channel_ids=[],
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        self._rows[row.id] = row
+        self._channels[row.id] = []
+        return row
+
+    async def set_cf_policy_id(self, alert_rule_id, *, cf_policy_id):
+        self._rows[alert_rule_id] = self._rows[alert_rule_id].model_copy(
+            update={"cf_policy_id": cf_policy_id}
+        )
+
+    async def update(self, alert_rule_id, *, name=None, is_active=None, severity=None):
+        existing = self._rows[alert_rule_id]
+        updates = {}
+        if name is not None:
+            updates["name"] = name
+        if is_active is not None:
+            updates["is_active"] = is_active
+        if severity is not None:
+            updates["severity"] = severity
+        self._rows[alert_rule_id] = existing.model_copy(update=updates)
+        return self._rows[alert_rule_id]
+
+    async def delete(self, alert_rule_id):
+        self._rows.pop(alert_rule_id, None)
+        self._channels.pop(alert_rule_id, None)
+
+    async def list_channel_ids(self, alert_rule_id):
+        return self._channels.get(alert_rule_id, [])
+
+    async def set_channels(self, alert_rule_id, channel_ids):
+        self._channels[alert_rule_id] = list(channel_ids)
+        self._rows[alert_rule_id] = self._rows[alert_rule_id].model_copy(
+            update={"channel_ids": list(channel_ids)}
+        )
+
+
+class FakeIncidentRepo(AbstractIncidentRepository):
+    def __init__(self) -> None:
+        self._rows: dict = {}
+
+    async def get_by_id(self, entity_id):
+        return self._rows.get(entity_id)
+
+    async def list_page(self, limit, offset):
+        raise NotImplementedError
+
+    async def get_open_by_correlation_id(self, correlation_id):
+        raise NotImplementedError
+
+    async def list_page_filtered(self, *, project_id=None, environment_id=None, status=None, limit, offset):
+        raise NotImplementedError
+
+    async def create(self, **kwargs):
+        raise NotImplementedError
+
+    async def update_status(self, incident_id, *, status, actor_id, at):
+        raise NotImplementedError
+
+
 class FakeObservabilityUnitOfWork(AbstractObservabilityUnitOfWork):
     def __init__(self) -> None:
         self.loki_configs = FakeLokiConfigRepo()
+        self.alert_rules = FakeAlertRuleRepo()
+        self.incidents = FakeIncidentRepo()
         self.commits = 0
         self.rollbacks = 0
 
@@ -591,7 +699,6 @@ class TestResolveLokiAuthHeader:
         assert LokiAuthHelper.resolve_loki_auth_header(config, None) is None
 
 
-
 class TestStreamLogTail:
     async def test_raises_not_found_when_unconfigured(self) -> None:
         uow = FakeObservabilityUnitOfWork()
@@ -640,3 +747,288 @@ class TestStreamLogTail:
         with pytest.raises(LokiApiUnavailable):
             async for _ in use_case.execute(environment_id=env_id, query="{}", limit=100):
                 pass
+
+
+class FakeReadyCloudflareClient:
+    def __init__(self, client, cf_account_id="cf-1", api_token="tok", cloudflare_account_id=None) -> None:
+        self.client, self.cf_account_id, self.api_token, self.cloudflare_account_id = (
+            client,
+            cf_account_id,
+            api_token,
+            cloudflare_account_id or uuid4(),
+        )
+
+
+class FakeCloudflareApiForAlertRules:
+    def __init__(self, ready=None, webhook_destination_id="wh-123") -> None:
+        self._ready = ready
+        self._webhook_destination_id = webhook_destination_id
+        self.ensure_calls: list[tuple] = []
+
+    async def get_ready_client_for_environment(self, environment_id):
+        return self._ready
+
+    async def ensure_webhook_destination(self, cloudflare_account_id, *, webhook_url):
+        self.ensure_calls.append((cloudflare_account_id, webhook_url))
+        return self._webhook_destination_id
+
+
+class FakeCloudflareClientForPolicy:
+    def __init__(self, policy_id="policy-789") -> None:
+        self.policy_id = policy_id
+        self.created: list[dict] = []
+        self.updated: list[dict] = []
+        self.deleted: list[dict] = []
+
+    async def create_policy(self, **kwargs):
+        self.created.append(kwargs)
+        return self.policy_id
+
+    async def update_policy(self, **kwargs):
+        self.updated.append(kwargs)
+
+    async def delete_policy(self, **kwargs):
+        self.deleted.append(kwargs)
+
+    async def list_available_alerts(self, **kwargs):
+        return [{"type": "advanced_ddos_attack_l4_alert"}, {"type": "health_check_status_notification"}]
+
+
+class FakeLokiClientForRuleGroup:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    async def upsert_rule_group(self, **kwargs):
+        self.calls.append(kwargs)
+
+
+class TestCreateAlertRuleCloudflareNative:
+    async def test_full_flow_persists_cf_policy_id(self) -> None:
+        env_id = uuid4()
+        cf_client = FakeCloudflareClientForPolicy()
+        cloudflare_api = FakeCloudflareApiForAlertRules(ready=FakeReadyCloudflareClient(cf_client))
+        uow = FakeObservabilityUnitOfWork()
+        use_case = CreateAlertRule(
+            uow,
+            cloudflare_api=cloudflare_api,
+            loki_client=None,
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4())}),
+            audit_api=FakeAuditApi(),
+        )
+
+        result = await use_case.execute(
+            environment_id=env_id,
+            name="DDoS",
+            source=AlertRuleSource.CLOUDFLARE_NATIVE,
+            cf_alert_type="advanced_ddos_attack_l4_alert",
+            condition=None,
+            severity=AlertSeverity.HIGH,
+            channel_ids=[],
+            actor=_actor(),
+        )
+        assert result.cf_policy_id == "policy-789"
+        assert cloudflare_api.ensure_calls
+        assert cf_client.created[0]["alert_type"] == "advanced_ddos_attack_l4_alert"
+
+    async def test_unbound_environment_raises(self) -> None:
+        env_id = uuid4()
+        cloudflare_api = FakeCloudflareApiForAlertRules(ready=None)
+        uow = FakeObservabilityUnitOfWork()
+        use_case = CreateAlertRule(
+            uow,
+            cloudflare_api=cloudflare_api,
+            loki_client=None,
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4())}),
+            audit_api=FakeAuditApi(),
+        )
+        with pytest.raises(CloudflareNotBoundForAlerting):
+            await use_case.execute(
+                environment_id=env_id,
+                name="X",
+                source=AlertRuleSource.CLOUDFLARE_NATIVE,
+                cf_alert_type="x",
+                condition=None,
+                severity=AlertSeverity.LOW,
+                channel_ids=[],
+                actor=_actor(),
+            )
+        assert uow.alert_rules._rows == {}
+
+    async def test_cloudflare_failure_persists_nothing(self) -> None:
+        env_id = uuid4()
+
+        class FailingCfClient:
+            async def create_policy(self, **kwargs):
+                raise CloudflareDnsOperationRejected()
+
+        cloudflare_api = FakeCloudflareApiForAlertRules(ready=FakeReadyCloudflareClient(FailingCfClient()))
+        uow = FakeObservabilityUnitOfWork()
+        use_case = CreateAlertRule(
+            uow,
+            cloudflare_api=cloudflare_api,
+            loki_client=None,
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4())}),
+            audit_api=FakeAuditApi(),
+        )
+        with pytest.raises(CloudflareDnsOperationRejected):
+            await use_case.execute(
+                environment_id=env_id,
+                name="X",
+                source=AlertRuleSource.CLOUDFLARE_NATIVE,
+                cf_alert_type="x",
+                condition=None,
+                severity=AlertSeverity.LOW,
+                channel_ids=[],
+                actor=_actor(),
+            )
+        assert uow.alert_rules._rows == {}
+
+    async def test_rejects_unknown_environment(self) -> None:
+        use_case = CreateAlertRule(
+            FakeObservabilityUnitOfWork(),
+            cloudflare_api=FakeCloudflareApiForAlertRules(),
+            loki_client=None,
+            projects_api=FakeProjectsApi({}),
+            audit_api=FakeAuditApi(),
+        )
+        with pytest.raises(ObservabilityEnvironmentNotFound):
+            await use_case.execute(
+                environment_id=uuid4(),
+                name="X",
+                source=AlertRuleSource.CLOUDFLARE_NATIVE,
+                cf_alert_type="x",
+                condition=None,
+                severity=AlertSeverity.LOW,
+                channel_ids=[],
+                actor=_actor(),
+            )
+
+
+class TestCreateAlertRuleLokiQuery:
+    async def test_calls_upsert_rule_group_with_join_label(self) -> None:
+        loki_client = FakeLokiClientForRuleGroup()
+        env_id = uuid4()
+        use_case = CreateAlertRule(
+            FakeObservabilityUnitOfWork(),
+            cloudflare_api=None,
+            loki_client=loki_client,
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4())}),
+            audit_api=FakeAuditApi(),
+        )
+        result = await use_case.execute(
+            environment_id=env_id,
+            name="Error rate",
+            source=AlertRuleSource.LOKI_QUERY,
+            cf_alert_type=None,
+            condition={"query": '{app="x"} |= "error"', "for": "5m", "endpoint_url": "http://loki:3100"},
+            severity=AlertSeverity.MEDIUM,
+            channel_ids=[],
+            actor=_actor(),
+        )
+        assert loki_client.calls[0]["labels"] == {"app_alert_rule_id": str(result.id)}
+        assert loki_client.calls[0]["namespace"] == "itsm"
+
+
+class TestListAvailableAlerts:
+    async def test_shapes_raw_dicts_into_options(self) -> None:
+        env_id = uuid4()
+        cf_client = FakeCloudflareClientForPolicy()
+        cloudflare_api = FakeCloudflareApiForAlertRules(ready=FakeReadyCloudflareClient(cf_client))
+        use_case = ListAvailableAlerts(cloudflare_api)
+
+        options = await use_case.execute(env_id)
+
+        assert options[0].alert_type == "advanced_ddos_attack_l4_alert"
+        assert options[0].display_name
+
+    async def test_unbound_environment_raises(self) -> None:
+        cloudflare_api = FakeCloudflareApiForAlertRules(ready=None)
+        use_case = ListAvailableAlerts(cloudflare_api)
+        with pytest.raises(CloudflareNotBoundForAlerting):
+            await use_case.execute(uuid4())
+
+
+class TestUpdateAlertRule:
+    async def test_raises_not_found_when_absent(self) -> None:
+        use_case = UpdateAlertRule(FakeObservabilityUnitOfWork(), FakeAuditApi())
+        with pytest.raises(AlertRuleNotFound):
+            await use_case.execute(uuid4(), actor=_actor())
+
+    async def test_partial_update_keeps_unprovided_fields(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        env_id = uuid4()
+        rule = await uow.alert_rules.create(
+            environment_id=env_id,
+            name="Original",
+            source=AlertRuleSource.LOKI_QUERY,
+            severity=AlertSeverity.LOW,
+        )
+        use_case = UpdateAlertRule(uow, FakeAuditApi())
+
+        updated = await use_case.execute(rule.id, is_active=False, actor=_actor())
+
+        assert updated.is_active is False
+        assert updated.name == "Original"
+
+
+class TestDeleteAlertRule:
+    async def test_deletes_loki_rule_without_cloudflare_call(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        env_id = uuid4()
+        rule = await uow.alert_rules.create(
+            environment_id=env_id,
+            name="Loki rule",
+            source=AlertRuleSource.LOKI_QUERY,
+            severity=AlertSeverity.LOW,
+        )
+        cloudflare_api = FakeCloudflareApiForAlertRules()
+        use_case = DeleteAlertRule(uow, cloudflare_api, FakeAuditApi())
+
+        await use_case.execute(rule.id, actor=_actor())
+
+        assert await uow.alert_rules.get_by_id(rule.id) is None
+
+    async def test_deletes_cloudflare_native_rule_calls_delete_policy_first(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        env_id = uuid4()
+        rule = await uow.alert_rules.create(
+            environment_id=env_id,
+            name="CF rule",
+            source=AlertRuleSource.CLOUDFLARE_NATIVE,
+            cf_alert_type="advanced_ddos_attack_l4_alert",
+            severity=AlertSeverity.HIGH,
+        )
+        await uow.alert_rules.set_cf_policy_id(rule.id, cf_policy_id="policy-789")
+        cf_client = FakeCloudflareClientForPolicy()
+        cloudflare_api = FakeCloudflareApiForAlertRules(ready=FakeReadyCloudflareClient(cf_client))
+        use_case = DeleteAlertRule(uow, cloudflare_api, FakeAuditApi())
+
+        await use_case.execute(rule.id, actor=_actor())
+
+        assert cf_client.deleted[0]["policy_id"] == "policy-789"
+        assert await uow.alert_rules.get_by_id(rule.id) is None
+
+    async def test_raises_not_found_when_absent(self) -> None:
+        use_case = DeleteAlertRule(
+            FakeObservabilityUnitOfWork(), FakeCloudflareApiForAlertRules(), FakeAuditApi()
+        )
+        with pytest.raises(AlertRuleNotFound):
+            await use_case.execute(uuid4(), actor=_actor())
+
+
+class TestListAlertRules:
+    async def test_returns_rules_for_environment(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        env_id = uuid4()
+        await uow.alert_rules.create(
+            environment_id=env_id, name="A", source=AlertRuleSource.LOKI_QUERY, severity=AlertSeverity.LOW
+        )
+        await uow.alert_rules.create(
+            environment_id=uuid4(), name="B", source=AlertRuleSource.LOKI_QUERY, severity=AlertSeverity.LOW
+        )
+        use_case = ListAlertRules(uow)
+
+        rules = await use_case.execute(env_id)
+
+        assert len(rules) == 1
+        assert rules[0].name == "A"

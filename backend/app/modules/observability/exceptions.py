@@ -50,6 +50,26 @@ class InvalidWebhookSecret(ForbiddenError):
     status_code = 401
 
 
+class CloudflareNotBoundForAlerting(NotFoundError):
+    """Raised when a CLOUDFLARE_NATIVE alert rule is created/edited for an
+    environment with no bound Cloudflare account (Phase 4's cloudflare_configs
+    has no row). Distinct from ObservabilityEnvironmentNotFound — the
+    environment itself exists, it just has nothing to create a Notification
+    Policy against."""
+
+    code = ErrorCode.CLOUDFLARE_NOT_BOUND
+    message = "This environment has no Cloudflare account bound"
+
+
+class MissingCloudflareAlertType(ValidationFailedError):
+    """Raised when a CLOUDFLARE_NATIVE alert rule is created without
+    cf_alert_type — required for that source, unlike LOKI_QUERY where it's
+    genuinely unused."""
+
+    code = ErrorCode.MISSING_CF_ALERT_TYPE
+    message = "cf_alert_type is required for a Cloudflare-native alert rule"
+
+
 class CloudflarePolicyNotFound(Exception):
     """Internal control-flow signal only — never raised past the webhook
     receiver's own handler; a webhook whose policy_id matches nothing logs a
