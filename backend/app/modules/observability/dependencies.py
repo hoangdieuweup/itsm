@@ -1,13 +1,19 @@
 """FastAPI dependency providers for the observability module. Every provider
 depends on an Abstract* contract."""
 
-from fastapi import Depends
+import hmac
+from uuid import UUID
+
+from fastapi import Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.integrations.loki.client import LokiClient
 from app.integrations.loki.dependencies import get_loki_client
 from app.modules.audit.public import AuditApi, get_audit_api
+from app.modules.cloudflare.public import CloudflareApi, get_cloudflare_api
+from app.modules.observability.config import observability_settings
+from app.modules.observability.exceptions import InvalidWebhookSecret
 from app.modules.observability.services.create_loki_config import CreateLokiConfig
 from app.modules.observability.services.delete_loki_config import DeleteLokiConfig
 from app.modules.observability.services.get_loki_config import GetLokiConfig
@@ -63,3 +69,29 @@ async def get_stream_log_tail(
     client: LokiClient = Depends(get_loki_client),
 ) -> StreamLogTail:
     return StreamLogTail(uow, client)
+
+
+async def verify_cloudflare_webhook_secret(
+    cloudflare_account_id: UUID,
+    cf_webhook_auth: str | None = Header(default=None),
+    cloudflare_api: CloudflareApi = Depends(get_cloudflare_api),
+) -> None:
+    """Reject unless cf-webhook-auth matches the secret stored for this
+    account (Decision #5 — the path segment is what resolves WHICH secret
+    to check, never a body/payload field). Uses CloudflareApi.get_webhook_secret
+    (Task 5) — the read-only counterpart of ensure_webhook_destination."""
+    stored_secret = await cloudflare_api.get_webhook_secret(cloudflare_account_id)
+    if not stored_secret or not cf_webhook_auth or not hmac.compare_digest(cf_webhook_auth, stored_secret):
+        raise InvalidWebhookSecret()
+
+
+async def verify_loki_webhook_secret(authorization: str | None = Header(default=None)) -> None:
+    """Bearer-token check against one app-wide shared secret (Decision #11) —
+    Alertmanager's http_config.authorization sends this natively."""
+    expected = f"Bearer {observability_settings.LOKI_WEBHOOK_SECRET}"
+    if (
+        not authorization
+        or not observability_settings.LOKI_WEBHOOK_SECRET
+        or not hmac.compare_digest(authorization, expected)
+    ):
+        raise InvalidWebhookSecret()

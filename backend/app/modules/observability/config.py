@@ -15,5 +15,10 @@ class ObservabilityConfig(BaseSettings):
     #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     FERNET_KEY: str = ""
 
+    # App-wide shared secret Alertmanager's http_config.authorization sends as
+    # a bearer token — compared directly, never decrypted, so a plain string
+    # setting is correct here (not a ciphertext-in-DB pattern like FERNET_KEY).
+    LOKI_WEBHOOK_SECRET: str = ""
+
 
 observability_settings = ObservabilityConfig()
