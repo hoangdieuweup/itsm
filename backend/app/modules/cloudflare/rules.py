@@ -136,4 +136,3 @@ class TunnelSyncRules:
     def map_cf_status(cf_status: str) -> TunnelStatus:
         """Map a Cloudflare API status string to local TunnelStatus enum."""
         return TunnelSyncRules.CF_STATUS_MAP.get(cf_status, TunnelStatus.UNKNOWN)
-

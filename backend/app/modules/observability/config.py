@@ -20,5 +20,10 @@ class ObservabilityConfig(BaseSettings):
     # setting is correct here (not a ciphertext-in-DB pattern like FERNET_KEY).
     LOKI_WEBHOOK_SECRET: str = ""
 
+    # How often the drift reconciliation job (app/scheduler.py) re-checks
+    # every Cloudflare-bound environment's DNS/Tunnel state. Within the
+    # spec's own stated 15-30 minute window.
+    RECONCILIATION_INTERVAL_SECONDS: int = 1200
+
 
 observability_settings = ObservabilityConfig()

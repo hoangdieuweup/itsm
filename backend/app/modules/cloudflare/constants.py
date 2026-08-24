@@ -141,3 +141,18 @@ class CloudflareTunnelLockDefaults:
     plan's `SET lock:tunnel:<id> NX PX 5000` (5 seconds)."""
 
     INGRESS_LOCK_TTL_SECONDS = 5
+
+
+class DriftKind(StrEnum):
+    """What kind of drift a reconciled DNS record / tunnel hostname
+    represents, relative to the last known local state."""
+
+    NEW_EXTERNAL = "new_external"
+    VANISHED = "vanished"
+
+
+class CloudflareWebhookDefaults:
+    """Fixed values used when registering this app's webhook destination
+    with a Cloudflare account (Decision #5, Phase 9)."""
+
+    DESTINATION_NAME = "itsm-alerting"

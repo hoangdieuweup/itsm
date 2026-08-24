@@ -50,6 +50,7 @@ from app.modules.observability.services.list_alert_rules import ListAlertRules
 from app.modules.observability.services.list_available_alerts import ListAvailableAlerts
 from app.modules.observability.services.list_incidents import ListIncidents
 from app.modules.observability.services.resolve_incident import ResolveIncident
+from app.modules.observability.services.run_drift_reconciliation import RunDriftReconciliation
 from app.modules.observability.services.run_log_query import RunLogQuery
 from app.modules.observability.services.stream_log_tail import StreamLogTail
 from app.modules.observability.services.update_alert_rule import UpdateAlertRule
@@ -1494,3 +1495,225 @@ class TestGetIncident:
         use_case = GetIncident(FakeObservabilityUnitOfWork())
         with pytest.raises(IncidentNotFound):
             await use_case.execute(uuid4())
+
+
+def _dns_record(cf_record_id: str, name: str = "app") -> SimpleNamespace:
+    return SimpleNamespace(cf_record_id=cf_record_id, name=name, record_type="A")
+
+
+def _hostname(hostname: str, environment_id: UUID) -> SimpleNamespace:
+    return SimpleNamespace(hostname=hostname, environment_id=environment_id)
+
+
+def _drift_entry(kind: str, environment_id: UUID, hostname: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        kind=kind, environment_id=environment_id, hostname=_hostname(hostname, environment_id)
+    )
+
+
+class FakeCloudflareApiForReconciliation:
+    def __init__(
+        self,
+        configs: list | None = None,
+        dns_diffs: dict[UUID, SimpleNamespace] | None = None,
+        tunnel_entries: dict[UUID, list] | None = None,
+    ) -> None:
+        self._configs = configs if configs is not None else []
+        self._dns_diffs = dns_diffs if dns_diffs is not None else {}
+        self._tunnel_entries = tunnel_entries if tunnel_entries is not None else {}
+        self.dns_calls: list[UUID] = []
+        self.tunnel_calls: list[UUID] = []
+
+    async def list_bound_configs(self):
+        return self._configs
+
+    async def reconcile_dns_records(self, environment_id):
+        self.dns_calls.append(environment_id)
+        return self._dns_diffs.get(environment_id, SimpleNamespace(new_external=[], vanished=[]))
+
+    async def reconcile_tunnels_for_account(self, cloudflare_account_id):
+        self.tunnel_calls.append(cloudflare_account_id)
+        return self._tunnel_entries.get(cloudflare_account_id, [])
+
+
+class TestRunDriftReconciliation:
+    async def test_new_external_dns_record_creates_high_severity_incident(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        env_id, project_id, account_id = uuid4(), uuid4(), uuid4()
+        projects_api = FakeProjectsApi({env_id: SimpleNamespace(id=env_id, project_id=project_id)})
+        cloudflare_api = FakeCloudflareApiForReconciliation(
+            configs=[SimpleNamespace(environment_id=env_id, cloudflare_account_id=account_id)],
+            dns_diffs={env_id: SimpleNamespace(new_external=[_dns_record("rec-1")], vanished=[])},
+        )
+        audit_api = FakeAuditApi()
+        use_case = RunDriftReconciliation(
+            uow, cloudflare_api=cloudflare_api, projects_api=projects_api, audit_api=audit_api
+        )
+
+        await use_case.execute()
+
+        items, total = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert total == 1
+        assert items[0].category == IncidentCategory.DNS_DRIFT
+        assert items[0].severity == AlertSeverity.HIGH
+        assert items[0].project_id == project_id
+        assert audit_api.events[0]["action"] == "DNS_DRIFT_DETECTED"
+
+    async def test_vanished_dns_record_creates_low_severity_incident(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        env_id, project_id, account_id = uuid4(), uuid4(), uuid4()
+        projects_api = FakeProjectsApi({env_id: SimpleNamespace(id=env_id, project_id=project_id)})
+        cloudflare_api = FakeCloudflareApiForReconciliation(
+            configs=[SimpleNamespace(environment_id=env_id, cloudflare_account_id=account_id)],
+            dns_diffs={env_id: SimpleNamespace(new_external=[], vanished=[_dns_record("rec-gone")])},
+        )
+        use_case = RunDriftReconciliation(
+            uow, cloudflare_api=cloudflare_api, projects_api=projects_api, audit_api=FakeAuditApi()
+        )
+
+        await use_case.execute()
+
+        items, total = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert total == 1
+        assert items[0].severity == AlertSeverity.LOW
+
+    async def test_tunnel_drift_attributed_to_the_matched_environment(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        env_a, env_b, project_a, project_b, account_id = uuid4(), uuid4(), uuid4(), uuid4(), uuid4()
+        projects_api = FakeProjectsApi(
+            {
+                env_a: SimpleNamespace(id=env_a, project_id=project_a),
+                env_b: SimpleNamespace(id=env_b, project_id=project_b),
+            }
+        )
+        cloudflare_api = FakeCloudflareApiForReconciliation(
+            configs=[
+                SimpleNamespace(environment_id=env_a, cloudflare_account_id=account_id),
+                SimpleNamespace(environment_id=env_b, cloudflare_account_id=account_id),
+            ],
+            tunnel_entries={
+                account_id: [
+                    _drift_entry("new_external", env_a, "a.example.com"),
+                    _drift_entry("new_external", env_b, "b.example.com"),
+                ]
+            },
+        )
+        use_case = RunDriftReconciliation(
+            uow, cloudflare_api=cloudflare_api, projects_api=projects_api, audit_api=FakeAuditApi()
+        )
+
+        await use_case.execute()
+
+        items, total = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert total == 2
+        by_project = {i.project_id for i in items}
+        assert by_project == {project_a, project_b}
+        assert all(i.category == IncidentCategory.TUNNEL_DRIFT for i in items)
+
+    async def test_reconciles_each_account_exactly_once_across_sibling_environments(self) -> None:
+        """The literal regression-adjacent case for the account-wide tunnel
+        design: 2 environments sharing 1 account must trigger exactly 1
+        reconcile_tunnels_for_account call, never 2."""
+        uow = FakeObservabilityUnitOfWork()
+        env_a, env_b, account_id = uuid4(), uuid4(), uuid4()
+        projects_api = FakeProjectsApi({})
+        cloudflare_api = FakeCloudflareApiForReconciliation(
+            configs=[
+                SimpleNamespace(environment_id=env_a, cloudflare_account_id=account_id),
+                SimpleNamespace(environment_id=env_b, cloudflare_account_id=account_id),
+            ]
+        )
+        use_case = RunDriftReconciliation(
+            uow, cloudflare_api=cloudflare_api, projects_api=projects_api, audit_api=FakeAuditApi()
+        )
+
+        await use_case.execute()
+
+        assert cloudflare_api.tunnel_calls == [account_id]
+        assert sorted(cloudflare_api.dns_calls) == sorted([env_a, env_b])
+
+    async def test_deduplicates_against_a_still_open_incident(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        env_id, project_id, account_id = uuid4(), uuid4(), uuid4()
+        projects_api = FakeProjectsApi({env_id: SimpleNamespace(id=env_id, project_id=project_id)})
+        cloudflare_api = FakeCloudflareApiForReconciliation(
+            configs=[SimpleNamespace(environment_id=env_id, cloudflare_account_id=account_id)],
+            dns_diffs={env_id: SimpleNamespace(new_external=[_dns_record("rec-1")], vanished=[])},
+        )
+        use_case = RunDriftReconciliation(
+            uow, cloudflare_api=cloudflare_api, projects_api=projects_api, audit_api=FakeAuditApi()
+        )
+        await use_case.execute()
+
+        await use_case.execute()  # a second pass while the drift is still unresolved
+
+        _items, total = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert total == 1
+
+    async def test_resolved_incident_does_not_block_a_fresh_one(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        env_id, project_id, account_id = uuid4(), uuid4(), uuid4()
+        projects_api = FakeProjectsApi({env_id: SimpleNamespace(id=env_id, project_id=project_id)})
+        cloudflare_api = FakeCloudflareApiForReconciliation(
+            configs=[SimpleNamespace(environment_id=env_id, cloudflare_account_id=account_id)],
+            dns_diffs={env_id: SimpleNamespace(new_external=[_dns_record("rec-1")], vanished=[])},
+        )
+        use_case = RunDriftReconciliation(
+            uow, cloudflare_api=cloudflare_api, projects_api=projects_api, audit_api=FakeAuditApi()
+        )
+        await use_case.execute()
+        first_items, _ = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        await uow.incidents.update_status(
+            first_items[0].id, status=IncidentStatus.RESOLVED, actor_id=None, at=datetime.now(UTC)
+        )
+
+        await use_case.execute()  # same drift, still present on Cloudflare, but now resolved locally
+
+        _items, total = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert total == 2
+
+    async def test_one_environments_failure_does_not_stop_the_rest_of_the_pass(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        broken_env, healthy_env, project_id, account_id = uuid4(), uuid4(), uuid4(), uuid4()
+        projects_api = FakeProjectsApi({healthy_env: SimpleNamespace(id=healthy_env, project_id=project_id)})
+
+        class FlakyCloudflareApi(FakeCloudflareApiForReconciliation):
+            async def reconcile_dns_records(self, environment_id):
+                if environment_id == broken_env:
+                    raise RuntimeError("cloudflare API exploded")
+                return await super().reconcile_dns_records(environment_id)
+
+        cloudflare_api = FlakyCloudflareApi(
+            configs=[
+                SimpleNamespace(environment_id=broken_env, cloudflare_account_id=account_id),
+                SimpleNamespace(environment_id=healthy_env, cloudflare_account_id=uuid4()),
+            ],
+            dns_diffs={healthy_env: SimpleNamespace(new_external=[_dns_record("rec-1")], vanished=[])},
+        )
+        use_case = RunDriftReconciliation(
+            uow, cloudflare_api=cloudflare_api, projects_api=projects_api, audit_api=FakeAuditApi()
+        )
+
+        await use_case.execute()  # must not raise
+
+        _items, total = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert total == 1
+
+    async def test_no_notification_dispatch(self) -> None:
+        """Matches CreateManualIncident's own precedent — no alert_rule
+        triggered this, so there's no channel list to fan out to."""
+        uow = FakeObservabilityUnitOfWork()
+        env_id, project_id, account_id = uuid4(), uuid4(), uuid4()
+        projects_api = FakeProjectsApi({env_id: SimpleNamespace(id=env_id, project_id=project_id)})
+        cloudflare_api = FakeCloudflareApiForReconciliation(
+            configs=[SimpleNamespace(environment_id=env_id, cloudflare_account_id=account_id)],
+            dns_diffs={env_id: SimpleNamespace(new_external=[_dns_record("rec-1")], vanished=[])},
+        )
+        audit_api = FakeAuditApi()
+        use_case = RunDriftReconciliation(
+            uow, cloudflare_api=cloudflare_api, projects_api=projects_api, audit_api=audit_api
+        )
+
+        await use_case.execute()
+
+        assert not any(e["type"].name == "NOTIFICATION_SENT" for e in audit_api.events)

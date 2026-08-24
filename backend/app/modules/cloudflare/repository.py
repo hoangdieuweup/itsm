@@ -357,6 +357,13 @@ class AbstractCloudflareConfigRepository(AbstractRepository[CloudflareConfigRead
         triggered the sync."""
         raise NotImplementedError
 
+    @abstractmethod
+    async def list_all(self) -> list[CloudflareConfigRead]:
+        """Return every cloudflare_configs row, unfiltered — the full set
+        of Cloudflare-bound environments the drift reconciliation job must
+        consider on each pass."""
+        raise NotImplementedError
+
 
 class CloudflareConfigRepository(AbstractCloudflareConfigRepository):
     """SQLAlchemy implementation. No cache-aside — Decision #8: low-traffic,
@@ -436,6 +443,11 @@ class CloudflareConfigRepository(AbstractCloudflareConfigRepository):
             )
         )
         return list(rows)
+
+    @database
+    async def list_all(self) -> list[CloudflareConfigRead]:
+        rows = await self._session.scalars(select(CloudflareConfig).order_by(CloudflareConfig.created_at))
+        return [CloudflareConfigRead.model_validate(row) for row in rows]
 
 
 class AbstractDnsRecordRepository(AbstractRepository[DnsRecordRead, UUID]):
@@ -889,6 +901,15 @@ class AbstractTunnelHostnameRepository(AbstractRepository[TunnelPublicHostnameRe
         in the given set (they were removed on Cloudflare)."""
         raise NotImplementedError
 
+    @abstractmethod
+    async def list_for_environment(self, environment_id: UUID) -> list[TunnelPublicHostnameRead]:
+        """Return every hostname matched to environment_id, across ALL
+        tunnels on the account — distinct from list_for_tunnel, which needs
+        an already-known tunnel_id. Backs the drift reconciliation job's
+        account-wide before/after snapshot (a single environment's matched
+        hostnames can live on more than one tunnel sharing the account)."""
+        raise NotImplementedError
+
 
 class TunnelHostnameRepository(AbstractTunnelHostnameRepository):
     """SQLAlchemy implementation. No cache-aside — Decision #8."""
@@ -1002,3 +1023,12 @@ class TunnelHostnameRepository(AbstractTunnelHostnameRepository):
         )
         await self._session.execute(stmt)
         await self._session.flush()
+
+    @database
+    async def list_for_environment(self, environment_id: UUID) -> list[TunnelPublicHostnameRead]:
+        rows = await self._session.scalars(
+            select(TunnelPublicHostname)
+            .where(TunnelPublicHostname.environment_id == environment_id)
+            .order_by(TunnelPublicHostname.created_at)
+        )
+        return [TunnelPublicHostnameRead.model_validate(row) for row in rows]
