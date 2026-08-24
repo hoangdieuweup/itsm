@@ -19,6 +19,7 @@ from app.modules.observability.constants import (
     IncidentSource,
     IncidentStatus,
     LokiAuthType,
+    ObservabilityDefaults,
     ObservabilityLimits,
 )
 
@@ -40,7 +41,9 @@ class LokiConfig(Base):
     auth_type: Mapped[LokiAuthType] = mapped_column(Enum(LokiAuthType, native_enum=False))
     credential: Mapped[str | None] = mapped_column(Text, nullable=True)
     default_query: Mapped[str] = mapped_column(Text, default="")
-    default_range_minutes: Mapped[int] = mapped_column(Integer, default=60)
+    default_range_minutes: Mapped[int] = mapped_column(
+        Integer, default=ObservabilityDefaults.DEFAULT_RANGE_MINUTES
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

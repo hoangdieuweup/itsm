@@ -85,3 +85,66 @@ class AlertingAuditActions(StrEnum):
     INCIDENT_ACKNOWLEDGED = "INCIDENT_ACKNOWLEDGED"
     INCIDENT_RESOLVED = "INCIDENT_RESOLVED"
     INCIDENT_NOTIFICATION_SENT = "INCIDENT_NOTIFICATION_SENT"
+
+
+class CloudflareAlertTypes:
+    """Known Cloudflare Notification Policy alert types."""
+
+    ADVANCED_DDOS_L4 = "advanced_ddos_attack_l4_alert"
+    ADVANCED_DDOS_L7 = "advanced_ddos_attack_l7_alert"
+    HEALTH_CHECK_STATUS = "health_check_status_notification"
+
+
+class CloudflareWebhookPayloadKeys:
+    """Keys in Cloudflare Notification webhook payloads."""
+
+    ALERT_EVENT = "alert_event"
+    ALERT_STATE_START = "ALERT_STATE_EVENT_START"
+    POLICY_ID = "policy_id"
+    ALERT_CORRELATION_ID = "alert_correlation_id"
+    ALERT_TYPE = "alert_type"
+    TEXT = "text"
+
+
+class LokiWebhookPayloadKeys:
+    """Keys in Prometheus/Loki Alertmanager webhook payloads."""
+
+    ALERTS = "alerts"
+    STATUS = "status"
+    STATUS_FIRING = "firing"
+    LABELS = "labels"
+    APP_ALERT_RULE_ID = "app_alert_rule_id"
+    FINGERPRINT = "fingerprint"
+    ANNOTATIONS = "annotations"
+    SUMMARY = "summary"
+    ALERT_NAME = "alertname"
+    QUERY = "query"
+    FOR = "for"
+    ENDPOINT_URL = "endpoint_url"
+
+
+class ObservabilityDefaults:
+    """Default values across the observability module."""
+
+    DEFAULT_RANGE_MINUTES = 60
+    DEFAULT_LOKI_NAMESPACE = "itsm"
+    DEFAULT_LOKI_FOR_DURATION = "5m"
+    FALLBACK_CLOUDFLARE_ALERT_TITLE = "Cloudflare alert"
+    FALLBACK_LOKI_ALERT_TITLE = "Loki alert"
+    NOTIFICATION_STATUS_SENT = "sent"
+    NOTIFICATION_STATUS_FAILED = "failed"
+    SSE_EVENT_MESSAGE = "message"
+    SSE_HEADER_NO_BUFFERING = "no"
+    ERROR_LOKI_UNAVAILABLE = "loki_unavailable"
+    AUTH_HEADER_BEARER_PREFIX = "Bearer "
+    RULE_GROUP_PREFIX = "alert-rule-"
+
+
+class IncidentTransitions:
+    """Allowed incident status transitions."""
+
+    ALLOWED: set[tuple[IncidentStatus, IncidentStatus]] = {
+        (IncidentStatus.OPEN, IncidentStatus.ACKNOWLEDGED),
+        (IncidentStatus.OPEN, IncidentStatus.RESOLVED),
+        (IncidentStatus.ACKNOWLEDGED, IncidentStatus.RESOLVED),
+    }

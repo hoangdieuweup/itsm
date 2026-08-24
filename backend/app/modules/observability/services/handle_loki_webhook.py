@@ -9,7 +9,7 @@ aborts the rest."""
 import logging
 from uuid import UUID
 
-from app.core.base.markers import use_case
+from app.core.base.markers import helper, use_case
 from app.core.base.use_case import AbstractUseCase
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
@@ -19,15 +19,18 @@ from app.modules.observability.constants import (
     AlertingLimits,
     IncidentCategory,
     IncidentSource,
+    LokiWebhookPayloadKeys,
+    ObservabilityDefaults,
 )
 from app.modules.observability.uow import AbstractObservabilityUnitOfWork
 from app.modules.projects.public import ProjectsApi
 
 logger = logging.getLogger(__name__)
-_SYSTEM_ACTOR = AuditActor(user_id=None, email=None)
 
 
 class HandleLokiWebhook(AbstractUseCase):
+    SYSTEM_ACTOR = AuditActor(user_id=None, email=None)
+
     def __init__(
         self,
         uow: AbstractObservabilityUnitOfWork,
@@ -43,14 +46,15 @@ class HandleLokiWebhook(AbstractUseCase):
 
     @use_case
     async def execute(self, payload: dict) -> None:
-        for alert in payload.get("alerts", []):
-            if alert.get("status") != "firing":
+        for alert in payload.get(LokiWebhookPayloadKeys.ALERTS, []):
+            if alert.get(LokiWebhookPayloadKeys.STATUS) != LokiWebhookPayloadKeys.STATUS_FIRING:
                 continue
             await self._handle_one(alert)
 
+    @helper
     async def _handle_one(self, alert: dict) -> None:
-        labels = alert.get("labels", {})
-        raw_rule_id = labels.get("app_alert_rule_id")
+        labels = alert.get(LokiWebhookPayloadKeys.LABELS, {})
+        raw_rule_id = labels.get(LokiWebhookPayloadKeys.APP_ALERT_RULE_ID)
         rule = None
         if raw_rule_id:
             try:
@@ -61,7 +65,7 @@ class HandleLokiWebhook(AbstractUseCase):
             logger.warning("loki webhook: no alert_rules row for app_alert_rule_id=%s", raw_rule_id)
             return
 
-        fingerprint = alert.get("fingerprint")
+        fingerprint = alert.get(LokiWebhookPayloadKeys.FINGERPRINT)
         if fingerprint and await self._uow.incidents.get_open_by_correlation_id(fingerprint):
             return
 
@@ -69,9 +73,11 @@ class HandleLokiWebhook(AbstractUseCase):
         if environment is None:
             logger.warning("loki webhook: environment %s no longer exists", rule.environment_id)
             return
-        title = (alert.get("annotations", {}).get("summary") or labels.get("alertname") or "Loki alert")[
-            : AlertingLimits.MAX_TITLE_LENGTH
-        ]
+        title = (
+            alert.get(LokiWebhookPayloadKeys.ANNOTATIONS, {}).get(LokiWebhookPayloadKeys.SUMMARY)
+            or labels.get(LokiWebhookPayloadKeys.ALERT_NAME)
+            or ObservabilityDefaults.FALLBACK_LOKI_ALERT_TITLE
+        )[: AlertingLimits.MAX_TITLE_LENGTH]
         incident = await self._uow.incidents.create(
             project_id=environment.project_id,
             environment_id=rule.environment_id,
@@ -89,7 +95,7 @@ class HandleLokiWebhook(AbstractUseCase):
             action=AlertingAuditActions.INCIDENT_DETECTED,
             severity=AuditSeverity.HIGH,
             message=title,
-            actor=_SYSTEM_ACTOR,
+            actor=self.SYSTEM_ACTOR,
             project_id=incident.project_id,
             environment_id=incident.environment_id,
             incident_id=str(incident.id),
@@ -97,16 +103,16 @@ class HandleLokiWebhook(AbstractUseCase):
         for channel_id in await self._uow.alert_rules.list_channel_ids(rule.id):
             try:
                 await self._notifications_api.dispatch(channel_id, title)
-                status = "sent"
+                status = ObservabilityDefaults.NOTIFICATION_STATUS_SENT
             except Exception:  # noqa: BLE001 -- same Decision #7 reasoning as the Cloudflare path
                 logger.warning("notification dispatch failed for channel %s", channel_id, exc_info=True)
-                status = "failed"
+                status = ObservabilityDefaults.NOTIFICATION_STATUS_FAILED
             await self._audit_api.log_event(
                 type=AuditEventType.NOTIFICATION_SENT,
                 source=AuditSource.SYSTEM,
                 action=AlertingAuditActions.INCIDENT_NOTIFICATION_SENT,
                 severity=AuditSeverity.INFO,
                 message=f"Notification {status} for channel {channel_id}",
-                actor=_SYSTEM_ACTOR,
+                actor=self.SYSTEM_ACTOR,
                 incident_id=str(incident.id),
             )

@@ -10,12 +10,18 @@ system first" convention every prior Cloudflare-write use case follows."""
 from uuid import UUID
 
 from app.config import settings as root_settings
-from app.core.base.markers import use_case
+from app.core.base.markers import helper, use_case
 from app.core.base.use_case import AbstractUseCase
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
 from app.modules.cloudflare.public import CloudflareApi
-from app.modules.observability.constants import AlertingAuditActions, AlertRuleSource, AlertSeverity
+from app.modules.observability.constants import (
+    AlertingAuditActions,
+    AlertRuleSource,
+    AlertSeverity,
+    LokiWebhookPayloadKeys,
+    ObservabilityDefaults,
+)
 from app.modules.observability.exceptions import (
     AlertRuleNotFound,
     CloudflareNotBoundForAlerting,
@@ -61,28 +67,9 @@ class CreateAlertRule(AbstractUseCase):
         if environment is None:
             raise ObservabilityEnvironmentNotFound()
 
-        ready = None
         policy_id: str | None = None
         if source == AlertRuleSource.CLOUDFLARE_NATIVE:
-            if self._cloudflare_api is None:
-                raise CloudflareNotBoundForAlerting()
-            if cf_alert_type is None:
-                raise MissingCloudflareAlertType()
-            ready = await self._cloudflare_api.get_ready_client_for_environment(environment_id)
-            if ready is None:
-                raise CloudflareNotBoundForAlerting()
-            webhook_path = f"/api/v1/webhooks/cloudflare-alert/{ready.cloudflare_account_id}"
-            webhook_url = f"{root_settings.BACKEND_BASE_URL}{webhook_path}"
-            webhook_destination_id = await self._cloudflare_api.ensure_webhook_destination(
-                ready.cloudflare_account_id, webhook_url=webhook_url
-            )
-            policy_id = await ready.client.create_policy(
-                cf_account_id=ready.cf_account_id,
-                api_token=ready.api_token,
-                name=name,
-                alert_type=cf_alert_type,
-                webhook_destination_id=webhook_destination_id,
-            )
+            policy_id = await self._setup_cloudflare_policy(environment_id, name, cf_alert_type)
 
         rule = await self._uow.alert_rules.create(
             environment_id=environment_id,
@@ -93,31 +80,7 @@ class CreateAlertRule(AbstractUseCase):
             severity=severity,
         )
 
-        if policy_id is not None:
-            await self._uow.alert_rules.set_cf_policy_id(rule.id, cf_policy_id=policy_id)
-            refetched = await self._uow.alert_rules.get_by_id(rule.id)
-            if refetched is None:
-                raise AlertRuleNotFound()
-            rule = refetched
-        elif source == AlertRuleSource.LOKI_QUERY:
-            condition = condition or {}
-            await self._loki_client.upsert_rule_group(
-                endpoint_url=condition.get("endpoint_url", ""),
-                namespace="itsm",
-                group_name=f"alert-rule-{rule.id}",
-                rule_name=f"alert-rule-{rule.id}",
-                expr=condition["query"],
-                for_duration=condition.get("for", "5m"),
-                labels={"app_alert_rule_id": str(rule.id)},
-                auth_header=None,
-            )
-
-        if channel_ids:
-            await self._uow.alert_rules.set_channels(rule.id, channel_ids)
-            refetched = await self._uow.alert_rules.get_by_id(rule.id)
-            if refetched is None:
-                raise AlertRuleNotFound()
-            rule = refetched
+        rule = await self._attach_rule_integrations(rule, source, policy_id, condition, channel_ids)
 
         await self._uow.commit()
         await self._audit_api.log_event(
@@ -129,4 +92,72 @@ class CreateAlertRule(AbstractUseCase):
             actor=AuditActor(user_id=actor.id, email=actor.email),
             environment_id=environment_id,
         )
+        return rule
+
+    @helper
+    async def _setup_cloudflare_policy(
+        self, environment_id: UUID, name: str, cf_alert_type: str | None
+    ) -> str:
+        if self._cloudflare_api is None:
+            raise CloudflareNotBoundForAlerting()
+        if cf_alert_type is None:
+            raise MissingCloudflareAlertType()
+        ready = await self._cloudflare_api.get_ready_client_for_environment(environment_id)
+        if ready is None:
+            raise CloudflareNotBoundForAlerting()
+        webhook_path = f"/api/v1/webhooks/cloudflare-alert/{ready.cloudflare_account_id}"
+        webhook_url = f"{root_settings.BACKEND_BASE_URL}{webhook_path}"
+        webhook_destination_id = await self._cloudflare_api.ensure_webhook_destination(
+            ready.cloudflare_account_id, webhook_url=webhook_url
+        )
+        return await ready.client.create_policy(
+            cf_account_id=ready.cf_account_id,
+            api_token=ready.api_token,
+            name=name,
+            alert_type=cf_alert_type,
+            webhook_destination_id=webhook_destination_id,
+        )
+
+    @helper
+    async def _setup_loki_ruler(self, rule_id: UUID, condition: dict | None) -> None:
+        cond = condition or {}
+        group_name = f"{ObservabilityDefaults.RULE_GROUP_PREFIX}{rule_id}"
+        await self._loki_client.upsert_rule_group(
+            endpoint_url=cond.get(LokiWebhookPayloadKeys.ENDPOINT_URL, ""),
+            namespace=ObservabilityDefaults.DEFAULT_LOKI_NAMESPACE,
+            group_name=group_name,
+            rule_name=group_name,
+            expr=cond[LokiWebhookPayloadKeys.QUERY],
+            for_duration=cond.get(
+                LokiWebhookPayloadKeys.FOR, ObservabilityDefaults.DEFAULT_LOKI_FOR_DURATION
+            ),
+            labels={LokiWebhookPayloadKeys.APP_ALERT_RULE_ID: str(rule_id)},
+            auth_header=None,
+        )
+
+    @helper
+    async def _attach_rule_integrations(
+        self,
+        rule: AlertRuleRead,
+        source: AlertRuleSource,
+        policy_id: str | None,
+        condition: dict | None,
+        channel_ids: list[UUID],
+    ) -> AlertRuleRead:
+        if policy_id is not None:
+            await self._uow.alert_rules.set_cf_policy_id(rule.id, cf_policy_id=policy_id)
+            refetched = await self._uow.alert_rules.get_by_id(rule.id)
+            if refetched is None:
+                raise AlertRuleNotFound()
+            rule = refetched
+        elif source == AlertRuleSource.LOKI_QUERY:
+            await self._setup_loki_ruler(rule.id, condition)
+
+        if channel_ids:
+            await self._uow.alert_rules.set_channels(rule.id, channel_ids)
+            refetched = await self._uow.alert_rules.get_by_id(rule.id)
+            if refetched is None:
+                raise AlertRuleNotFound()
+            rule = refetched
+
         return rule
