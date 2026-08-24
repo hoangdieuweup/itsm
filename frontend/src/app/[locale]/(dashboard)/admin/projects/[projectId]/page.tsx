@@ -6,7 +6,9 @@ import { fetchAuthSession } from "@/modules/auth";
 import { RESOURCES, ACTIONS } from "@/shared/constants/permissions";
 import { fetchProject, projectsKeys } from "@/entities/project";
 import { fetchProjectEnvironments, environmentsKeys } from "@/entities/environment";
+import { fetchNotificationChannels, notificationChannelsKeys } from "@/entities/notification-channel";
 import { ProjectDetailView } from "@/modules/projects";
+import { NotificationChannelsSection } from "@/modules/notifications";
 
 export default async function AdminProjectDetailPage({
   params,
@@ -18,10 +20,16 @@ export default async function AdminProjectDetailPage({
 
   const session = await fetchAuthSession();
   const canReadProjects = hasPermission(session, RESOURCES.PROJECT, ACTIONS.READ);
+  const canReadNotificationChannels = hasPermission(
+    session,
+    RESOURCES.NOTIFICATION_CHANNEL,
+    ACTIONS.READ,
+  );
 
   const queryClient = createQueryClient();
+  const prefetches = [];
   if (canReadProjects) {
-    await Promise.all([
+    prefetches.push(
       queryClient.prefetchQuery({
         queryKey: projectsKeys.detail(projectId),
         queryFn: () => fetchProject(projectId),
@@ -30,8 +38,17 @@ export default async function AdminProjectDetailPage({
         queryKey: environmentsKeys.forProject(projectId),
         queryFn: () => fetchProjectEnvironments(projectId),
       }),
-    ]);
+    );
   }
+  if (canReadNotificationChannels) {
+    prefetches.push(
+      queryClient.prefetchQuery({
+        queryKey: notificationChannelsKeys.list(projectId),
+        queryFn: () => fetchNotificationChannels(projectId),
+      }),
+    );
+  }
+  await Promise.all(prefetches);
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
@@ -41,6 +58,13 @@ export default async function AdminProjectDetailPage({
         fallback={<NoPermission />}
       >
         <ProjectDetailView projectId={projectId} />
+      </RequirePermission>
+      <RequirePermission
+        resource={RESOURCES.NOTIFICATION_CHANNEL}
+        action={ACTIONS.READ}
+        fallback={null}
+      >
+        <NotificationChannelsSection projectId={projectId} />
       </RequirePermission>
     </HydrationBoundary>
   );
