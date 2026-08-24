@@ -30,7 +30,11 @@ function TestSendButton({ channelId }: { channelId: string }) {
         <Send className="size-3.5" aria-hidden="true" />
       </button>
       {testSend.isSuccess && (
-        <span role="status" className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+        <span
+          role="status"
+          aria-atomic="true"
+          className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"
+        >
           <CheckCircle2 className="size-3.5" aria-hidden="true" /> {t("actions.testSendSuccess")}
         </span>
       )}
