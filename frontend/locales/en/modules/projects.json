@@ -13,7 +13,8 @@
     "addLink": "Add",
     "manageDns": "Manage DNS",
     "manageTunnels": "Manage Tunnels",
-    "manageLogs": "View Logs"
+    "manageLogs": "View Logs",
+    "manageAlerting": "Manage Alerting"
   },
   "table": {
     "name": "Name",

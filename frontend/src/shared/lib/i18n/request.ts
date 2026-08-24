@@ -20,6 +20,8 @@ export default getRequestConfig(async ({ requestLocale }) => {
     cloudflareTunnels,
     logViewer,
     notifications,
+    alerting,
+    incidents,
   ] = await Promise.all([
     import(`../../../../locales/${locale}/common.json`),
     import(`../../../../locales/${locale}/modules/auth.json`),
@@ -32,6 +34,8 @@ export default getRequestConfig(async ({ requestLocale }) => {
     import(`../../../../locales/${locale}/modules/cloudflare-tunnels.json`),
     import(`../../../../locales/${locale}/modules/log-viewer.json`),
     import(`../../../../locales/${locale}/modules/notifications.json`),
+    import(`../../../../locales/${locale}/modules/alerting.json`),
+    import(`../../../../locales/${locale}/modules/incidents.json`),
   ]);
 
   return {
@@ -48,6 +52,8 @@ export default getRequestConfig(async ({ requestLocale }) => {
       cloudflareTunnels: cloudflareTunnels.default,
       logViewer: logViewer.default,
       notifications: notifications.default,
+      alerting: alerting.default,
+      incidents: incidents.default,
     },
   };
 });

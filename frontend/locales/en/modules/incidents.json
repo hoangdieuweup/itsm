@@ -1,0 +1,59 @@
+{
+  "title": "Incidents",
+  "description": "Incidents detected by alert rules, plus anything filed manually.",
+  "empty": "No incidents match these filters.",
+  "list": {
+    "title": "Incidents"
+  },
+  "filters": {
+    "project": "Project",
+    "allProjects": "All projects",
+    "environment": "Environment",
+    "allEnvironments": "All environments",
+    "status": "Status",
+    "allStatuses": "All statuses"
+  },
+  "status": {
+    "OPEN": "Open",
+    "ACKNOWLEDGED": "Acknowledged",
+    "RESOLVED": "Resolved"
+  },
+  "sources": {
+    "CLOUDFLARE": "Cloudflare",
+    "LOKI": "Loki",
+    "MANUAL": "Manual"
+  },
+  "categories": {
+    "TRAFFIC": "Traffic",
+    "DDOS": "DDoS",
+    "ORIGIN_ERROR": "Origin Error",
+    "DNS_DRIFT": "DNS Drift",
+    "TUNNEL_DRIFT": "Tunnel Drift",
+    "LOG_MATCH": "Log Match",
+    "MANUAL": "Manual"
+  },
+  "severities": {
+    "LOW": "Low",
+    "MEDIUM": "Medium",
+    "HIGH": "High",
+    "CRITICAL": "Critical"
+  },
+  "detail": {
+    "detected": "Detected",
+    "category": "Category",
+    "source": "Source",
+    "acknowledgedAt": "Acknowledged",
+    "resolvedAt": "Resolved",
+    "acknowledge": "Acknowledge",
+    "resolve": "Resolve",
+    "resolveConfirm": {
+      "title": "Resolve this incident?",
+      "description": "\"{title}\" will be marked resolved. This cannot be undone from here."
+    }
+  },
+  "errors": {
+    "incident_not_found": "This incident no longer exists.",
+    "invalid_incident_transition": "This status change is no longer possible — someone may have already updated it.",
+    "observability_environment_not_found": "This environment no longer exists."
+  }
+}

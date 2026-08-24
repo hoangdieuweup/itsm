@@ -4,45 +4,93 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Siren } from "lucide-react";
 import { Label } from "@/shared/ui/label";
+import { useProjectsQuery } from "@/entities/project";
 import { useProjectEnvironmentsQuery } from "@/entities/environment";
 import { INCIDENT_STATUS, useIncidentsQuery } from "@/entities/incident";
 import { IncidentStatusBadge } from "./incident-status-badge";
 import { IncidentDetailPanel } from "./incident-detail-panel";
 
-function IncidentsFilterBar({
-  environmentId,
-  onEnvironmentIdChange,
-  status,
-  onStatusChange,
+function ProjectSelect({ projectId, onChange }: { projectId: string; onChange: (value: string) => void }) {
+  const t = useTranslations("incidents");
+  const { data: projectsPage } = useProjectsQuery();
+
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor="filter-project">{t("filters.project")}</Label>
+      <select
+        id="filter-project"
+        value={projectId}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <option value="">{t("filters.allProjects")}</option>
+        {projectsPage.items.map((project) => (
+          <option key={project.id} value={project.id}>
+            {project.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function EnvironmentSelect({
   projectId,
+  environmentId,
+  onChange,
 }: {
-  environmentId: string;
-  onEnvironmentIdChange: (value: string) => void;
-  status: string;
-  onStatusChange: (value: string) => void;
   projectId: string;
+  environmentId: string;
+  onChange: (value: string) => void;
 }) {
   const t = useTranslations("incidents");
   const { data: environments } = useProjectEnvironmentsQuery(projectId);
 
   return (
+    <div className="space-y-1.5">
+      <Label htmlFor="filter-environment">{t("filters.environment")}</Label>
+      <select
+        id="filter-environment"
+        value={environmentId}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <option value="">{t("filters.allEnvironments")}</option>
+        {environments.map((environment) => (
+          <option key={environment.id} value={environment.id}>
+            {environment.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function IncidentsFilterBar({
+  projectId,
+  onProjectIdChange,
+  environmentId,
+  onEnvironmentIdChange,
+  status,
+  onStatusChange,
+}: {
+  projectId: string;
+  onProjectIdChange: (value: string) => void;
+  environmentId: string;
+  onEnvironmentIdChange: (value: string) => void;
+  status: string;
+  onStatusChange: (value: string) => void;
+}) {
+  const t = useTranslations("incidents");
+
+  return (
     <div className="flex flex-wrap gap-4 rounded-xl border bg-card p-4">
-      <div className="space-y-1.5">
-        <Label htmlFor="filter-environment">{t("filters.environment")}</Label>
-        <select
-          id="filter-environment"
-          value={environmentId}
-          onChange={(event) => onEnvironmentIdChange(event.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          <option value="">{t("filters.allEnvironments")}</option>
-          {environments.map((environment) => (
-            <option key={environment.id} value={environment.id}>
-              {environment.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <ProjectSelect projectId={projectId} onChange={onProjectIdChange} />
+
+      {projectId && (
+        <EnvironmentSelect projectId={projectId} environmentId={environmentId} onChange={onEnvironmentIdChange} />
+      )}
+
       <div className="space-y-1.5">
         <Label htmlFor="filter-status">{t("filters.status")}</Label>
         <select
@@ -63,14 +111,21 @@ function IncidentsFilterBar({
   );
 }
 
-export function IncidentsPageContent({ projectId }: { projectId: string }) {
+/**
+ * Project-agnostic by default — mirrors modules/audit-log's own filter shape
+ * (a flat top-level route with an optional project scope, not a required
+ * one), the closest precedent for "list records optionally scoped to one
+ * project" this codebase already has.
+ */
+export function IncidentsPageContent() {
   const t = useTranslations("incidents");
+  const [projectId, setProjectId] = useState("");
   const [environmentId, setEnvironmentId] = useState("");
   const [status, setStatus] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data: incidents = [], isLoading } = useIncidentsQuery({
-    projectId,
+    projectId: projectId || undefined,
     environmentId: environmentId || undefined,
     status: status || undefined,
   });
@@ -85,6 +140,12 @@ export function IncidentsPageContent({ projectId }: { projectId: string }) {
       </div>
 
       <IncidentsFilterBar
+        projectId={projectId}
+        onProjectIdChange={(value) => {
+          setProjectId(value);
+          setEnvironmentId("");
+          setSelectedId(null);
+        }}
         environmentId={environmentId}
         onEnvironmentIdChange={(value) => {
           setEnvironmentId(value);
@@ -95,7 +156,6 @@ export function IncidentsPageContent({ projectId }: { projectId: string }) {
           setStatus(value);
           setSelectedId(null);
         }}
-        projectId={projectId}
       />
 
       <section className="flex flex-col gap-3 rounded-xl border bg-card p-5">

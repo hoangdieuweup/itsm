@@ -1,0 +1,59 @@
+{
+  "title": "Sự cố",
+  "description": "Sự cố được phát hiện bởi quy tắc cảnh báo, cùng với những sự cố được tạo thủ công.",
+  "empty": "Không có sự cố nào khớp với bộ lọc này.",
+  "list": {
+    "title": "Sự cố"
+  },
+  "filters": {
+    "project": "Dự án",
+    "allProjects": "Tất cả dự án",
+    "environment": "Môi trường",
+    "allEnvironments": "Tất cả môi trường",
+    "status": "Trạng thái",
+    "allStatuses": "Tất cả trạng thái"
+  },
+  "status": {
+    "OPEN": "Đang mở",
+    "ACKNOWLEDGED": "Đã ghi nhận",
+    "RESOLVED": "Đã xử lý"
+  },
+  "sources": {
+    "CLOUDFLARE": "Cloudflare",
+    "LOKI": "Loki",
+    "MANUAL": "Thủ công"
+  },
+  "categories": {
+    "TRAFFIC": "Lưu lượng",
+    "DDOS": "Tấn công DDoS",
+    "ORIGIN_ERROR": "Lỗi Origin",
+    "DNS_DRIFT": "Lệch cấu hình DNS",
+    "TUNNEL_DRIFT": "Lệch cấu hình Tunnel",
+    "LOG_MATCH": "Khớp log",
+    "MANUAL": "Thủ công"
+  },
+  "severities": {
+    "LOW": "Thấp",
+    "MEDIUM": "Trung bình",
+    "HIGH": "Cao",
+    "CRITICAL": "Nghiêm trọng"
+  },
+  "detail": {
+    "detected": "Phát hiện lúc",
+    "category": "Danh mục",
+    "source": "Nguồn",
+    "acknowledgedAt": "Đã ghi nhận lúc",
+    "resolvedAt": "Đã xử lý lúc",
+    "acknowledge": "Ghi nhận",
+    "resolve": "Xử lý xong",
+    "resolveConfirm": {
+      "title": "Đánh dấu sự cố đã xử lý?",
+      "description": "\"{title}\" sẽ được đánh dấu là đã xử lý. Không thể hoàn tác từ đây."
+    }
+  },
+  "errors": {
+    "incident_not_found": "Sự cố này không còn tồn tại.",
+    "invalid_incident_transition": "Không thể thay đổi trạng thái này nữa — có thể ai đó đã cập nhật trước.",
+    "observability_environment_not_found": "Môi trường này không còn tồn tại."
+  }
+}

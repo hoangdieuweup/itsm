@@ -7,6 +7,7 @@ import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
+import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { INCIDENT_STATUS, type Incident } from "@/entities/incident";
 import { useAcknowledgeIncident } from "../hooks/use-acknowledge-incident";
 import { useResolveIncident } from "../hooks/use-resolve-incident";
@@ -14,15 +15,23 @@ import { IncidentStatusBadge } from "./incident-status-badge";
 
 export function IncidentDetailPanel({ incident }: { incident: Incident }) {
   const t = useTranslations("incidents");
+  const getErrorMessage = useApiErrorMessage("incidents");
   const acknowledge = useAcknowledgeIncident();
   const resolve = useResolveIncident();
   const [resolveConfirmOpen, setResolveConfirmOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const isResolved = incident.status === INCIDENT_STATUS.RESOLVED;
   const canAcknowledge = incident.status === INCIDENT_STATUS.OPEN;
 
   return (
     <section className="flex flex-col gap-4 rounded-xl border bg-card p-5">
+      {errorMessage && (
+        <div role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {errorMessage}
+        </div>
+      )}
+
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-2">
@@ -43,7 +52,12 @@ export function IncidentDetailPanel({ incident }: { incident: Incident }) {
               variant="outline"
               size="sm"
               disabled={!canAcknowledge || acknowledge.isPending}
-              onClick={() => acknowledge.mutate(incident.id)}
+              onClick={() => {
+                setErrorMessage(null);
+                acknowledge.mutate(incident.id, {
+                  onError: (err) => setErrorMessage(getErrorMessage(err)),
+                });
+              }}
             >
               <Eye className="mr-1.5 size-3.5" aria-hidden="true" />
               {t("detail.acknowledge")}
@@ -54,7 +68,10 @@ export function IncidentDetailPanel({ incident }: { incident: Incident }) {
               variant="default"
               size="sm"
               disabled={isResolved || resolve.isPending}
-              onClick={() => setResolveConfirmOpen(true)}
+              onClick={() => {
+                setErrorMessage(null);
+                setResolveConfirmOpen(true);
+              }}
             >
               <CheckCircle2 className="mr-1.5 size-3.5" aria-hidden="true" />
               {t("detail.resolve")}
@@ -89,7 +106,12 @@ export function IncidentDetailPanel({ incident }: { incident: Incident }) {
       <ConfirmDialog
         isOpen={resolveConfirmOpen}
         onClose={() => setResolveConfirmOpen(false)}
-        onConfirm={() => resolve.mutate(incident.id, { onSuccess: () => setResolveConfirmOpen(false) })}
+        onConfirm={() =>
+          resolve.mutate(incident.id, {
+            onSuccess: () => setResolveConfirmOpen(false),
+            onError: (err) => setErrorMessage(getErrorMessage(err)),
+          })
+        }
         title={t("detail.resolveConfirm.title")}
         description={t("detail.resolveConfirm.description", { title: incident.title })}
         confirmText={t("detail.resolve")}

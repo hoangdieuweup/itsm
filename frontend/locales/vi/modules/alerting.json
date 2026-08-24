@@ -1,0 +1,59 @@
+{
+  "title": "Quy tắc cảnh báo",
+  "subtitle": "Định nghĩa khi nào môi trường này tạo sự cố và ai sẽ được thông báo.",
+  "addRule": "Thêm quy tắc",
+  "empty": "Chưa có quy tắc cảnh báo nào được cấu hình.",
+  "table": {
+    "name": "Tên",
+    "source": "Nguồn",
+    "severity": "Mức độ",
+    "status": "Trạng thái",
+    "active": "Đang bật",
+    "inactive": "Đang tắt",
+    "editRule": "Sửa quy tắc",
+    "deleteRule": "Xoá quy tắc"
+  },
+  "sources": {
+    "CLOUDFLARE_NATIVE": "Thông báo Cloudflare",
+    "LOKI_QUERY": "Truy vấn Loki"
+  },
+  "severities": {
+    "LOW": "Thấp",
+    "MEDIUM": "Trung bình",
+    "HIGH": "Cao",
+    "CRITICAL": "Nghiêm trọng"
+  },
+  "fields": {
+    "name": "Tên",
+    "source": "Nguồn",
+    "severity": "Mức độ",
+    "channels": "Kênh thông báo",
+    "noChannels": "Dự án này chưa có kênh thông báo nào.",
+    "cfAlertType": "Loại cảnh báo Cloudflare",
+    "cfAlertTypeLoading": "Đang tải danh sách cảnh báo…",
+    "cfAlertTypePlaceholder": "Chọn loại cảnh báo",
+    "cloudflareNotBoundHint": "Môi trường này chưa gắn tài khoản Cloudflare — hãy gắn ở trang DNS trước.",
+    "lokiEndpointUrl": "URL endpoint Loki",
+    "lokiQuery": "Truy vấn LogQL",
+    "lokiQueryHint": "Biểu thức được Ruler của Loki đánh giá để quyết định khi nào quy tắc này kích hoạt.",
+    "lokiFor": "Thời lượng (for)"
+  },
+  "form": {
+    "createTitle": "Tạo quy tắc cảnh báo",
+    "editTitle": "Sửa quy tắc cảnh báo",
+    "create": "Tạo",
+    "save": "Lưu",
+    "saving": "Đang lưu…",
+    "cancel": "Huỷ"
+  },
+  "deleteConfirm": {
+    "title": "Xoá quy tắc cảnh báo?",
+    "description": "Thao tác này sẽ xoá vĩnh viễn \"{name}\" và ngừng tạo sự cố từ quy tắc này."
+  },
+  "errors": {
+    "alert_rule_not_found": "Quy tắc cảnh báo này không còn tồn tại.",
+    "cloudflare_not_bound_for_alerting": "Môi trường này chưa gắn tài khoản Cloudflare.",
+    "missing_cf_alert_type": "Vui lòng chọn loại cảnh báo Cloudflare trước khi lưu.",
+    "observability_environment_not_found": "Môi trường này không còn tồn tại."
+  }
+}

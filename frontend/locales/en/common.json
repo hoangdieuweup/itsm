@@ -28,6 +28,7 @@
     "projects": "Projects",
     "auditLog": "Audit Log",
     "cloudflareAccounts": "Cloudflare Accounts",
+    "incidents": "Incidents",
     "mainMenu": "Main Menu",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",

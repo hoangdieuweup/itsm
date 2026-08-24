@@ -9,6 +9,7 @@ import {
   FolderKanban,
   ScrollText,
   Cloud,
+  Siren,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -314,6 +315,13 @@ export function DashboardSidebar({
       icon: Cloud,
       active: pathname === ROUTES.adminCloudflareAccounts,
       permission: { action: ACTIONS.VIEW, resource: RESOURCES.CLOUDFLARE_ACCOUNT },
+    },
+    {
+      href: ROUTES.adminIncidents,
+      label: t("incidents"),
+      icon: Siren,
+      active: pathname === ROUTES.adminIncidents,
+      permission: { action: ACTIONS.READ, resource: RESOURCES.INCIDENT },
     },
   ];
 

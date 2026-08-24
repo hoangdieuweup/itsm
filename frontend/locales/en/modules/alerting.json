@@ -1,0 +1,59 @@
+{
+  "title": "Alert Rules",
+  "subtitle": "Define when this environment raises an incident and who gets notified.",
+  "addRule": "Add Rule",
+  "empty": "No alert rules configured yet.",
+  "table": {
+    "name": "Name",
+    "source": "Source",
+    "severity": "Severity",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "editRule": "Edit rule",
+    "deleteRule": "Delete rule"
+  },
+  "sources": {
+    "CLOUDFLARE_NATIVE": "Cloudflare Notification",
+    "LOKI_QUERY": "Loki Query"
+  },
+  "severities": {
+    "LOW": "Low",
+    "MEDIUM": "Medium",
+    "HIGH": "High",
+    "CRITICAL": "Critical"
+  },
+  "fields": {
+    "name": "Name",
+    "source": "Source",
+    "severity": "Severity",
+    "channels": "Notification channels",
+    "noChannels": "No notification channels available for this project yet.",
+    "cfAlertType": "Cloudflare alert type",
+    "cfAlertTypeLoading": "Loading available alerts…",
+    "cfAlertTypePlaceholder": "Select an alert type",
+    "cloudflareNotBoundHint": "This environment has no Cloudflare account bound yet — bind one from the DNS page first.",
+    "lokiEndpointUrl": "Loki endpoint URL",
+    "lokiQuery": "LogQL query",
+    "lokiQueryHint": "The expression evaluated by Loki's Ruler to decide when this rule fires.",
+    "lokiFor": "For (duration)"
+  },
+  "form": {
+    "createTitle": "Create Alert Rule",
+    "editTitle": "Edit Alert Rule",
+    "create": "Create",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel"
+  },
+  "deleteConfirm": {
+    "title": "Delete alert rule?",
+    "description": "This will permanently remove \"{name}\" and stop it from raising incidents."
+  },
+  "errors": {
+    "alert_rule_not_found": "This alert rule no longer exists.",
+    "cloudflare_not_bound_for_alerting": "This environment has no Cloudflare account bound.",
+    "missing_cf_alert_type": "Select a Cloudflare alert type before saving.",
+    "observability_environment_not_found": "This environment no longer exists."
+  }
+}
