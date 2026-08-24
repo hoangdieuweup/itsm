@@ -7,8 +7,8 @@ import { RESOURCES, ACTIONS } from "@/shared/constants/permissions";
 import { fetchProject, projectsKeys } from "@/entities/project";
 import { fetchProjectEnvironments, environmentsKeys } from "@/entities/environment";
 import { fetchNotificationChannels, notificationChannelsKeys } from "@/entities/notification-channel";
-import { ProjectDetailView } from "@/modules/projects";
 import { NotificationChannelsSection } from "@/modules/notifications";
+import { ProjectDetailClient } from "./project-detail-client";
 
 export default async function AdminProjectDetailPage({
   params,
@@ -57,7 +57,7 @@ export default async function AdminProjectDetailPage({
         action={ACTIONS.READ}
         fallback={<NoPermission />}
       >
-        <ProjectDetailView projectId={projectId} />
+        <ProjectDetailClient projectId={projectId} />
       </RequirePermission>
       <RequirePermission
         resource={RESOURCES.NOTIFICATION_CHANNEL}

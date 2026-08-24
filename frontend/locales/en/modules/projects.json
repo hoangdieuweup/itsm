@@ -13,6 +13,8 @@
     "addLink": "Add",
     "manageDns": "Manage DNS",
     "manageTunnels": "Manage Tunnels",
+    "closeDnsDrawer": "Close DNS panel",
+    "closeTunnelsDrawer": "Close tunnels panel",
     "manageLogs": "View Logs",
     "manageAlerting": "Manage Alerting"
   },

@@ -13,6 +13,8 @@
     "addLink": "Thêm",
     "manageDns": "Quản lý DNS",
     "manageTunnels": "Quản lý Tunnel",
+    "closeDnsDrawer": "Đóng bảng điều khiển DNS",
+    "closeTunnelsDrawer": "Đóng bảng điều khiển Tunnel",
     "manageLogs": "Xem Log",
     "manageAlerting": "Quản lý Cảnh báo"
   },

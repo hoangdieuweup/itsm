@@ -18,7 +18,17 @@ import { useDeleteProjectLink } from "../hooks/use-delete-project-link";
 import { EnvironmentFormDialog } from "./environment-form-dialog";
 import { ProjectLinkFormDialog } from "./project-link-form-dialog";
 
-export function ProjectDetailView({ projectId }: { projectId: string }) {
+export function ProjectDetailView({
+  projectId,
+  onManageDns,
+  onManageTunnels,
+}: {
+  projectId: string;
+  /** Opens the environment's DNS management inline instead of navigating away. */
+  onManageDns: (environment: Environment) => void;
+  /** Opens the environment's Tunnels management inline instead of navigating away. */
+  onManageTunnels: (environment: Environment) => void;
+}) {
   const t = useTranslations("projects");
   const { data: project } = useProjectQuery(projectId);
   const { data: environments } = useProjectEnvironmentsQuery(projectId);
@@ -67,22 +77,24 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
               </span>
               <span className="text-muted-foreground">{env.name}</span>
               <Can I={ACTIONS.VIEW} a={RESOURCES.CLOUDFLARE_ACCOUNT}>
-                <Link
-                  href={`/admin/environments/${env.id}/dns`}
-                  className="text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                <button
+                  type="button"
+                  onClick={() => onManageDns(env)}
+                  className="cursor-pointer text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   aria-label={t("actions.manageDns")}
                 >
                   <Globe className="size-3.5" />
-                </Link>
+                </button>
               </Can>
               <Can I={ACTIONS.VIEW} a={RESOURCES.CLOUDFLARE_ACCOUNT}>
-                <Link
-                  href={`/admin/environments/${env.id}/tunnels`}
-                  className="text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                <button
+                  type="button"
+                  onClick={() => onManageTunnels(env)}
+                  className="cursor-pointer text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   aria-label={t("actions.manageTunnels")}
                 >
                   <Waypoints className="size-3.5" />
-                </Link>
+                </button>
               </Can>
               <Can I={ACTIONS.READ} a={RESOURCES.ENVIRONMENT}>
                 <Link
