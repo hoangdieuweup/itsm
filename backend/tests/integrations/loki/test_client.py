@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 
 import httpx
 import pytest
+import yaml
 from websockets.asyncio.server import serve as ws_serve
 from websockets.datastructures import Headers
 from websockets.exceptions import ConnectionClosedOK
@@ -245,3 +246,111 @@ class TestTail:
                 endpoint_url="http://localhost:1", query="{}", tenant_id=None, auth_header=None
             ):
                 pass
+
+
+class TestUpsertRuleGroup:
+    async def test_success_posts_yaml_rule_group(self) -> None:
+        captured = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.url.path == "/loki/api/v1/rules/itsm"
+            assert request.method == "POST"
+            assert request.headers["content-type"] == "application/yaml"
+            captured["body"] = yaml.safe_load(request.read())
+            return httpx.Response(202)
+
+        client = LokiClient(transport=httpx.MockTransport(handler))
+        await client.upsert_rule_group(
+            endpoint_url="http://loki:3100",
+            namespace="itsm",
+            group_name="alert-rule-abc",
+            rule_name="alert-rule-abc",
+            expr='{app="x"} |= "error"',
+            for_duration="5m",
+            labels={"app_alert_rule_id": "abc"},
+            auth_header=None,
+        )
+        assert captured["body"]["name"] == "alert-rule-abc"
+        assert captured["body"]["rules"][0]["alert"] == "alert-rule-abc"
+        assert captured["body"]["rules"][0]["expr"] == '{app="x"} |= "error"'
+        assert captured["body"]["rules"][0]["for"] == "5m"
+        assert captured["body"]["rules"][0]["labels"] == {"app_alert_rule_id": "abc"}
+
+    async def test_sends_auth_header_when_given(self) -> None:
+        captured = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["auth"] = request.headers.get("authorization")
+            return httpx.Response(202)
+
+        client = LokiClient(transport=httpx.MockTransport(handler))
+        await client.upsert_rule_group(
+            endpoint_url="http://loki:3100",
+            namespace="itsm",
+            group_name="g",
+            rule_name="r",
+            expr="{}",
+            for_duration="5m",
+            labels={},
+            auth_header="Bearer secret",
+        )
+        assert captured["auth"] == "Bearer secret"
+
+    async def test_unauthorized_raises_invalid_credential(self) -> None:
+        client = LokiClient(transport=httpx.MockTransport(lambda r: httpx.Response(401, text="unauthorized")))
+        with pytest.raises(InvalidLokiCredential):
+            await client.upsert_rule_group(
+                endpoint_url="http://loki:3100",
+                namespace="itsm",
+                group_name="g",
+                rule_name="r",
+                expr="{}",
+                for_duration="5m",
+                labels={},
+                auth_header=None,
+            )
+
+    async def test_rejected_raises(self) -> None:
+        client = LokiClient(transport=httpx.MockTransport(lambda r: httpx.Response(400, text="bad LogQL")))
+        with pytest.raises(LokiQueryRejected):
+            await client.upsert_rule_group(
+                endpoint_url="http://loki:3100",
+                namespace="itsm",
+                group_name="g",
+                rule_name="r",
+                expr="{{bad",
+                for_duration="5m",
+                labels={},
+                auth_header=None,
+            )
+
+    async def test_unavailable_raises_on_transport_error(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("refused")
+
+        client = LokiClient(transport=httpx.MockTransport(handler))
+        with pytest.raises(LokiApiUnavailable):
+            await client.upsert_rule_group(
+                endpoint_url="http://loki:3100",
+                namespace="itsm",
+                group_name="g",
+                rule_name="r",
+                expr="{}",
+                for_duration="5m",
+                labels={},
+                auth_header=None,
+            )
+
+    async def test_unavailable_raises_on_5xx(self) -> None:
+        client = LokiClient(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
+        with pytest.raises(LokiApiUnavailable):
+            await client.upsert_rule_group(
+                endpoint_url="http://loki:3100",
+                namespace="itsm",
+                group_name="g",
+                rule_name="r",
+                expr="{}",
+                for_duration="5m",
+                labels={},
+                auth_header=None,
+            )

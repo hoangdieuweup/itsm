@@ -9,6 +9,7 @@ from urllib.parse import quote
 
 import httpx
 import websockets
+import yaml
 from websockets.exceptions import InvalidStatus, WebSocketException
 
 from app.core.base.markers import integration
@@ -127,3 +128,50 @@ class LokiClient:
             raise LokiApiUnavailable() from exc
         except OSError as exc:
             raise LokiApiUnavailable() from exc
+
+    @integration
+    async def upsert_rule_group(
+        self,
+        *,
+        endpoint_url: str,
+        namespace: str,
+        group_name: str,
+        rule_name: str,
+        expr: str,
+        for_duration: str,
+        labels: dict[str, str],
+        auth_header: str | None,
+    ) -> None:
+        """POST {endpoint_url}/loki/api/v1/rules/{namespace}, Content-Type:
+        application/yaml — Loki's Ruler management API. One rule per group;
+        group_name/rule_name both derive from the owning alert_rules.id
+        (Phase 9 Decision #10). `labels` is carried through by Alertmanager
+        into its webhook payload's alerts[].labels verbatim, which is exactly
+        the join key /webhooks/loki-alert needs to resolve back to this rule."""
+        body = yaml.safe_dump(
+            {
+                "name": group_name,
+                "rules": [{"alert": rule_name, "expr": expr, "for": for_duration, "labels": labels}],
+            }
+        )
+        headers = {"Content-Type": "application/yaml"}
+        if auth_header is not None:
+            headers["Authorization"] = auth_header
+
+        try:
+            async with httpx.AsyncClient(base_url=endpoint_url, transport=self._transport) as client:
+                response = await client.post(
+                    f"/loki/api/v1/rules/{namespace}",
+                    content=body,
+                    headers=headers,
+                    timeout=loki_settings.HTTP_TIMEOUT_SECONDS,
+                )
+        except httpx.HTTPError as exc:
+            raise LokiApiUnavailable() from exc
+
+        if response.status_code in (401, 403):
+            raise InvalidLokiCredential()
+        if response.status_code >= 500:
+            raise LokiApiUnavailable(status_code=response.status_code)
+        if response.is_error:
+            raise LokiQueryRejected(message=response.text or "Loki rejected this rule group")
