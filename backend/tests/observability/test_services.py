@@ -13,7 +13,13 @@ from app.integrations.cloudflare.exceptions import CloudflareDnsOperationRejecte
 from app.integrations.loki.exceptions import LokiApiUnavailable
 from app.integrations.loki.schemas import LokiLogEntry, LokiQueryResult
 from app.modules.observability.config import observability_settings
-from app.modules.observability.constants import AlertRuleSource, AlertSeverity, LokiAuthType
+from app.modules.observability.constants import (
+    AlertRuleSource,
+    AlertSeverity,
+    IncidentCategory,
+    IncidentStatus,
+    LokiAuthType,
+)
 from app.modules.observability.exceptions import (
     AlertRuleNotFound,
     CloudflareNotBoundForAlerting,
@@ -26,12 +32,14 @@ from app.modules.observability.repository import (
     AbstractIncidentRepository,
     AbstractLokiConfigRepository,
 )
-from app.modules.observability.schemas import AlertRuleRead, LokiConfigRead
+from app.modules.observability.schemas import AlertRuleRead, IncidentRead, LokiConfigRead
 from app.modules.observability.services.create_alert_rule import CreateAlertRule
 from app.modules.observability.services.create_loki_config import CreateLokiConfig
 from app.modules.observability.services.delete_alert_rule import DeleteAlertRule
 from app.modules.observability.services.delete_loki_config import DeleteLokiConfig
 from app.modules.observability.services.get_loki_config import GetLokiConfig
+from app.modules.observability.services.handle_cloudflare_webhook import HandleCloudflareWebhook
+from app.modules.observability.services.handle_loki_webhook import HandleLokiWebhook
 from app.modules.observability.services.list_alert_rules import ListAlertRules
 from app.modules.observability.services.list_available_alerts import ListAvailableAlerts
 from app.modules.observability.services.run_log_query import RunLogQuery
@@ -202,25 +210,80 @@ class FakeAlertRuleRepo(AbstractAlertRuleRepository):
 
 class FakeIncidentRepo(AbstractIncidentRepository):
     def __init__(self) -> None:
-        self._rows: dict = {}
+        self._rows: dict[UUID, IncidentRead] = {}
+        self._correlation_ids: dict[UUID, str | None] = {}
 
     async def get_by_id(self, entity_id):
         return self._rows.get(entity_id)
 
     async def list_page(self, limit, offset):
-        raise NotImplementedError
+        return await self.list_page_filtered(limit=limit, offset=offset)
 
     async def get_open_by_correlation_id(self, correlation_id):
-        raise NotImplementedError
+        for incident_id, row in self._rows.items():
+            same_correlation = self._correlation_ids.get(incident_id) == correlation_id
+            if same_correlation and row.status != IncidentStatus.RESOLVED:
+                return row
+        return None
 
     async def list_page_filtered(self, *, project_id=None, environment_id=None, status=None, limit, offset):
-        raise NotImplementedError
+        items = list(self._rows.values())
+        if project_id is not None:
+            items = [i for i in items if i.project_id == project_id]
+        if environment_id is not None:
+            items = [i for i in items if i.environment_id == environment_id]
+        if status is not None:
+            items = [i for i in items if i.status == status]
+        return items[offset : offset + limit], len(items)
 
-    async def create(self, **kwargs):
-        raise NotImplementedError
+    async def create(
+        self,
+        *,
+        project_id,
+        environment_id,
+        alert_rule_id,
+        source,
+        category,
+        severity,
+        title,
+        alert_correlation_id=None,
+        log_ref_id=None,
+    ):
+        row = IncidentRead(
+            id=uuid4(),
+            project_id=project_id,
+            environment_id=environment_id,
+            alert_rule_id=alert_rule_id,
+            source=source,
+            category=category,
+            severity=severity,
+            status=IncidentStatus.OPEN,
+            title=title,
+            log_ref_id=log_ref_id,
+            detected_at=datetime.now(UTC),
+            acknowledged_at=None,
+            acknowledged_by=None,
+            resolved_at=None,
+            resolved_by=None,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        self._rows[row.id] = row
+        self._correlation_ids[row.id] = alert_correlation_id
+        return row
 
     async def update_status(self, incident_id, *, status, actor_id, at):
-        raise NotImplementedError
+        existing = self._rows[incident_id]
+        updates = {"status": status}
+        if status == IncidentStatus.ACKNOWLEDGED:
+            updates["acknowledged_at"] = at
+            updates["acknowledged_by"] = actor_id
+        elif status == IncidentStatus.RESOLVED:
+            updates["resolved_at"] = at
+            updates["resolved_by"] = actor_id
+        updated = existing.model_copy(update=updates)
+        self._rows[incident_id] = updated
+        return updated
 
 
 class FakeObservabilityUnitOfWork(AbstractObservabilityUnitOfWork):
@@ -1032,3 +1095,238 @@ class TestListAlertRules:
 
         assert len(rules) == 1
         assert rules[0].name == "A"
+
+
+class FakeNotificationsApiForWebhook:
+    def __init__(self, raises: bool = False) -> None:
+        self._raises = raises
+        self.dispatched: list[tuple] = []
+
+    async def dispatch(self, channel_id, message):
+        if self._raises:
+            raise RuntimeError("dispatch failed")
+        self.dispatched.append((channel_id, message))
+
+
+_CF_PAYLOAD_BASE = {
+    "name": "n",
+    "text": "DDoS attack detected on zone example.com",
+    "data": {},
+    "ts": 1136214245,
+    "account_id": "acc1",
+    "policy_id": "policy-789",
+    "policy_name": "n",
+    "alert_type": "advanced_ddos_attack_l4_alert",
+    "alert_correlation_id": "corr-1",
+    "alert_event": "ALERT_STATE_EVENT_START",
+}
+
+
+class TestHandleCloudflareWebhook:
+    async def test_creates_incident_for_matching_policy(self) -> None:
+        env_id, project_id = uuid4(), uuid4()
+        uow = FakeObservabilityUnitOfWork()
+        rule = await uow.alert_rules.create(
+            environment_id=env_id,
+            name="n",
+            source=AlertRuleSource.CLOUDFLARE_NATIVE,
+            cf_alert_type="advanced_ddos_attack_l4_alert",
+            severity=AlertSeverity.HIGH,
+        )
+        await uow.alert_rules.set_cf_policy_id(rule.id, cf_policy_id="policy-789")
+        notifications_api = FakeNotificationsApiForWebhook()
+        use_case = HandleCloudflareWebhook(
+            uow,
+            notifications_api=notifications_api,
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id)}),
+            audit_api=FakeAuditApi(),
+        )
+        await use_case.execute(cloudflare_account_id=uuid4(), payload=_CF_PAYLOAD_BASE)
+
+        incidents, _ = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert len(incidents) == 1
+        assert incidents[0].category == IncidentCategory.DDOS
+        assert incidents[0].severity == AlertSeverity.HIGH
+        assert incidents[0].title == "DDoS attack detected on zone example.com"
+
+    async def test_ignores_end_event(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        use_case = HandleCloudflareWebhook(
+            uow,
+            notifications_api=FakeNotificationsApiForWebhook(),
+            projects_api=FakeProjectsApi({}),
+            audit_api=FakeAuditApi(),
+        )
+        payload = {**_CF_PAYLOAD_BASE, "alert_event": "ALERT_STATE_EVENT_END"}
+        await use_case.execute(cloudflare_account_id=uuid4(), payload=payload)
+        incidents, _ = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert incidents == []
+
+    async def test_dedupes_by_correlation_id(self) -> None:
+        env_id, project_id = uuid4(), uuid4()
+        uow = FakeObservabilityUnitOfWork()
+        rule = await uow.alert_rules.create(
+            environment_id=env_id,
+            name="n",
+            source=AlertRuleSource.CLOUDFLARE_NATIVE,
+            cf_alert_type="advanced_ddos_attack_l4_alert",
+            severity=AlertSeverity.HIGH,
+        )
+        await uow.alert_rules.set_cf_policy_id(rule.id, cf_policy_id="policy-789")
+        use_case = HandleCloudflareWebhook(
+            uow,
+            notifications_api=FakeNotificationsApiForWebhook(),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id)}),
+            audit_api=FakeAuditApi(),
+        )
+        await use_case.execute(cloudflare_account_id=uuid4(), payload=_CF_PAYLOAD_BASE)
+        await use_case.execute(cloudflare_account_id=uuid4(), payload=_CF_PAYLOAD_BASE)
+        incidents, total = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert total == 1
+
+    async def test_unmatched_policy_id_skips_without_raising(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        use_case = HandleCloudflareWebhook(
+            uow,
+            notifications_api=FakeNotificationsApiForWebhook(),
+            projects_api=FakeProjectsApi({}),
+            audit_api=FakeAuditApi(),
+        )
+        await use_case.execute(cloudflare_account_id=uuid4(), payload=_CF_PAYLOAD_BASE)
+        incidents, _ = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert incidents == []
+
+    async def test_failed_notification_dispatch_does_not_block_incident_creation(self) -> None:
+        env_id, project_id = uuid4(), uuid4()
+        uow = FakeObservabilityUnitOfWork()
+        rule = await uow.alert_rules.create(
+            environment_id=env_id,
+            name="n",
+            source=AlertRuleSource.CLOUDFLARE_NATIVE,
+            cf_alert_type="advanced_ddos_attack_l4_alert",
+            severity=AlertSeverity.HIGH,
+        )
+        await uow.alert_rules.set_cf_policy_id(rule.id, cf_policy_id="policy-789")
+        await uow.alert_rules.set_channels(rule.id, [uuid4()])
+        failing_notifications_api = FakeNotificationsApiForWebhook(raises=True)
+        use_case = HandleCloudflareWebhook(
+            uow,
+            notifications_api=failing_notifications_api,
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id)}),
+            audit_api=FakeAuditApi(),
+        )
+        await use_case.execute(cloudflare_account_id=uuid4(), payload=_CF_PAYLOAD_BASE)
+        incidents, total = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert total == 1
+
+
+_LOKI_ALERT_BASE = {
+    "status": "firing",
+    "labels": {"alertname": "HighErrorRate", "app_alert_rule_id": ""},
+    "annotations": {"summary": "Error rate exceeded threshold"},
+    "fingerprint": "fp-1",
+}
+
+
+class TestHandleLokiWebhook:
+    async def test_creates_incident_for_matching_rule(self) -> None:
+        env_id, project_id = uuid4(), uuid4()
+        uow = FakeObservabilityUnitOfWork()
+        rule = await uow.alert_rules.create(
+            environment_id=env_id,
+            name="Error rate",
+            source=AlertRuleSource.LOKI_QUERY,
+            condition={"query": "{}"},
+            severity=AlertSeverity.MEDIUM,
+        )
+        use_case = HandleLokiWebhook(
+            uow,
+            notifications_api=FakeNotificationsApiForWebhook(),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id)}),
+            audit_api=FakeAuditApi(),
+        )
+        rule_labels = {**_LOKI_ALERT_BASE["labels"], "app_alert_rule_id": str(rule.id)}
+        payload = {"alerts": [{**_LOKI_ALERT_BASE, "labels": rule_labels}]}
+        await use_case.execute(payload)
+
+        incidents, _ = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert len(incidents) == 1
+        assert incidents[0].category == IncidentCategory.LOG_MATCH
+        assert incidents[0].severity == AlertSeverity.MEDIUM
+        assert incidents[0].title == "Error rate exceeded threshold"
+
+    async def test_ignores_resolved_status(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        use_case = HandleLokiWebhook(
+            uow,
+            notifications_api=FakeNotificationsApiForWebhook(),
+            projects_api=FakeProjectsApi({}),
+            audit_api=FakeAuditApi(),
+        )
+        payload = {"alerts": [{**_LOKI_ALERT_BASE, "status": "resolved"}]}
+        await use_case.execute(payload)
+        incidents, _ = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert incidents == []
+
+    async def test_missing_label_skips_without_raising(self) -> None:
+        uow = FakeObservabilityUnitOfWork()
+        use_case = HandleLokiWebhook(
+            uow,
+            notifications_api=FakeNotificationsApiForWebhook(),
+            projects_api=FakeProjectsApi({}),
+            audit_api=FakeAuditApi(),
+        )
+        payload = {"alerts": [{**_LOKI_ALERT_BASE, "labels": {"alertname": "x"}}]}
+        await use_case.execute(payload)
+        incidents, _ = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert incidents == []
+
+    async def test_dedupes_by_fingerprint(self) -> None:
+        env_id, project_id = uuid4(), uuid4()
+        uow = FakeObservabilityUnitOfWork()
+        rule = await uow.alert_rules.create(
+            environment_id=env_id,
+            name="Error rate",
+            source=AlertRuleSource.LOKI_QUERY,
+            condition={"query": "{}"},
+            severity=AlertSeverity.MEDIUM,
+        )
+        use_case = HandleLokiWebhook(
+            uow,
+            notifications_api=FakeNotificationsApiForWebhook(),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id)}),
+            audit_api=FakeAuditApi(),
+        )
+        rule_labels = {**_LOKI_ALERT_BASE["labels"], "app_alert_rule_id": str(rule.id)}
+        payload = {"alerts": [{**_LOKI_ALERT_BASE, "labels": rule_labels}]}
+        await use_case.execute(payload)
+        await use_case.execute(payload)
+        incidents, total = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert total == 1
+
+    async def test_batch_continues_after_one_bad_entry(self) -> None:
+        env_id, project_id = uuid4(), uuid4()
+        uow = FakeObservabilityUnitOfWork()
+        rule = await uow.alert_rules.create(
+            environment_id=env_id,
+            name="Error rate",
+            source=AlertRuleSource.LOKI_QUERY,
+            condition={"query": "{}"},
+            severity=AlertSeverity.MEDIUM,
+        )
+        use_case = HandleLokiWebhook(
+            uow,
+            notifications_api=FakeNotificationsApiForWebhook(),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id)}),
+            audit_api=FakeAuditApi(),
+        )
+        good_alert = {
+            **_LOKI_ALERT_BASE,
+            "fingerprint": "fp-2",
+            "labels": {**_LOKI_ALERT_BASE["labels"], "app_alert_rule_id": str(rule.id)},
+        }
+        bad_alert = {**_LOKI_ALERT_BASE, "fingerprint": "fp-3", "labels": {"alertname": "x"}}
+        payload = {"alerts": [bad_alert, good_alert]}
+        await use_case.execute(payload)
+        incidents, total = await uow.incidents.list_page_filtered(limit=10, offset=0)
+        assert total == 1
