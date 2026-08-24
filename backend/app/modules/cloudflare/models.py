@@ -27,6 +27,8 @@ class CloudflareAccount(Base):
     label: Mapped[str] = mapped_column(String(CloudflareAccountLimits.MAX_LABEL_LENGTH))
     cf_account_id: Mapped[str] = mapped_column(String(CloudflareAccountLimits.MAX_CF_ACCOUNT_ID_LENGTH))
     api_token: Mapped[str] = mapped_column(Text)
+    cf_webhook_destination_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    webhook_secret_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

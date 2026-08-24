@@ -1,4 +1,4 @@
-from app.core.exceptions import ConflictError, NotFoundError
+from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationFailedError
 from app.modules.observability.constants import ErrorCode
 
 
@@ -24,3 +24,34 @@ class ObservabilityEnvironmentNotFound(NotFoundError):
 
     code = ErrorCode.ENVIRONMENT_NOT_FOUND
     message = "Environment not found"
+
+
+class AlertRuleNotFound(NotFoundError):
+    code = ErrorCode.ALERT_RULE_NOT_FOUND
+    message = "Alert rule not found"
+
+
+class IncidentNotFound(NotFoundError):
+    code = ErrorCode.INCIDENT_NOT_FOUND
+    message = "Incident not found"
+
+
+class InvalidIncidentTransition(ValidationFailedError):
+    code = ErrorCode.INVALID_INCIDENT_TRANSITION
+    message = "This status change is not allowed from the incident's current state"
+
+
+class InvalidWebhookSecret(ForbiddenError):
+    """The one 401 in this codebase outside auth/ — mirrors auth/exceptions.py's
+    NotAuthenticated, the only existing precedent for overriding status_code."""
+
+    code = ErrorCode.INVALID_WEBHOOK_SECRET
+    message = "Invalid webhook secret"
+    status_code = 401
+
+
+class CloudflarePolicyNotFound(Exception):
+    """Internal control-flow signal only — never raised past the webhook
+    receiver's own handler; a webhook whose policy_id matches nothing logs a
+    warning and returns 200, it never surfaces this as an HTTP error to
+    Cloudflare."""
