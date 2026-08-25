@@ -20,8 +20,8 @@ class TestRejectsUnassignable:
         assert ProjectRoleRules.rejects_unassignable([("environment", "update"), ("project", "read")]) == []
 
     def test_rejects_user_update_status(self) -> None:
-        rejected = ProjectRoleRules.rejects_unassignable([("environment", "update"), ("user", "update_status")])
-        assert rejected == [("user", "update_status")]
+        keys = [("environment", "update"), ("user", "update_status")]
+        assert ProjectRoleRules.rejects_unassignable(keys) == [("user", "update_status")]
 
     def test_rejects_project_delete(self) -> None:
         assert ProjectRoleRules.rejects_unassignable([("project", "delete")]) == [("project", "delete")]
@@ -41,4 +41,5 @@ class TestEffectivePermissions:
     def test_overlapping_keys_do_not_duplicate(self) -> None:
         global_keys = frozenset({"environment.read"})
         project_keys = frozenset({"environment.read"})
-        assert ProjectRoleRules.effective_permissions(global_keys, project_keys) == frozenset({"environment.read"})
+        result = ProjectRoleRules.effective_permissions(global_keys, project_keys)
+        assert result == frozenset({"environment.read"})
