@@ -47,6 +47,9 @@
     "environments": "Chưa có môi trường nào.",
     "links": "Chưa có liên kết nào."
   },
+  "noPermission": {
+    "environments": "Bạn không có quyền xem môi trường của dự án này."
+  },
   "form": {
     "nameLabel": "Tên",
     "descriptionLabel": "Mô tả",

@@ -47,6 +47,9 @@
     "environments": "No environments yet.",
     "links": "No links yet."
   },
+  "noPermission": {
+    "environments": "You don't have permission to view this project's environments."
+  },
   "form": {
     "nameLabel": "Name",
     "descriptionLabel": "Description",

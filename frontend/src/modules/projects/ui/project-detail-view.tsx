@@ -17,7 +17,13 @@ import { useDeleteProjectLink } from "../hooks/use-delete-project-link";
 import { EnvironmentFormDialog } from "./environment-form-dialog";
 import { ProjectLinkFormDialog } from "./project-link-form-dialog";
 
-export function ProjectDetailView({
+/**
+ * useProjectEnvironmentsQuery is a Suspense query with no built-in "disabled"
+ * mode, so this must stay unmounted (not just visually hidden) for a caller
+ * without environment:read — gated via <Can>'s children-as-ReactNode prop in
+ * ProjectDetailView, never rendered directly.
+ */
+function EnvironmentsSection({
   projectId,
   onManageTunnels,
   onManageLogs,
@@ -29,28 +35,14 @@ export function ProjectDetailView({
   onManageAlerting: (environment: Environment) => void;
 }) {
   const t = useTranslations("projects");
-  const { data: project } = useProjectQuery(projectId);
   const { data: environments } = useProjectEnvironmentsQuery(projectId);
-  const { data: links = [] } = useQuery({
-    queryKey: projectLinksKeys.forProject(projectId),
-    queryFn: () => fetchProjectLinks(projectId),
-  });
-
   const deleteEnvironment = useDeleteEnvironment(projectId);
-  const deleteLink = useDeleteProjectLink(projectId);
 
   const [envFormTarget, setEnvFormTarget] = useState<Environment | "create" | null>(null);
   const [envDeleteTarget, setEnvDeleteTarget] = useState<Environment | null>(null);
-  const [linkFormTarget, setLinkFormTarget] = useState<ProjectLink | "create" | null>(null);
-  const [linkDeleteTarget, setLinkDeleteTarget] = useState<ProjectLink | null>(null);
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-bold text-foreground">{project.name}</h1>
-        {project.description && <p className="text-sm text-muted-foreground">{project.description}</p>}
-      </div>
-
+    <>
       <section className="flex flex-col gap-3 rounded-xl border bg-card p-5">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-sm font-bold text-foreground">
@@ -128,6 +120,82 @@ export function ProjectDetailView({
         </div>
       </section>
 
+      {envFormTarget !== null && (
+        <EnvironmentFormDialog
+          isOpen
+          onClose={() => setEnvFormTarget(null)}
+          projectId={projectId}
+          environment={envFormTarget === "create" ? null : envFormTarget}
+          existingTypes={environments.map((e) => e.type)}
+        />
+      )}
+      <ConfirmDialog
+        isOpen={envDeleteTarget !== null}
+        onClose={() => setEnvDeleteTarget(null)}
+        onConfirm={() => {
+          if (envDeleteTarget) {
+            deleteEnvironment.mutate(envDeleteTarget.id, { onSuccess: () => setEnvDeleteTarget(null) });
+          }
+        }}
+        title={t("deleteConfirm.environmentTitle")}
+        description={t("deleteConfirm.environmentDescription", { name: envDeleteTarget?.name ?? "" })}
+        isLoading={deleteEnvironment.isPending}
+      />
+    </>
+  );
+}
+
+function EnvironmentsSectionNoPermission() {
+  const t = useTranslations("projects");
+  return (
+    <section className="flex flex-col gap-3 rounded-xl border bg-card p-5">
+      <h2 className="flex items-center gap-2 text-sm font-bold text-foreground">
+        <Server className="size-4" /> {t("sections.environments")}
+      </h2>
+      <p className="text-sm text-muted-foreground">{t("noPermission.environments")}</p>
+    </section>
+  );
+}
+
+export function ProjectDetailView({
+  projectId,
+  onManageTunnels,
+  onManageLogs,
+  onManageAlerting,
+}: {
+  projectId: string;
+  onManageTunnels: (environment: Environment) => void;
+  onManageLogs: (environment: Environment) => void;
+  onManageAlerting: (environment: Environment) => void;
+}) {
+  const t = useTranslations("projects");
+  const { data: project } = useProjectQuery(projectId);
+  const { data: links = [] } = useQuery({
+    queryKey: projectLinksKeys.forProject(projectId),
+    queryFn: () => fetchProjectLinks(projectId),
+  });
+
+  const deleteLink = useDeleteProjectLink(projectId);
+
+  const [linkFormTarget, setLinkFormTarget] = useState<ProjectLink | "create" | null>(null);
+  const [linkDeleteTarget, setLinkDeleteTarget] = useState<ProjectLink | null>(null);
+
+  return (
+    <div className="flex flex-1 flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-xl font-bold text-foreground">{project.name}</h1>
+        {project.description && <p className="text-sm text-muted-foreground">{project.description}</p>}
+      </div>
+
+      <Can I={ACTIONS.READ} a={RESOURCES.ENVIRONMENT} fallback={<EnvironmentsSectionNoPermission />}>
+        <EnvironmentsSection
+          projectId={projectId}
+          onManageTunnels={onManageTunnels}
+          onManageLogs={onManageLogs}
+          onManageAlerting={onManageAlerting}
+        />
+      </Can>
+
       <section className="flex flex-col gap-3 rounded-xl border bg-card p-5">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-sm font-bold text-foreground">
@@ -181,28 +249,6 @@ export function ProjectDetailView({
           ))}
         </div>
       </section>
-
-      {envFormTarget !== null && (
-        <EnvironmentFormDialog
-          isOpen
-          onClose={() => setEnvFormTarget(null)}
-          projectId={projectId}
-          environment={envFormTarget === "create" ? null : envFormTarget}
-          existingTypes={environments.map((e) => e.type)}
-        />
-      )}
-      <ConfirmDialog
-        isOpen={envDeleteTarget !== null}
-        onClose={() => setEnvDeleteTarget(null)}
-        onConfirm={() => {
-          if (envDeleteTarget) {
-            deleteEnvironment.mutate(envDeleteTarget.id, { onSuccess: () => setEnvDeleteTarget(null) });
-          }
-        }}
-        title={t("deleteConfirm.environmentTitle")}
-        description={t("deleteConfirm.environmentDescription", { name: envDeleteTarget?.name ?? "" })}
-        isLoading={deleteEnvironment.isPending}
-      />
 
       {linkFormTarget !== null && (
         <ProjectLinkFormDialog
