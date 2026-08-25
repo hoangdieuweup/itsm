@@ -9,14 +9,56 @@ import { Can } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useCloudflareAccountQuery } from "@/entities/cloudflare-account";
+import { ACCESS_LEVEL, type AccessLevel, type CloudflareAccountManager } from "../api/fetchers";
 import { useTestCloudflareAccountConnection } from "../hooks/use-test-cloudflare-account-connection";
 import { useRevealCloudflareAccountToken } from "../hooks/use-reveal-cloudflare-account-token";
 import { useCloudflareAccountManagersQuery } from "../hooks/use-cloudflare-account-managers";
 import { useRemoveCloudflareAccountManager } from "../hooks/use-remove-cloudflare-account-manager";
+import { useUpdateCloudflareAccountManager } from "../hooks/use-update-cloudflare-account-manager";
 import { CloudflareAccountManagerFormDialog } from "./cloudflare-account-manager-form-dialog";
 
 interface CloudflareAccountDetailViewProps {
   accountId: string;
+}
+
+/** Read-only display for a viewer without manage permission; an editable
+ * select for a manager, so changing a manager's level doesn't require
+ * removing and re-assigning them. */
+function ManagerAccessLevelControl({
+  manager,
+  onChange,
+  disabled,
+}: {
+  manager: CloudflareAccountManager;
+  onChange: (accessLevel: AccessLevel) => void;
+  disabled: boolean;
+}) {
+  const t = useTranslations("cloudflareAccounts");
+  return (
+    <Can
+      I={ACTIONS.MANAGE}
+      a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}
+      fallback={
+        <span className="text-xs uppercase text-muted-foreground">
+          {t(`managers.levels.${manager.accessLevel}`)}
+        </span>
+      }
+    >
+      <select
+        value={manager.accessLevel}
+        onChange={(event) => onChange(event.target.value as AccessLevel)}
+        disabled={disabled}
+        aria-label={t("managers.accessLevel")}
+        className="h-8 rounded-md border border-input bg-background px-2 text-xs uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {Object.values(ACCESS_LEVEL).map((level) => (
+          <option key={level} value={level}>
+            {t(`managers.levels.${level}`)}
+          </option>
+        ))}
+      </select>
+    </Can>
+  );
 }
 
 export function CloudflareAccountDetailView({ accountId }: CloudflareAccountDetailViewProps) {
@@ -28,6 +70,7 @@ export function CloudflareAccountDetailView({ accountId }: CloudflareAccountDeta
   const testConnection = useTestCloudflareAccountConnection();
   const revealToken = useRevealCloudflareAccountToken();
   const removeManager = useRemoveCloudflareAccountManager(accountId);
+  const updateManager = useUpdateCloudflareAccountManager(accountId);
 
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
@@ -125,6 +168,13 @@ export function CloudflareAccountDetailView({ accountId }: CloudflareAccountDeta
           </Can>
         </div>
 
+        {updateManager.isError && (
+          <p role="alert" className="mb-3 flex items-center gap-1.5 text-sm text-destructive">
+            <ShieldAlert className="size-4" aria-hidden="true" />
+            {getErrorMessage(updateManager.error)}
+          </p>
+        )}
+
         {managers.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("managers.empty")}</p>
         ) : (
@@ -136,9 +186,13 @@ export function CloudflareAccountDetailView({ accountId }: CloudflareAccountDeta
                   <p className="text-muted-foreground">{manager.email}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs uppercase text-muted-foreground">
-                    {t(`managers.levels.${manager.accessLevel}`)}
-                  </span>
+                  <ManagerAccessLevelControl
+                    manager={manager}
+                    disabled={updateManager.isPending}
+                    onChange={(accessLevel) =>
+                      updateManager.mutate({ userId: manager.userId, accessLevel })
+                    }
+                  />
                   <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
                     <Button
                       variant="ghost"

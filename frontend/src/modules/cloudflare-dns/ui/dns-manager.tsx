@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Cloud, Globe, Plus, Pencil, Trash2, ExternalLink } from "lucide-react";
+import { Cloud, Globe, Pencil, Trash2, ExternalLink } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
@@ -15,12 +15,7 @@ import type { DnsRecord } from "../model/schema";
 import { CloudflareBindingForm } from "./cloudflare-binding-form";
 import { DnsRecordFormDialog } from "./dns-record-form-dialog";
 
-/**
- * The reusable DNS-management surface — binding form, zone header, records
- * table — with no page-level chrome of its own. Shared by the full-page
- * route (`CloudflareDnsPageContent`, which adds the `<h1>`/padding wrapper)
- * and the inline drawer opened from the environment chip on Project Detail.
- */
+
 export function DnsManager({ environmentId }: { environmentId: string }) {
   const t = useTranslations("cloudflareDns");
   const { data: config, isLoading: configLoading } = useCloudflareConfigQuery(environmentId);
@@ -68,11 +63,6 @@ export function DnsManager({ environmentId }: { environmentId: string }) {
               <h2 className="flex items-center gap-2 text-sm font-bold text-foreground">
                 <Globe className="size-4" aria-hidden="true" /> {t("records.title")}
               </h2>
-              <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
-                <Button size="sm" onClick={() => setRecordFormTarget("create")}>
-                  <Plus className="mr-1.5 size-3.5" aria-hidden="true" /> {t("records.addRecord")}
-                </Button>
-              </Can>
             </div>
 
             {records.length === 0 ? (

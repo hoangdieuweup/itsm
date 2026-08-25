@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Waypoints, Plus, Trash2, RefreshCw, KeyRound } from "lucide-react";
-import { Button } from "@/shared/ui/button";
+import { Waypoints, Trash2, RefreshCw, KeyRound } from "lucide-react";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
@@ -17,7 +16,6 @@ import {
 import { useTunnelHostnamesQuery } from "../hooks/use-tunnel-hostnames";
 import type { CloudflareTunnel } from "../model/schema";
 import { TunnelStatusBadge } from "./tunnel-status-badge";
-import { CreateTunnelDialog } from "./create-tunnel-dialog";
 import { TunnelHostnamesPanel } from "./tunnel-hostnames-panel";
 
 /**
@@ -69,7 +67,6 @@ export function TunnelsManager({ environmentId }: { environmentId: string }) {
     }
   }, [syncMutation]);
 
-  const [createOpen, setCreateOpen] = useState(false);
   const [selectedTunnelId, setSelectedTunnelId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CloudflareTunnel | null>(null);
   const [revealedToken, setRevealedToken] = useState<{ tunnelId: string; token: string } | null>(null);
@@ -81,11 +78,6 @@ export function TunnelsManager({ environmentId }: { environmentId: string }) {
           <h2 className="flex items-center gap-2 text-sm font-bold text-foreground">
             <Waypoints className="size-4" aria-hidden="true" /> {t("title")}
           </h2>
-          <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-1.5 size-3.5" aria-hidden="true" /> {t("addTunnel")}
-            </Button>
-          </Can>
         </div>
 
         {tunnels.length === 0 ? (
@@ -160,8 +152,6 @@ export function TunnelsManager({ environmentId }: { environmentId: string }) {
       )}
 
       {selectedTunnelId && <TunnelHostnamesPanel environmentId={environmentId} tunnelId={selectedTunnelId} />}
-
-      {createOpen && <CreateTunnelDialog environmentId={environmentId} onClose={() => setCreateOpen(false)} />}
 
       <ConfirmDialog
         isOpen={deleteTarget !== null}
