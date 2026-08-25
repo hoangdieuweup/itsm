@@ -217,11 +217,17 @@ class CloudflareClient:
     ) -> list[dict]:
         """GET /accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}/configurations.
         Returns the raw ingress array — Decision #2: this is the only source
-        of truth for fields this app doesn't model (path, originRequest)."""
+        of truth for fields this app doesn't model (path, originRequest).
+
+        Cloudflare returns "config": null (not a missing key) for a tunnel
+        that has never had its remote configuration set — dict.get's default
+        only kicks in for a MISSING key, not one present with a null value,
+        so a bare `.get("config", {})` still crashes on that response."""
         body = await self._write(
             f"/accounts/{cf_account_id}/cfd_tunnel/{cf_tunnel_id}/configurations", "GET", api_token
         )
-        return body["result"].get("config", {}).get("ingress", [])
+        config = body["result"].get("config") or {}
+        return config.get("ingress") or []
 
     @integration
     async def put_tunnel_configuration(

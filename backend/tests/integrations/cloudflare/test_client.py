@@ -330,6 +330,32 @@ class TestGetTunnelConfiguration:
         )
         assert ingress == []
 
+    async def test_returns_empty_list_when_config_is_explicitly_null(self) -> None:
+        """Regression test: Cloudflare returns "config": null (not a missing
+        key) for a tunnel that has never had its remote configuration set —
+        dict.get's default only applies to a missing key, not a present key
+        whose value is null, so this previously crashed with
+        AttributeError: 'NoneType' object has no attribute 'get'."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"success": True, "result": {"config": None}})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        ingress = await client.get_tunnel_configuration(
+            cf_account_id="acc-1", cf_tunnel_id="tun-1", api_token="tok"
+        )
+        assert ingress == []
+
+    async def test_returns_empty_list_when_ingress_is_explicitly_null(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"success": True, "result": {"config": {"ingress": None}}})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        ingress = await client.get_tunnel_configuration(
+            cf_account_id="acc-1", cf_tunnel_id="tun-1", api_token="tok"
+        )
+        assert ingress == []
+
 
 class TestPutTunnelConfiguration:
     async def test_sends_ingress_array(self) -> None:
