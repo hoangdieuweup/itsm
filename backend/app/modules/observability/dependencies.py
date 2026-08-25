@@ -11,11 +11,18 @@ from app.core.database import get_session
 from app.integrations.loki.client import LokiClient
 from app.integrations.loki.dependencies import get_loki_client
 from app.modules.audit.public import AuditApi, get_audit_api
+from app.modules.auth.public import AuthApi, get_auth_api
 from app.modules.cloudflare.public import CloudflareApi, get_cloudflare_api
 from app.modules.notifications.public import NotificationsApi, get_notifications_api
 from app.modules.observability.config import observability_settings
 from app.modules.observability.constants import ObservabilityDefaults
-from app.modules.observability.exceptions import InvalidWebhookSecret
+from app.modules.observability.exceptions import (
+    AlertRuleNotFound,
+    IncidentNotFound,
+    InvalidWebhookSecret,
+    ObservabilityEnvironmentNotFound,
+    ObservabilityPermissionDenied,
+)
 from app.modules.observability.services.acknowledge_incident import AcknowledgeIncident
 from app.modules.observability.services.create_alert_rule import CreateAlertRule
 from app.modules.observability.services.create_loki_config import CreateLokiConfig
@@ -36,11 +43,89 @@ from app.modules.observability.services.update_alert_rule import UpdateAlertRule
 from app.modules.observability.services.update_loki_config import UpdateLokiConfig
 from app.modules.observability.uow import AbstractObservabilityUnitOfWork, ObservabilityUnitOfWork
 from app.modules.projects.public import ProjectsApi, get_projects_api
+from app.modules.rbac.public import RbacApi, get_rbac_api
+from app.modules.users.public import UserRead
 
 
 async def get_uow(session: AsyncSession = Depends(get_session)) -> ObservabilityUnitOfWork:
     """Provide a request scoped unit of work. The one place the concrete class is named."""
     return ObservabilityUnitOfWork(session)
+
+
+def require_project_permission_for_environment(resource: str, action: str):
+    """Environment-scoped project-permission gate — the observability
+    module's own thin wrapper, since require_project_permission_for_
+    environment in projects/dependencies.py cannot be imported directly
+    (cross-module boundary only permits projects.public, which does not
+    export it). Delegates the actual union computation to
+    ProjectsApi.resolve_effective_permissions (the one sanctioned path)."""
+
+    async def check(
+        environment_id: UUID,
+        auth_api: AuthApi = Depends(get_auth_api),
+        rbac_api: RbacApi = Depends(get_rbac_api),
+        projects_api: ProjectsApi = Depends(get_projects_api),
+    ) -> UserRead:
+        user = auth_api.current_user()
+        environment = await projects_api.get_environment_by_id(environment_id)
+        if environment is None:
+            raise ObservabilityEnvironmentNotFound()
+        permissions = await projects_api.resolve_effective_permissions(environment.project_id, user, rbac_api)
+        if f"{resource}.{action}" not in permissions:
+            raise ObservabilityPermissionDenied()
+        return user
+
+    return check
+
+
+def require_project_permission_for_alert_rule(resource: str, action: str):
+    """Same shape as require_project_permission_for_environment, keyed by
+    alert_rule_id — resolves AlertRule.environment_id first (AlertRule has
+    no project_id column of its own, only environment_id)."""
+
+    async def check(
+        alert_rule_id: UUID,
+        auth_api: AuthApi = Depends(get_auth_api),
+        rbac_api: RbacApi = Depends(get_rbac_api),
+        uow: AbstractObservabilityUnitOfWork = Depends(get_uow),
+        projects_api: ProjectsApi = Depends(get_projects_api),
+    ) -> UserRead:
+        user = auth_api.current_user()
+        alert_rule = await uow.alert_rules.get_by_id(alert_rule_id)
+        if alert_rule is None:
+            raise AlertRuleNotFound()
+        environment = await projects_api.get_environment_by_id(alert_rule.environment_id)
+        if environment is None:
+            raise AlertRuleNotFound()
+        permissions = await projects_api.resolve_effective_permissions(environment.project_id, user, rbac_api)
+        if f"{resource}.{action}" not in permissions:
+            raise ObservabilityPermissionDenied()
+        return user
+
+    return check
+
+
+def require_project_permission_for_incident(resource: str, action: str):
+    """Same shape, keyed by incident_id — Incident has its OWN project_id
+    column directly (unlike AlertRule), so no environment lookup needed."""
+
+    async def check(
+        incident_id: UUID,
+        auth_api: AuthApi = Depends(get_auth_api),
+        rbac_api: RbacApi = Depends(get_rbac_api),
+        uow: AbstractObservabilityUnitOfWork = Depends(get_uow),
+        projects_api: ProjectsApi = Depends(get_projects_api),
+    ) -> UserRead:
+        user = auth_api.current_user()
+        incident = await uow.incidents.get_by_id(incident_id)
+        if incident is None:
+            raise IncidentNotFound()
+        permissions = await projects_api.resolve_effective_permissions(incident.project_id, user, rbac_api)
+        if f"{resource}.{action}" not in permissions:
+            raise ObservabilityPermissionDenied()
+        return user
+
+    return check
 
 
 async def get_create_loki_config(
