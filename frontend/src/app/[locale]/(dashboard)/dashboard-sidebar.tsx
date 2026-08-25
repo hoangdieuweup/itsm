@@ -259,6 +259,164 @@ function SidebarUserProfile({
   );
 }
 
+interface SidebarFooterProps {
+  isCollapsed?: boolean;
+  languageLabel: string;
+  expandSidebarLabel?: string;
+  onToggleExpand?: () => void;
+  session?: ReturnType<typeof useAuthSession>["data"];
+  logoutLabel: string;
+  onLogout: () => void;
+  isLogoutPending: boolean;
+}
+
+function SidebarFooter({
+  isCollapsed,
+  languageLabel,
+  expandSidebarLabel,
+  onToggleExpand,
+  session,
+  logoutLabel,
+  onLogout,
+  isLogoutPending,
+}: SidebarFooterProps) {
+  if (isCollapsed) {
+    return (
+      <div className="flex flex-col gap-2.5 p-3">
+        <div className="flex justify-center pb-2">
+          <button
+            type="button"
+            onClick={onToggleExpand}
+            aria-label={expandSidebarLabel}
+            className="flex size-9 items-center justify-center rounded-xl bg-muted/40 text-muted-foreground shadow-2xs transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
+            title={expandSidebarLabel}
+          >
+            <ChevronRight className="size-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const initials = getInitials(session?.user?.name);
+  const userName = session?.user?.name || "";
+  const roleName = session?.roleName || "User";
+
+  return (
+    <div className="flex flex-col gap-2.5 p-3">
+      <div className="flex items-center justify-between px-2">
+        <span className="text-xs font-medium text-muted-foreground">
+          {languageLabel}
+        </span>
+        <LanguageSwitch />
+      </div>
+
+      {session?.user && (
+        <SidebarUserProfile
+          name={userName}
+          roleName={roleName}
+          initials={initials}
+          logoutLabel={logoutLabel}
+          onLogout={onLogout}
+          isPending={isLogoutPending}
+        />
+      )}
+    </div>
+  );
+}
+
+function MobileSidebarDrawer({
+  isOpen,
+  onClose,
+  appName,
+  mainMenuLabel,
+  languageLabel,
+  logoutLabel,
+  navItems,
+  session,
+  onLogout,
+  isLogoutPending,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  appName: string;
+  mainMenuLabel: string;
+  languageLabel: string;
+  logoutLabel: string;
+  navItems: NavItem[];
+  session?: ReturnType<typeof useAuthSession>["data"];
+  onLogout: () => void;
+  isLogoutPending: boolean;
+}) {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-50 md:hidden"
+          role="dialog"
+          aria-modal="true"
+        >
+          <m.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+          />
+
+          <m.aside
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 260 }}
+            className="fixed inset-y-0 left-0 z-10 flex w-72 max-w-[80vw] flex-col rounded-r-2xl bg-card shadow-2xl"
+          >
+            <div className="flex h-16 items-center justify-between px-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-black text-base shadow-sm shadow-blue-500/25">
+                  W
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-base font-bold tracking-tight text-foreground">
+                    {appName}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    ITSM Console
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={mainMenuLabel}
+                className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <SidebarNavList
+              items={navItems}
+              mainMenuLabel={mainMenuLabel}
+              onItemClick={onClose}
+            />
+
+            <SidebarFooter
+              languageLabel={languageLabel}
+              session={session}
+              logoutLabel={logoutLabel}
+              onLogout={onLogout}
+              isLogoutPending={isLogoutPending}
+            />
+          </m.aside>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 export function DashboardSidebar({
   mobileOpen,
   onMobileClose,
@@ -330,10 +488,6 @@ export function DashboardSidebar({
     },
   ];
 
-  const initials = getInitials(session?.user?.name);
-  const userName = session?.user?.name || "";
-  const roleName = session?.roleName || "User";
-
   return (
     <>
       {/* 1. Desktop Permanent Sidebar */}
@@ -358,121 +512,31 @@ export function DashboardSidebar({
           mainMenuLabel={t("mainMenu")}
         />
 
-        <div className="flex flex-col gap-2.5 p-3">
-          {isCollapsed ? (
-            <div className="flex justify-center pb-2">
-              <button
-                type="button"
-                onClick={() => sidebarStore.toggle(isCollapsed)}
-                aria-label={t("expandSidebar")}
-                className="flex size-9 items-center justify-center rounded-xl bg-muted/40 text-muted-foreground shadow-2xs transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
-                title={t("expandSidebar")}
-              >
-                <ChevronRight className="size-4" />
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between px-2">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {t("language")}
-                </span>
-                <LanguageSwitch />
-              </div>
-
-              {session?.user && (
-                <SidebarUserProfile
-                  name={userName}
-                  roleName={roleName}
-                  initials={initials}
-                  logoutLabel={tu("logout")}
-                  onLogout={() => logout.mutate()}
-                  isPending={logout.isPending}
-                />
-              )}
-            </>
-          )}
-        </div>
+        <SidebarFooter
+          isCollapsed={isCollapsed}
+          languageLabel={t("language")}
+          expandSidebarLabel={t("expandSidebar")}
+          onToggleExpand={() => sidebarStore.toggle(isCollapsed)}
+          session={session}
+          logoutLabel={tu("logout")}
+          onLogout={() => logout.mutate()}
+          isLogoutPending={logout.isPending}
+        />
       </aside>
 
       {/* 2. Mobile Slide-over Drawer */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <div
-            className="fixed inset-0 z-50 md:hidden"
-            role="dialog"
-            aria-modal="true"
-          >
-            <m.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={onMobileClose}
-              className="fixed inset-0 bg-black/50 backdrop-blur-xs"
-            />
-
-            <m.aside
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 260 }}
-              className="fixed inset-y-0 left-0 z-10 flex w-72 max-w-[80vw] flex-col rounded-r-2xl bg-card shadow-2xl"
-            >
-              <div className="flex h-16 items-center justify-between px-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-black text-base shadow-sm shadow-blue-500/25">
-                    W
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-base font-bold tracking-tight text-foreground">
-                      {tm("appName")}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">
-                      ITSM Console
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={onMobileClose}
-                  aria-label={t("closeMenu")}
-                  className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
-                >
-                  <X className="size-5" />
-                </button>
-              </div>
-
-              <SidebarNavList
-                items={navItems}
-                mainMenuLabel={t("mainMenu")}
-                onItemClick={onMobileClose}
-              />
-
-              <div className="flex flex-col gap-3 p-4">
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {t("language")}
-                  </span>
-                  <LanguageSwitch />
-                </div>
-
-                {session?.user && (
-                  <SidebarUserProfile
-                    name={userName}
-                    roleName={roleName}
-                    initials={initials}
-                    logoutLabel={tu("logout")}
-                    onLogout={() => logout.mutate()}
-                    isPending={logout.isPending}
-                  />
-                )}
-              </div>
-            </m.aside>
-          </div>
-        )}
-      </AnimatePresence>
+      <MobileSidebarDrawer
+        isOpen={mobileOpen}
+        onClose={onMobileClose}
+        appName={tm("appName")}
+        mainMenuLabel={t("mainMenu")}
+        languageLabel={t("language")}
+        logoutLabel={tu("logout")}
+        navItems={navItems}
+        session={session}
+        onLogout={() => logout.mutate()}
+        isLogoutPending={logout.isPending}
+      />
     </>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter } from "@/shared/lib/i18n/navigation";
 import { routing, type Locale } from "@/shared/lib/i18n/routing";
 import { cn } from "@/shared/lib/utils";
@@ -14,6 +14,7 @@ import { cn } from "@/shared/lib/utils";
  */
 export function LanguageSwitch() {
   const locale = useLocale();
+  const t = useTranslations("common.nav");
   const router = useRouter();
   const pathname = usePathname();
 
@@ -24,7 +25,7 @@ export function LanguageSwitch() {
   return (
     <div
       role="group"
-      aria-label="Language"
+      aria-label={t("language")}
       className="inline-flex items-center rounded-full bg-muted p-0.5 text-xs font-semibold"
     >
       {routing.locales.map((loc) => (
