@@ -547,14 +547,44 @@ class TestDeleteProjectLink:
 
 
 class FakeRbacApi:
-    """Duck-typed stand-in for app.modules.rbac.public.RbacApi — only the one
-    method this module's services actually call."""
+    """Duck-typed stand-in for app.modules.rbac.public.RbacApi — only the
+    methods this module's services actually call."""
 
-    def __init__(self, *, manage_all: bool) -> None:
+    def __init__(
+        self,
+        *,
+        manage_all: bool,
+        global_permissions: list[str] | None = None,
+        catalog_by_id: dict[UUID, str] | None = None,
+    ) -> None:
         self._manage_all = manage_all
+        self._global_permissions = global_permissions or []
+        self._catalog_by_id = catalog_by_id or {}
 
     async def has_permission(self, user_id, resource, action) -> bool:
         return self._manage_all
+
+    async def role_summary_for_user(self, user_id):
+        from app.modules.rbac.schemas import RoleSummary
+
+        return RoleSummary(roles=[], permissions=self._global_permissions, role_name=None)
+
+    async def get_permissions_by_ids(self, ids: list[UUID]):
+        from app.modules.rbac.schemas import PermissionRead
+
+        return [
+            PermissionRead(id=pid, resource=key.split(".")[0], action=key.split(".")[1], description_key="x")
+            for pid, key in self._catalog_by_id.items()
+            if pid in ids
+        ]
+
+    async def list_permission_catalog(self):
+        from app.modules.rbac.schemas import PermissionRead
+
+        return [
+            PermissionRead(id=pid, resource=key.split(".")[0], action=key.split(".")[1], description_key="x")
+            for pid, key in self._catalog_by_id.items()
+        ]
 
 
 class FakeUsersApi:
