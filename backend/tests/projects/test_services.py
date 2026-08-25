@@ -21,7 +21,9 @@ from app.modules.projects.repository import (
     AbstractProjectLinkRepository,
     AbstractProjectMemberRepository,
     AbstractProjectRepository,
+    AbstractProjectRoleRepository,
     ProjectMemberRow,
+    ProjectRoleRow,
 )
 from app.modules.projects.schemas import EnvironmentRead, ProjectLinkRead, ProjectRead
 from app.modules.projects.services.add_project_member import AddProjectMember
@@ -208,6 +210,67 @@ class FakeProjectMemberRepository(AbstractProjectMemberRepository):
     async def remove(self, project_id: UUID, user_id: UUID) -> None:
         self._rows.pop((project_id, user_id), None)
 
+    async def set_project_role(self, project_id: UUID, user_id: UUID, project_role_id: UUID | None) -> None:
+        existing = self._rows.get((project_id, user_id))
+        if existing is not None:
+            self._rows[(project_id, user_id)] = existing.model_copy(
+                update={"project_role_id": project_role_id}
+            )
+
+
+class FakeProjectRoleRepository(AbstractProjectRoleRepository):
+    def __init__(self, member_repo: "FakeProjectMemberRepository") -> None:
+        self._rows: dict[UUID, ProjectRoleRow] = {}
+        self._member_repo = member_repo
+
+    async def get_by_id(self, entity_id: UUID) -> ProjectRoleRow | None:
+        return self._rows.get(entity_id)
+
+    async def list_page(self, limit: int, offset: int) -> tuple[list[ProjectRoleRow], int]:
+        items = list(self._rows.values())[offset : offset + limit]
+        return items, len(self._rows)
+
+    async def list_for_project(self, project_id: UUID) -> list[ProjectRoleRow]:
+        return [row for row in self._rows.values() if row.project_id == project_id]
+
+    async def find_by_name(self, project_id: UUID, name: str) -> ProjectRoleRow | None:
+        return next((r for r in self._rows.values() if r.project_id == project_id and r.name == name), None)
+
+    async def create(self, *, project_id: UUID, name: str, permission_ids: list[UUID]) -> ProjectRoleRow:
+        row = ProjectRoleRow(
+            id=uuid4(),
+            project_id=project_id,
+            name=name,
+            permission_ids=permission_ids,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        self._rows[row.id] = row
+        return row
+
+    async def update(
+        self, project_role_id: UUID, *, name: str | None, permission_ids: list[UUID] | None
+    ) -> ProjectRoleRow:
+        existing = self._rows[project_role_id]
+        updated = existing.model_copy(
+            update={
+                "name": name if name is not None else existing.name,
+                "permission_ids": permission_ids if permission_ids is not None else existing.permission_ids,
+            }
+        )
+        self._rows[project_role_id] = updated
+        return updated
+
+    async def delete(self, project_role_id: UUID) -> None:
+        self._rows.pop(project_role_id, None)
+
+    async def permission_ids_for_member(self, project_id: UUID, user_id: UUID) -> list[UUID]:
+        member = await self._member_repo.get_by_id((project_id, user_id))
+        if member is None or member.project_role_id is None:
+            return []
+        role = self._rows.get(member.project_role_id)
+        return role.permission_ids if role is not None else []
+
 
 class FakeProjectsUnitOfWork(AbstractProjectsUnitOfWork):
     """In-memory unit of work. commit/rollback are no-ops that just count calls."""
@@ -217,6 +280,7 @@ class FakeProjectsUnitOfWork(AbstractProjectsUnitOfWork):
         self.environments = FakeEnvironmentRepository()
         self.project_links = FakeProjectLinkRepository()
         self.project_members = FakeProjectMemberRepository()
+        self.project_roles = FakeProjectRoleRepository(self.project_members)
         self.commits = 0
         self.rollbacks = 0
         self.stale: list[tuple[str, UUID]] = []

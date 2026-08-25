@@ -140,6 +140,8 @@ class TestProjectEnvironmentsAndLinks:
                 ("environment", "read"),
                 ("environment", "update"),
                 ("environment", "delete"),
+                ("project_link", "read"),
+                ("project_link", "manage"),
             ],
         )
 
@@ -263,7 +265,13 @@ class TestProjectMembership:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("project", "read"), ("project", "update"), ("project", "manage_all")],
+            permissions=[
+                ("project", "read"),
+                ("project", "update"),
+                ("project", "manage_all"),
+                ("project_member", "read"),
+                ("project_member", "manage"),
+            ],
             email="admin2@example.com",
         )
         add_resp = await client.post(
