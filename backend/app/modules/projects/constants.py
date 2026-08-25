@@ -67,3 +67,27 @@ class ProjectAuditActions(StrEnum):
     ENVIRONMENT_DELETED = "ENVIRONMENT_DELETED"
     MEMBER_ADDED = "MEMBER_ADDED"
     MEMBER_REMOVED = "MEMBER_REMOVED"
+
+
+class ProjectScopedPermissionCatalog:
+    """The subset of the global rbac.Permission catalog a ProjectRole may
+    ever grant. Bounded deliberately: project.delete (cascades every
+    downstream Cloudflare/Loki/alerting row), project.manage_all,
+    project_member.manage, and both project_role.* atoms are permanently
+    excluded — managing roles/members and deleting a project always
+    require a GLOBAL atom, never a project-scoped one, closing the
+    mint-yourself-more-power loop a naive union would open."""
+
+    ASSIGNABLE: frozenset[tuple[str, str]] = frozenset(
+        {
+            ("project", "read"),
+            ("project", "update"),
+            ("environment", "create"),
+            ("environment", "read"),
+            ("environment", "update"),
+            ("environment", "delete"),
+            ("project_link", "read"),
+            ("project_link", "manage"),
+            ("project_member", "read"),
+        }
+    )

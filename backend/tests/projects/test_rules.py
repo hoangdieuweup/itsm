@@ -1,32 +1,44 @@
-"""Unit tests for app.modules.projects.rules — pure decisions, no I/O, no fixtures."""
+"""Unit tests for app.modules.projects.rules — pure decisions, no I/O."""
 
-from app.modules.projects.config import projects_settings
-from app.modules.projects.constants import ProjectLinkType
-from app.modules.projects.rules import ProjectsRules
+from app.modules.projects.rules import ProjectRoleRules
 
 
-class TestDefaultLinks:
-    def test_returns_jira_and_git_when_both_configured(self, monkeypatch) -> None:
-        monkeypatch.setattr(projects_settings, "DEFAULT_JIRA_URL", "https://jira.weup.vn")
-        monkeypatch.setattr(projects_settings, "DEFAULT_GIT_URL", "https://git.weup.vn")
+class TestAssignableKeys:
+    def test_includes_environment_update_but_not_project_delete(self) -> None:
+        keys = ProjectRoleRules.assignable_keys()
+        assert ("environment", "update") in keys
+        assert ("project", "delete") not in keys
+        assert ("project", "manage_all") not in keys
+        assert ("project_member", "manage") not in keys
+        assert ("project_role", "read") not in keys
+        assert ("project_role", "manage") not in keys
+        assert ("user", "update_status") not in keys
 
-        links = ProjectsRules.default_links()
 
-        assert links == [
-            (ProjectLinkType.JIRA, "Jira", "https://jira.weup.vn"),
-            (ProjectLinkType.GIT, "Git", "https://git.weup.vn"),
-        ]
+class TestRejectsUnassignable:
+    def test_accepts_every_assignable_key(self) -> None:
+        assert ProjectRoleRules.rejects_unassignable([("environment", "update"), ("project", "read")]) == []
 
-    def test_skips_jira_when_unconfigured(self, monkeypatch) -> None:
-        monkeypatch.setattr(projects_settings, "DEFAULT_JIRA_URL", "")
-        monkeypatch.setattr(projects_settings, "DEFAULT_GIT_URL", "https://git.weup.vn")
+    def test_rejects_user_update_status(self) -> None:
+        rejected = ProjectRoleRules.rejects_unassignable([("environment", "update"), ("user", "update_status")])
+        assert rejected == [("user", "update_status")]
 
-        links = ProjectsRules.default_links()
+    def test_rejects_project_delete(self) -> None:
+        assert ProjectRoleRules.rejects_unassignable([("project", "delete")]) == [("project", "delete")]
 
-        assert links == [(ProjectLinkType.GIT, "Git", "https://git.weup.vn")]
 
-    def test_returns_empty_when_neither_configured(self, monkeypatch) -> None:
-        monkeypatch.setattr(projects_settings, "DEFAULT_JIRA_URL", "")
-        monkeypatch.setattr(projects_settings, "DEFAULT_GIT_URL", "")
+class TestEffectivePermissions:
+    def test_null_project_role_yields_exactly_the_global_set(self) -> None:
+        global_keys = frozenset({"project.read", "environment.read"})
+        assert ProjectRoleRules.effective_permissions(global_keys, frozenset()) == global_keys
 
-        assert ProjectsRules.default_links() == []
+    def test_project_role_adds_to_global_not_replaces_it(self) -> None:
+        global_keys = frozenset({"project.read"})
+        project_keys = frozenset({"environment.update"})
+        result = ProjectRoleRules.effective_permissions(global_keys, project_keys)
+        assert result == frozenset({"project.read", "environment.update"})
+
+    def test_overlapping_keys_do_not_duplicate(self) -> None:
+        global_keys = frozenset({"environment.read"})
+        project_keys = frozenset({"environment.read"})
+        assert ProjectRoleRules.effective_permissions(global_keys, project_keys) == frozenset({"environment.read"})
