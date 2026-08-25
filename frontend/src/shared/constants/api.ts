@@ -31,6 +31,7 @@ export const API_CONFIG = {
       LINK_DETAIL: (id: string) => `/links/${id}`,
       MEMBERS: (projectId: string) => `/projects/${projectId}/members`,
       MEMBER_DETAIL: (projectId: string, userId: string) => `/projects/${projectId}/members/${userId}`,
+      PERMISSIONS: (projectId: string) => `/projects/${projectId}/permissions`,
     },
     AUDIT_LOGS: {
       ROOT: "/audit-logs",
