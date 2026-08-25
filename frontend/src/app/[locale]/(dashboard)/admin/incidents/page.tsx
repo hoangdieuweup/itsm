@@ -5,6 +5,7 @@ import { RequirePermission, NoPermission, hasPermission } from "@/entities/permi
 import { fetchAuthSession } from "@/modules/auth";
 import { RESOURCES, ACTIONS } from "@/shared/constants/permissions";
 import { fetchIncidents, incidentsKeys } from "@/entities/incident";
+import { fetchProjects, projectsKeys } from "@/entities/project";
 import { IncidentsPageContent } from "@/modules/incidents";
 
 export default async function AdminIncidentsPage({
@@ -17,14 +18,27 @@ export default async function AdminIncidentsPage({
 
   const session = await fetchAuthSession();
   const canRead = hasPermission(session, RESOURCES.INCIDENT, ACTIONS.READ);
+  const canReadProjects = hasPermission(session, RESOURCES.PROJECT, ACTIONS.READ);
 
   const queryClient = createQueryClient();
+  const prefetches = [];
   if (canRead) {
-    await queryClient.prefetchQuery({
-      queryKey: incidentsKeys.list({}),
-      queryFn: () => fetchIncidents({}),
-    });
+    prefetches.push(
+      queryClient.prefetchQuery({
+        queryKey: incidentsKeys.list({}),
+        queryFn: () => fetchIncidents({}),
+      }),
+    );
   }
+  if (canReadProjects) {
+    prefetches.push(
+      queryClient.prefetchQuery({
+        queryKey: projectsKeys.list({ limit: 50, offset: 0 }),
+        queryFn: () => fetchProjects(50, 0),
+      }),
+    );
+  }
+  await Promise.all(prefetches);
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>

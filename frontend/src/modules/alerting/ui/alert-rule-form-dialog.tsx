@@ -9,14 +9,13 @@ import { Label } from "@/shared/ui/label";
 import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useCloudflareConfigQuery } from "@/entities/cloudflare-config";
+import { ALERT_SEVERITY } from "@/entities/incident";
 import { ALERT_RULE_SOURCE, type AlertRule, type AlertRuleSource } from "../model/schema";
 import { type AlertRuleFormValues } from "../api/fetchers";
 import { useAvailableAlertsQuery } from "../hooks/use-alert-rules";
 import { useCreateAlertRule } from "../hooks/use-create-alert-rule";
 import { useUpdateAlertRule } from "../hooks/use-update-alert-rule";
 import { ChannelMultiselect } from "./channel-multiselect";
-
-const SEVERITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
 
 interface AlertRuleFormDialogProps {
   environmentId: string;
@@ -47,7 +46,7 @@ const EMPTY_FIELDS: AlertRuleFormFields = {
   endpointUrl: "",
   query: "",
   forDuration: "5m",
-  severity: "MEDIUM",
+  severity: ALERT_SEVERITY.MEDIUM,
   channelIds: [],
 };
 
@@ -308,7 +307,7 @@ export function AlertRuleFormDialog({ environmentId, projectId, alertRule, onClo
             onChange={(event) => setField("severity", event.target.value)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            {SEVERITIES.map((value) => (
+            {Object.values(ALERT_SEVERITY).map((value) => (
               <option key={value} value={value}>
                 {t(`severities.${value}`)}
               </option>

@@ -72,5 +72,16 @@
     "projects_environment_not_found": "Không tìm thấy môi trường.",
     "projects_environment_type_already_exists": "Dự án đã có môi trường loại này.",
     "projects_project_link_not_found": "Không tìm thấy liên kết."
+  },
+  "messages": {
+    "projectCreated": "Tạo dự án thành công.",
+    "projectUpdated": "Cập nhật dự án thành công.",
+    "projectDeleted": "Xóa dự án thành công.",
+    "environmentCreated": "Tạo môi trường thành công.",
+    "environmentUpdated": "Cập nhật môi trường thành công.",
+    "environmentDeleted": "Xóa môi trường thành công.",
+    "linkCreated": "Thêm liên kết thành công.",
+    "linkUpdated": "Cập nhật liên kết thành công.",
+    "linkDeleted": "Xóa liên kết thành công."
   }
 }

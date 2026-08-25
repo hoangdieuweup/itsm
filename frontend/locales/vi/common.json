@@ -37,7 +37,8 @@
     "language": "Ngôn ngữ",
     "account": "Tài khoản",
     "detail": "Chi tiết",
-    "environments": "Môi trường"
+    "environments": "Môi trường",
+    "breadcrumb": "Đường dẫn điều hướng"
   },
   "dashboard": {
     "welcomeBack": "Chào mừng trở lại, {name}!",

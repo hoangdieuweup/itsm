@@ -99,7 +99,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
               <Menu className="size-5" />
             </button>
 
-            <nav className="flex items-center gap-1.5" aria-label="Breadcrumb">
+            <nav className="flex items-center gap-1.5" aria-label={t("breadcrumb")}>
               <span className="text-sm font-medium text-muted-foreground hidden sm:inline">
                 {tm("appName")} /
               </span>

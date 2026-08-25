@@ -55,5 +55,10 @@
     "cloudflare_not_bound_for_alerting": "Môi trường này chưa gắn tài khoản Cloudflare.",
     "missing_cf_alert_type": "Vui lòng chọn loại cảnh báo Cloudflare trước khi lưu.",
     "observability_environment_not_found": "Môi trường này không còn tồn tại."
+  },
+  "messages": {
+    "ruleCreated": "Tạo quy tắc cảnh báo thành công.",
+    "ruleUpdated": "Cập nhật quy tắc cảnh báo thành công.",
+    "ruleDeleted": "Xóa quy tắc cảnh báo thành công."
   }
 }

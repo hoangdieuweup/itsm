@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@/shared/lib/i18n/navigation";
 import { ROUTES } from "@/shared/constants/routes";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
+import { toast } from "@/shared/ui/sonner";
 import { logoutUser } from "../api/logout";
 
 /**
@@ -12,14 +13,13 @@ import { logoutUser } from "../api/logout";
  * On success: clears all cached queries (so stale authenticated data doesn't
  * leak into the next session) and redirects to `/login`.
  *
- * On error: surfaces the translated error message via the callback the
- * consumer provides (typically a toast). Does NOT redirect on failure so
- * the user can retry.
+ * On error: surfaces the translated error message via toast.
+ * Does NOT redirect on failure so the user can retry.
  */
 export function useLogout() {
   const queryClient = useQueryClient();
   const router = useRouter();
-  const getErrorMessage = useApiErrorMessage();
+  const getErrorMessage = useApiErrorMessage("auth");
 
   return useMutation({
     mutationFn: logoutUser,
@@ -28,9 +28,7 @@ export function useLogout() {
       router.replace(ROUTES.login);
     },
     onError: (error) => {
-      // Consumer can read `mutation.error` or pass an `onError` override;
-      // the translated message is available via `getErrorMessage(error)`.
-      console.error("[logout]", getErrorMessage(error));
+      toast.error(getErrorMessage(error));
     },
   });
 }

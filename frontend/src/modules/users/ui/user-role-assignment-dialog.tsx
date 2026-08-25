@@ -121,7 +121,7 @@ function UserRoleAssignmentInner({
       icon={Shield}
       title={t("actions.assignRolesDialogTitle")}
       onClose={onClose}
-      closeLabel="Close dialog"
+      closeLabel={t("actions.closeRolesDialog")}
       size="lg"
       disableClose={assignRoles.isPending}
     >

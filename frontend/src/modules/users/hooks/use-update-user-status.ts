@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateUserStatus } from "../api/fetchers";
 import { usersKeys, type UserStatus } from "@/entities/user";
 import { authKeys } from "@/entities/auth";
+import { useToastMessage } from "@/shared/hooks/use-toast-message";
 
 /**
  * Mutation hook for updating a user's status (active / blocked).
@@ -11,6 +12,7 @@ import { authKeys } from "@/entities/auth";
  */
 export function useUpdateUserStatus() {
   const queryClient = useQueryClient();
+  const { success, error } = useToastMessage("users");
 
   return useMutation({
     mutationFn: ({
@@ -23,6 +25,8 @@ export function useUpdateUserStatus() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: usersKeys.all });
       queryClient.invalidateQueries({ queryKey: authKeys.session() });
+      success("statusUpdated");
     },
+    onError: error,
   });
 }

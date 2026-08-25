@@ -7,11 +7,13 @@ import {
 } from "@tanstack/react-query";
 import { createQueryClient } from "@/shared/lib/query-client";
 import { MotionProvider } from "@/shared/lib/motion";
+import { Toaster } from "@/shared/ui/sonner";
 
 /**
  * Framework-wiring providers shared by every route: the TanStack Query
- * client, the reset boundary each route's error.tsx relies on, and the
- * lazy-loaded Framer Motion feature set. Mounted once in app/layout.tsx.
+ * client, the reset boundary each route's error.tsx relies on, the
+ * lazy-loaded Framer Motion feature set, and the global toast container.
+ * Mounted once in app/layout.tsx.
  *
  * `QueryErrorResetBoundary` has to sit above every route's error.tsx so
  * "Try again" can clear a query's cached error before Next re-renders the
@@ -23,8 +25,14 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <QueryErrorResetBoundary>
-        {() => <MotionProvider>{children}</MotionProvider>}
+        {() => (
+          <MotionProvider>
+            {children}
+            <Toaster />
+          </MotionProvider>
+        )}
       </QueryErrorResetBoundary>
     </QueryClientProvider>
   );
 }
+

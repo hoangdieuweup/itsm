@@ -38,6 +38,18 @@
     "HIGH": "High",
     "CRITICAL": "Critical"
   },
+  "create": {
+    "trigger": "Create Incident",
+    "title": "Create Manual Incident",
+    "selectProject": "Select a project…",
+    "selectEnvironment": "Select an environment…",
+    "selectProjectFirst": "Select a project first",
+    "titleLabel": "Title",
+    "severityLabel": "Severity",
+    "cancel": "Cancel",
+    "create": "Create",
+    "creating": "Creating..."
+  },
   "detail": {
     "detected": "Detected",
     "category": "Category",
@@ -55,5 +67,10 @@
     "incident_not_found": "This incident no longer exists.",
     "invalid_incident_transition": "This status change is no longer possible — someone may have already updated it.",
     "observability_environment_not_found": "This environment no longer exists."
+  },
+  "messages": {
+    "created": "Incident reported.",
+    "acknowledged": "Incident acknowledged.",
+    "resolved": "Incident resolved."
   }
 }

@@ -3,9 +3,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateProject } from "../api/fetchers";
 import { projectsKeys } from "@/entities/project";
+import { useToastMessage } from "@/shared/hooks/use-toast-message";
 
 export function useUpdateProject() {
   const queryClient = useQueryClient();
+  const { success, error } = useToastMessage("projects");
 
   return useMutation({
     mutationFn: ({
@@ -18,6 +20,8 @@ export function useUpdateProject() {
     onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: projectsKeys.all });
       queryClient.invalidateQueries({ queryKey: projectsKeys.detail(variables.id) });
+      success("projectUpdated");
     },
+    onError: error,
   });
 }

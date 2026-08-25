@@ -73,5 +73,10 @@
     "loki_query_rejected": "Loki từ chối truy vấn này.",
     "loki_unavailable": "Không thể kết nối tới Loki.",
     "cloudflare_config_not_found": "Môi trường này chưa liên kết tài khoản/zone Cloudflare."
+  },
+  "messages": {
+    "configCreated": "Lưu cấu hình Loki thành công.",
+    "configUpdated": "Cập nhật cấu hình Loki thành công.",
+    "configDeleted": "Xóa cấu hình Loki thành công."
   }
 }

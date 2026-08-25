@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ALERT_SEVERITY } from "@/entities/incident";
 
 export const ALERT_RULE_SOURCE = { CLOUDFLARE_NATIVE: "CLOUDFLARE_NATIVE", LOKI_QUERY: "LOKI_QUERY" } as const;
 export type AlertRuleSource = (typeof ALERT_RULE_SOURCE)[keyof typeof ALERT_RULE_SOURCE];
@@ -14,7 +15,7 @@ export const alertRuleSchema = z.object({
   cfAlertType: z.string().nullable(),
   cfPolicyId: z.string().nullable(),
   condition: z.record(z.string(), z.unknown()).nullable(),
-  severity: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
+  severity: z.enum([ALERT_SEVERITY.LOW, ALERT_SEVERITY.MEDIUM, ALERT_SEVERITY.HIGH, ALERT_SEVERITY.CRITICAL]),
   isActive: z.boolean(),
   channelIds: z.array(z.uuid()),
   createdAt: z.string(),

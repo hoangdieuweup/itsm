@@ -58,5 +58,14 @@
     "cloudflare_missing_dns_priority": "MX records require a priority value.",
     "cloudflare_dns_sync_failed": "Cloudflare was updated but saving locally failed — please refresh and verify.",
     "cloudflare_dns_records_exist_for_config": "Delete all DNS records before removing this binding."
+  },
+  "messages": {
+    "configCreated": "DNS config linked.",
+    "configUpdated": "DNS config updated.",
+    "configDeleted": "DNS config removed.",
+    "recordCreated": "DNS record created.",
+    "recordUpdated": "DNS record updated.",
+    "recordDeleted": "DNS record deleted.",
+    "syncCompleted": "DNS records synced."
   }
 }
