@@ -3,19 +3,21 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Link2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Link2, Users } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
 import { ACTIONS, RESOURCES } from "@/shared/constants/permissions";
 import { useProjectQuery } from "@/entities/project";
 import { useProjectEnvironmentsQuery, type Environment } from "@/entities/environment";
-import { fetchProjectLinks, type ProjectLink } from "../api/fetchers";
-import { projectLinksKeys } from "../api/query-keys";
+import { fetchProjectLinks, fetchProjectMembers, type ProjectLink, type ProjectMember } from "../api/fetchers";
+import { projectLinksKeys, projectMembersKeys } from "../api/query-keys";
 import { useDeleteEnvironment } from "../hooks/use-delete-environment";
 import { useDeleteProjectLink } from "../hooks/use-delete-project-link";
+import { useRemoveProjectMember } from "../hooks/use-remove-project-member";
 import { EnvironmentFormDialog } from "./environment-form-dialog";
 import { ProjectLinkFormDialog } from "./project-link-form-dialog";
+import { ProjectMemberFormDialog } from "./project-member-form-dialog";
 import { IconDns, IconJira, IconGit, IconNotification, IconGrafana, IconServer } from "@/shared/ui/icons";
 
 import { m, type Variants } from "@/shared/lib/motion";
@@ -256,11 +258,18 @@ export function ProjectDetailView({
     queryKey: projectLinksKeys.forProject(projectId),
     queryFn: () => fetchProjectLinks(projectId),
   });
+  const { data: members = [] } = useQuery({
+    queryKey: projectMembersKeys.forProject(projectId),
+    queryFn: () => fetchProjectMembers(projectId),
+  });
 
   const deleteLink = useDeleteProjectLink(projectId);
+  const removeMember = useRemoveProjectMember(projectId);
 
   const [linkFormTarget, setLinkFormTarget] = useState<ProjectLink | "create" | null>(null);
   const [linkDeleteTarget, setLinkDeleteTarget] = useState<ProjectLink | null>(null);
+  const [memberFormOpen, setMemberFormOpen] = useState(false);
+  const [memberRemoveTarget, setMemberRemoveTarget] = useState<ProjectMember | null>(null);
 
   return (
     <m.div
@@ -387,6 +396,58 @@ export function ProjectDetailView({
         )}
       </m.section>
 
+      {/* 4. Members */}
+      <m.section variants={itemVariants} className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="size-4 text-primary" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              {t("sections.members")} ({members.length})
+            </h2>
+          </div>
+          <Can I={ACTIONS.UPDATE} a={RESOURCES.PROJECT}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setMemberFormOpen(true)}
+              className="gap-1.5 shadow-2xs"
+            >
+              <Plus className="size-3.5" /> {t("actions.addMember")}
+            </Button>
+          </Can>
+        </div>
+
+        {members.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-3xl border border-border/50 bg-card/60 py-12 text-center backdrop-blur-md">
+            <p className="text-sm text-muted-foreground">{t("empty.members")}</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {members.map((member) => (
+              <div
+                key={member.userId}
+                className="flex items-center justify-between rounded-2xl border border-border/60 bg-card/70 p-4 backdrop-blur-md transition-all hover:border-primary/40 shadow-2xs"
+              >
+                <div className="flex flex-col overflow-hidden">
+                  <span className="font-semibold text-sm text-foreground truncate">{member.name}</span>
+                  <span className="font-mono text-xs text-muted-foreground truncate">{member.email}</span>
+                </div>
+                <Can I={ACTIONS.UPDATE} a={RESOURCES.PROJECT}>
+                  <button
+                    type="button"
+                    onClick={() => setMemberRemoveTarget(member)}
+                    className="flex size-7 shrink-0 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 dark:hover:bg-rose-950/50 cursor-pointer"
+                    title={t("actions.removeMember")}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </Can>
+              </div>
+            ))}
+          </div>
+        )}
+      </m.section>
+
       {/* Dialogs */}
       {linkFormTarget !== null && (
         <ProjectLinkFormDialog
@@ -407,6 +468,27 @@ export function ProjectDetailView({
         title={t("deleteConfirm.linkTitle")}
         description={t("deleteConfirm.linkDescription", { name: linkDeleteTarget?.name ?? "" })}
         isLoading={deleteLink.isPending}
+      />
+
+      <ProjectMemberFormDialog
+        isOpen={memberFormOpen}
+        onClose={() => setMemberFormOpen(false)}
+        projectId={projectId}
+        excludeUserIds={new Set(members.map((m) => m.userId))}
+      />
+      <ConfirmDialog
+        isOpen={memberRemoveTarget !== null}
+        onClose={() => setMemberRemoveTarget(null)}
+        onConfirm={() => {
+          if (memberRemoveTarget) {
+            removeMember.mutate(memberRemoveTarget.userId, {
+              onSuccess: () => setMemberRemoveTarget(null),
+            });
+          }
+        }}
+        title={t("deleteConfirm.memberTitle")}
+        description={t("deleteConfirm.memberDescription", { name: memberRemoveTarget?.name ?? "" })}
+        isLoading={removeMember.isPending}
       />
     </m.div>
   );

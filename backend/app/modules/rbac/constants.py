@@ -32,6 +32,7 @@ class RbacPermissionCatalog:
         ("project", "read", "permissions.project.read"),
         ("project", "update", "permissions.project.update"),
         ("project", "delete", "permissions.project.delete"),
+        ("project", "manage_all", "permissions.project.manage_all"),
         ("environment", "create", "permissions.environment.create"),
         ("environment", "read", "permissions.environment.read"),
         ("environment", "update", "permissions.environment.update"),

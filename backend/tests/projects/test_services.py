@@ -5,30 +5,40 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from app.modules.projects.access import resolve_project_membership
 from app.modules.projects.config import projects_settings
 from app.modules.projects.constants import EnvironmentType, ProjectLinkType
 from app.modules.projects.exceptions import (
     EnvironmentNotFound,
     EnvironmentTypeAlreadyExists,
+    InsufficientProjectAccess,
     ProjectLinkNotFound,
+    ProjectMemberAlreadyExists,
     ProjectNotFound,
 )
 from app.modules.projects.repository import (
     AbstractEnvironmentRepository,
     AbstractProjectLinkRepository,
+    AbstractProjectMemberRepository,
     AbstractProjectRepository,
+    ProjectMemberRow,
 )
 from app.modules.projects.schemas import EnvironmentRead, ProjectLinkRead, ProjectRead
+from app.modules.projects.services.add_project_member import AddProjectMember
 from app.modules.projects.services.create_environment import CreateEnvironment
 from app.modules.projects.services.create_project import CreateProject
 from app.modules.projects.services.create_project_link import CreateProjectLink
 from app.modules.projects.services.delete_environment import DeleteEnvironment
 from app.modules.projects.services.delete_project import DeleteProject
 from app.modules.projects.services.delete_project_link import DeleteProjectLink
+from app.modules.projects.services.list_project_members import ListProjectMembers
+from app.modules.projects.services.list_visible_projects import ListVisibleProjects
+from app.modules.projects.services.remove_project_member import RemoveProjectMember
 from app.modules.projects.services.update_environment import UpdateEnvironment
 from app.modules.projects.services.update_project import UpdateProject
 from app.modules.projects.services.update_project_link import UpdateProjectLink
 from app.modules.projects.uow import AbstractProjectsUnitOfWork
+from app.modules.users.public import UserRead
 
 
 class FakeProjectRepository(AbstractProjectRepository):
@@ -67,6 +77,9 @@ class FakeProjectRepository(AbstractProjectRepository):
 
     async def delete(self, project_id: UUID) -> None:
         self._rows.pop(project_id, None)
+
+    async def list_for_ids(self, project_ids: list[UUID]) -> list[ProjectRead]:
+        return [self._rows[pid] for pid in project_ids if pid in self._rows]
 
 
 class FakeEnvironmentRepository(AbstractEnvironmentRepository):
@@ -167,6 +180,35 @@ class FakeProjectLinkRepository(AbstractProjectLinkRepository):
         self._rows.pop(link_id, None)
 
 
+class FakeProjectMemberRepository(AbstractProjectMemberRepository):
+    def __init__(self) -> None:
+        self._rows: dict[tuple[UUID, UUID], ProjectMemberRow] = {}
+
+    async def get_by_id(self, entity_id: tuple) -> ProjectMemberRow | None:
+        return self._rows.get(entity_id)
+
+    async def list_page(self, limit: int, offset: int) -> tuple[list[ProjectMemberRow], int]:
+        items = list(self._rows.values())[offset : offset + limit]
+        return items, len(self._rows)
+
+    async def is_member(self, project_id: UUID, user_id: UUID) -> bool:
+        return (project_id, user_id) in self._rows
+
+    async def list_for_project(self, project_id: UUID) -> list[ProjectMemberRow]:
+        return [row for row in self._rows.values() if row.project_id == project_id]
+
+    async def list_project_ids_for_user(self, user_id: UUID) -> list[UUID]:
+        return [row.project_id for row in self._rows.values() if row.user_id == user_id]
+
+    async def add(self, project_id: UUID, user_id: UUID) -> None:
+        self._rows[(project_id, user_id)] = ProjectMemberRow(
+            project_id=project_id, user_id=user_id, created_at=datetime.now(UTC)
+        )
+
+    async def remove(self, project_id: UUID, user_id: UUID) -> None:
+        self._rows.pop((project_id, user_id), None)
+
+
 class FakeProjectsUnitOfWork(AbstractProjectsUnitOfWork):
     """In-memory unit of work. commit/rollback are no-ops that just count calls."""
 
@@ -174,6 +216,7 @@ class FakeProjectsUnitOfWork(AbstractProjectsUnitOfWork):
         self.projects = FakeProjectRepository()
         self.environments = FakeEnvironmentRepository()
         self.project_links = FakeProjectLinkRepository()
+        self.project_members = FakeProjectMemberRepository()
         self.commits = 0
         self.rollbacks = 0
         self.stale: list[tuple[str, UUID]] = []
@@ -223,6 +266,7 @@ class TestCreateProject:
         assert all(link.is_default for link in links)
         assert uow.commits == 1
         assert audit_api.events[0]["action"] == "PROJECT_CREATED"
+        assert await uow.project_members.is_member(project.id, ACTOR_ID)
 
     async def test_creates_project_with_no_default_links_when_unconfigured(self, monkeypatch) -> None:
         monkeypatch.setattr(projects_settings, "DEFAULT_JIRA_URL", "")
@@ -436,3 +480,183 @@ class TestDeleteProjectLink:
 
         with pytest.raises(ProjectLinkNotFound):
             await DeleteProjectLink(uow).execute(uuid4())
+
+
+class FakeRbacApi:
+    """Duck-typed stand-in for app.modules.rbac.public.RbacApi — only the one
+    method this module's services actually call."""
+
+    def __init__(self, *, manage_all: bool) -> None:
+        self._manage_all = manage_all
+
+    async def has_permission(self, user_id, resource, action) -> bool:
+        return self._manage_all
+
+
+class FakeUsersApi:
+    """Duck-typed stand-in for app.modules.users.public.UsersApi."""
+
+    def __init__(self, users: dict[UUID, object]) -> None:
+        self._users = users
+
+    async def get_user_by_id(self, user_id: UUID):
+        return self._users.get(user_id)
+
+
+class TestResolveProjectMembership:
+    async def test_manage_all_bypasses_without_a_membership_row(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+        user = UserRead.model_construct(id=uuid4(), email=ACTOR_EMAIL, name="Actor")
+
+        await resolve_project_membership(project.id, user, FakeRbacApi(manage_all=True), uow)
+
+    async def test_member_passes(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+        user = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL, name="Actor")
+        await uow.project_members.add(project.id, ACTOR_ID)
+
+        await resolve_project_membership(project.id, user, FakeRbacApi(manage_all=False), uow)
+
+    async def test_non_member_without_manage_all_is_rejected(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+        user = UserRead.model_construct(id=uuid4(), email=ACTOR_EMAIL, name="Actor")
+
+        with pytest.raises(InsufficientProjectAccess):
+            await resolve_project_membership(project.id, user, FakeRbacApi(manage_all=False), uow)
+
+
+class TestListVisibleProjects:
+    async def test_manage_all_sees_every_project(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        await uow.projects.create(name="A", description=None, created_by=None)
+        await uow.projects.create(name="B", description=None, created_by=None)
+
+        items, total = await ListVisibleProjects(uow, FakeRbacApi(manage_all=True)).execute(
+            ACTOR_ID, limit=50, offset=0
+        )
+
+        assert total == 2
+        assert {p.name for p in items} == {"A", "B"}
+
+    async def test_non_manage_all_sees_only_member_projects(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        member_project = await uow.projects.create(name="Mine", description=None, created_by=None)
+        await uow.projects.create(name="Not mine", description=None, created_by=None)
+        await uow.project_members.add(member_project.id, ACTOR_ID)
+
+        items, total = await ListVisibleProjects(uow, FakeRbacApi(manage_all=False)).execute(
+            ACTOR_ID, limit=50, offset=0
+        )
+
+        assert total == 1
+        assert items[0].name == "Mine"
+
+    async def test_user_with_no_memberships_sees_nothing(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        await uow.projects.create(name="Not mine", description=None, created_by=None)
+
+        items, total = await ListVisibleProjects(uow, FakeRbacApi(manage_all=False)).execute(
+            ACTOR_ID, limit=50, offset=0
+        )
+
+        assert items == []
+        assert total == 0
+
+
+class TestListProjectMembers:
+    async def test_lists_members_enriched_with_user_info(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+        await uow.project_members.add(project.id, ACTOR_ID)
+        user = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL, name="Actor")
+        users_api = FakeUsersApi({ACTOR_ID: user})
+
+        members = await ListProjectMembers(uow, users_api).execute(project.id)
+
+        assert len(members) == 1
+        assert members[0].email == ACTOR_EMAIL
+
+    async def test_skips_a_member_row_whose_user_was_deleted(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+        await uow.project_members.add(project.id, ACTOR_ID)
+        users_api = FakeUsersApi({})  # ACTOR_ID resolves to None
+
+        members = await ListProjectMembers(uow, users_api).execute(project.id)
+
+        assert members == []
+
+    async def test_rejects_unknown_project(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+
+        with pytest.raises(ProjectNotFound):
+            await ListProjectMembers(uow, FakeUsersApi({})).execute(uuid4())
+
+
+class TestAddProjectMember:
+    async def test_adds_member_and_audits(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+        audit_api = FakeAuditApi()
+        target_id = uuid4()
+
+        await AddProjectMember(uow, audit_api).execute(
+            project.id, target_id, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        assert await uow.project_members.is_member(project.id, target_id)
+        assert audit_api.events[0]["action"] == "MEMBER_ADDED"
+
+    async def test_rejects_duplicate_add(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+        target_id = uuid4()
+        await uow.project_members.add(project.id, target_id)
+
+        with pytest.raises(ProjectMemberAlreadyExists):
+            await AddProjectMember(uow, FakeAuditApi()).execute(
+                project.id, target_id, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
+
+    async def test_rejects_unknown_project(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+
+        with pytest.raises(ProjectNotFound):
+            await AddProjectMember(uow, FakeAuditApi()).execute(
+                uuid4(), uuid4(), actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
+
+
+class TestRemoveProjectMember:
+    async def test_removes_member_and_audits(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+        target_id = uuid4()
+        await uow.project_members.add(project.id, target_id)
+        audit_api = FakeAuditApi()
+
+        await RemoveProjectMember(uow, audit_api).execute(
+            project.id, target_id, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        assert not await uow.project_members.is_member(project.id, target_id)
+        assert audit_api.events[0]["action"] == "MEMBER_REMOVED"
+
+    async def test_removing_a_non_member_is_a_silent_no_op(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="Website A", description=None, created_by=None)
+
+        await RemoveProjectMember(uow, FakeAuditApi()).execute(
+            project.id, uuid4(), actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+    async def test_rejects_unknown_project(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+
+        with pytest.raises(ProjectNotFound):
+            await RemoveProjectMember(uow, FakeAuditApi()).execute(
+                uuid4(), uuid4(), actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )

@@ -54,7 +54,8 @@
         "create": "Create new projects",
         "read": "View projects and details",
         "update": "Edit projects and links",
-        "delete": "Delete projects"
+        "delete": "Delete projects",
+        "manage_all": "Full administrative access to every project, regardless of membership"
       },
       "environment": {
         "create": "Create deployment environments",

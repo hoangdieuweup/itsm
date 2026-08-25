@@ -21,7 +21,9 @@
     "manageAlerting": "Manage Alerting",
     "inspect": "Inspect",
     "edit": "Edit",
-    "delete": "Delete"
+    "delete": "Delete",
+    "addMember": "Add Member",
+    "removeMember": "Remove member"
   },
   "table": {
     "name": "Name",
@@ -38,7 +40,8 @@
   "alerts": "Alerts",
   "sections": {
     "environments": "Environments",
-    "links": "External Links"
+    "links": "External Links",
+    "members": "Members"
   },
   "environmentTypes": {
     "dev": "Dev",
@@ -57,7 +60,8 @@
     "title": "No projects yet",
     "description": "Create your first project to start managing environments, Cloudflare, and logs.",
     "environments": "No environments yet.",
-    "links": "No links yet."
+    "links": "No links yet.",
+    "members": "No members yet."
   },
   "noPermission": {
     "environments": "You don't have permission to view this project's environments."
@@ -72,7 +76,10 @@
     "cancel": "Cancel",
     "save": "Save",
     "create": "Create",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "addMemberTitle": "Add Member",
+    "selectUserLabel": "User",
+    "selectUser": "Select a user"
   },
   "deleteConfirm": {
     "title": "Delete project?",
@@ -80,13 +87,17 @@
     "environmentTitle": "Delete environment?",
     "environmentDescription": "This will permanently delete the \"{name}\" environment.",
     "linkTitle": "Delete link?",
-    "linkDescription": "This will permanently delete the \"{name}\" link."
+    "linkDescription": "This will permanently delete the \"{name}\" link.",
+    "memberTitle": "Remove member?",
+    "memberDescription": "This will remove \"{name}\" from this project. They will lose access to it."
   },
   "errors": {
     "projects_project_not_found": "Project not found.",
     "projects_environment_not_found": "Environment not found.",
     "projects_environment_type_already_exists": "This project already has an environment of that type.",
-    "projects_project_link_not_found": "Link not found."
+    "projects_project_link_not_found": "Link not found.",
+    "projects_insufficient_project_access": "You are not a member of this project.",
+    "projects_project_member_already_exists": "This user is already a member of the project."
   },
   "messages": {
     "projectCreated": "Project created successfully.",
@@ -97,6 +108,8 @@
     "environmentDeleted": "Environment deleted successfully.",
     "linkCreated": "Link added successfully.",
     "linkUpdated": "Link updated successfully.",
-    "linkDeleted": "Link removed successfully."
+    "linkDeleted": "Link removed successfully.",
+    "memberAdded": "Member added successfully.",
+    "memberRemoved": "Member removed successfully."
   }
 }
