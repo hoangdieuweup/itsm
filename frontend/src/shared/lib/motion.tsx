@@ -12,3 +12,4 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
 }
 
 export { m, AnimatePresence };
+export type { Variants, Transition } from "framer-motion";

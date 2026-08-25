@@ -47,7 +47,33 @@
     "roleManagementTitle": "Vai trò & Quyền hạn",
     "roleManagementDesc": "Cấu hình vai trò tùy chỉnh và phân quyền truy cập hệ thống.",
     "serviceDeskTitle": "Dịch vụ hỗ trợ (Service Desk)",
-    "serviceDeskDesc": "Tiện ích quản lý sự cố và yêu cầu hỗ trợ sẽ ra mắt trong phiên bản tiếp theo."
+    "serviceDeskDesc": "Tiện ích quản lý sự cố và yêu cầu hỗ trợ sẽ ra mắt trong phiên bản tiếp theo.",
+    "systemStatus": "Hệ thống vận hành",
+    "liveOperational": "Tất cả dịch vụ hoạt động bình thường",
+    "operationalStatus": "Trạng thái: Hoạt động",
+    "nodeVersion": "Cụm máy chủ v2.4",
+    "telemetry": "Chỉ số thời gian thực",
+    "quickLaunchpad": "Thao tác nhanh",
+    "recentActivity": "Hoạt động kiểm toán gần nhất",
+    "viewAll": "Xem tất cả",
+    "stats": {
+      "cloudflareAccounts": "Tài khoản Cloudflare",
+      "cloudflareDesc": "Hạ tầng Edge & DNS",
+      "activeIncidents": "Sự cố đang mở",
+      "incidentsDesc": "Mức độ ưu tiên cao",
+      "activeProjects": "Dự án & Môi trường",
+      "projectsDesc": "Đang triển khai",
+      "securityAudit": "Sự kiện kiểm toán",
+      "securityDesc": "Ghi nhận 24h qua"
+    },
+    "actions": {
+      "manageUsers": "Quản lý tài khoản",
+      "manageRoles": "Cấu hình vai trò",
+      "manageProjects": "Quản lý dự án",
+      "manageCloudflare": "Hạ tầng Cloudflare",
+      "viewIncidents": "Trung tâm sự cố",
+      "viewAuditLog": "Nhật ký hệ thống"
+    }
   },
   "noPermission": {
     "title": "Truy cập bị từ chối",
@@ -56,5 +82,15 @@
   "confirmDialog": {
     "confirm": "Xác nhận",
     "cancel": "Hủy"
+  },
+  "pagination": {
+    "showing": "Hiển thị",
+    "to": "đến",
+    "of": "trên",
+    "results": "kết quả",
+    "perPage": "/ trang",
+    "prev": "Trang trước",
+    "next": "Trang sau",
+    "page": "Trang"
   }
 }

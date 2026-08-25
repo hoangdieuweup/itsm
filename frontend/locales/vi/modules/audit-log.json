@@ -1,7 +1,7 @@
 {
   "title": "Nhật ký hệ thống",
   "description": "Hoạt động hệ thống theo dự án và môi trường.",
-  "filters": { "projectId": "Mã dự án", "type": "Loại", "allTypes": "Tất cả loại" },
+  "filters": { "projectId": "Mã dự án", "projectPlaceholder": "Lọc theo mã dự án UUID...", "type": "Loại", "allTypes": "Tất cả loại" },
   "table": { "timestamp": "Thời gian", "action": "Hành động", "actor": "Người thực hiện", "message": "Nội dung" },
   "empty": { "title": "Chưa có bản ghi nào" }
 }

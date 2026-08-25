@@ -2,27 +2,37 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Users } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { Can, RESOURCES, ACTIONS } from "@/entities/permission";
 import { USER_STATUS, useUsers, type User } from "@/entities/user";
+import { IconUsers } from "@/shared/ui/icons";
 
-import { isProtectedAdminRole, SYSTEM_ROLE_NAMES } from "@/shared/constants/roles";
+import { SYSTEM_ROLE_NAMES } from "@/shared/constants/roles";
 import { useUpdateUserStatus } from "../hooks/use-update-user-status";
 import { UserRoleAssignmentDialog } from "./user-role-assignment-dialog";
+import { UserRolesCell } from "./user-roles-cell";
+
+import { m } from "@/shared/lib/motion";
+
+import { Pagination } from "@/shared/ui/pagination";
 
 export function UsersPageContent() {
   const t = useTranslations("users");
   const tCommon = useTranslations("common.confirmDialog");
   const getErrorMessage = useApiErrorMessage("users");
-  const { data: page } = useUsers(50, 0);
+  const [limit, setLimit] = useState(50);
+  const [offset, setOffset] = useState(0);
+  const { data: page } = useUsers(limit, offset);
   const updateStatus = useUpdateUserStatus();
   const [userToToggle, setUserToToggle] = useState<User | null>(null);
   const [userToAssignRoles, setUserToAssignRoles] = useState<User | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const currentPage = Math.floor(offset / limit) + 1;
 
   const handleToggleStatus = (user: User) => {
     setUserToToggle(user);
@@ -51,15 +61,20 @@ export function UsersPageContent() {
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
+    <m.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-1 min-h-0 flex-col gap-4"
+    >
       {/* Header */}
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+      <div className="shrink-0 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
               {t("title")}
             </h1>
-            <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+            <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/15 px-2.5 py-0.5 font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
               {page.total}
             </span>
           </div>
@@ -71,18 +86,18 @@ export function UsersPageContent() {
       {errorMessage && (
         <div
           role="alert"
-          className="flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
+          className="shrink-0 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive backdrop-blur-md"
         >
           <AlertCircle className="size-4 shrink-0" aria-hidden />
           <span>{errorMessage}</span>
         </div>
       )}
 
-      {/* Table Container - fully responsive */}
-      <div className="overflow-hidden rounded-2xl bg-card shadow-xs">
-        <div className="overflow-x-auto">
+      {/* Table Container - High Tech Glass Card */}
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-3xl border border-border/50 bg-card/75 backdrop-blur-xl shadow-lg shadow-black/5 dark:shadow-black/20">
+        <div className="flex-1 overflow-auto">
           <table className="w-full min-w-[700px] text-left text-sm">
-            <thead className="bg-muted/40 text-xs font-bold uppercase tracking-wider text-muted-foreground/90">
+            <thead className="sticky top-0 z-10 border-b border-border/40 bg-card/95 backdrop-blur-md text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
               <tr>
                 <th scope="col" className="px-6 py-4 font-bold text-foreground/80">
                   {t("columns.name")}
@@ -104,7 +119,7 @@ export function UsersPageContent() {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/60">
+            <tbody className="divide-y divide-border/40">
               {page.items.length === 0 ? (
                 <tr>
                   <td
@@ -112,9 +127,7 @@ export function UsersPageContent() {
                     className="px-6 py-16 text-center text-muted-foreground"
                   >
                     <div className="flex flex-col items-center justify-center gap-2.5">
-                      <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-                        <Users className="size-6 text-muted-foreground/60" />
-                      </div>
+                      <IconUsers className="size-12 shrink-0 rounded-2xl shadow-xs" />
                       <p className="font-medium">{t("empty")}</p>
                     </div>
                   </td>
@@ -135,12 +148,12 @@ export function UsersPageContent() {
                   return (
                     <tr
                       key={user.id}
-                      className="transition-colors hover:bg-muted/30"
+                      className="transition-colors hover:bg-muted/40"
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3.5">
                           <Avatar className="size-10 border border-border/80 shadow-2xs">
-                            <AvatarFallback className="bg-blue-50 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                            <AvatarFallback className="bg-blue-500/10 text-xs font-bold text-blue-600 dark:bg-blue-950 dark:text-blue-400">
                               {initials}
                             </AvatarFallback>
                           </Avatar>
@@ -148,34 +161,27 @@ export function UsersPageContent() {
                             <span className="font-semibold text-foreground">
                               {user.name}
                             </span>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-muted-foreground font-mono">
                               {user.email}
                             </span>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex max-w-[280px] flex-wrap items-center gap-1.5">
-                          {(user.roleNames && user.roleNames.length > 0
-                            ? user.roleNames
-                            : [user.roleName || SYSTEM_ROLE_NAMES.MEMBER]
-                          ).map((name) => (
-                            <span
-                              key={name}
-                              className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold uppercase tracking-wider ${
-                                isProtectedAdminRole(name)
-                                  ? "border border-amber-500/30 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-950/60 dark:text-amber-300"
-                                  : "border border-border/80 bg-muted/60 text-foreground"
-                              }`}
-                            >
-                              {name}
-                            </span>
-                          ))}
-                        </div>
+                        <UserRolesCell
+                          roles={
+                            user.roleNames && user.roleNames.length > 0
+                              ? user.roleNames
+                              : [user.roleName || SYSTEM_ROLE_NAMES.MEMBER]
+                          }
+                          userName={user.name}
+                          onAssignRoles={() => setUserToAssignRoles(user)}
+                          canAssign={true}
+                        />
                       </td>
                       <td className="px-6 py-4">
                         {user.employeeCode ? (
-                          <span className="inline-flex rounded-md border border-border/60 bg-muted/50 px-2 py-0.5 font-mono text-xs font-medium text-foreground">
+                          <span className="inline-flex rounded-lg border border-border/60 bg-muted/50 px-2 py-0.5 font-mono text-xs font-medium text-foreground">
                             {user.employeeCode}
                           </span>
                         ) : (
@@ -188,8 +194,8 @@ export function UsersPageContent() {
                         <span
                           className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
                             isBlocked
-                              ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/60 dark:text-rose-300"
-                              : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/60 dark:text-emerald-300"
+                              ? "border-rose-500/30 bg-rose-500/15 text-rose-700 dark:text-rose-300"
+                              : "border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                           }`}
                         >
                           <span
@@ -202,7 +208,7 @@ export function UsersPageContent() {
                             : t("status.active")}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-xs text-muted-foreground">
+                      <td className="px-6 py-4 text-xs font-mono text-muted-foreground">
                         {user.lastLoginAt
                           ? new Date(user.lastLoginAt).toLocaleString()
                           : "—"}
@@ -214,7 +220,7 @@ export function UsersPageContent() {
                               size="sm"
                               variant="outline"
                               onClick={() => setUserToAssignRoles(user)}
-                              className="font-medium shadow-2xs"
+                              className="font-medium shadow-2xs hover:border-primary/40"
                             >
                               {t("actions.assignRoles")}
                             </Button>
@@ -235,7 +241,6 @@ export function UsersPageContent() {
                             </Button>
                           </Can>
                         </div>
-
                       </td>
                     </tr>
                   );
@@ -243,6 +248,20 @@ export function UsersPageContent() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="shrink-0">
+          <Pagination
+            page={currentPage}
+            pageSize={limit}
+            total={page.total}
+            pageSizeOptions={[10, 20, 50, 100]}
+            onPageChange={(newPage) => setOffset((newPage - 1) * limit)}
+            onPageSizeChange={(newLimit) => {
+              setLimit(newLimit);
+              setOffset(0);
+            }}
+          />
         </div>
       </div>
 
@@ -288,6 +307,6 @@ export function UsersPageContent() {
         }
         isLoading={updateStatus.isPending}
       />
-    </div>
+    </m.div>
   );
 }

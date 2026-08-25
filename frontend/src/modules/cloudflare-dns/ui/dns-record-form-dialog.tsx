@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Globe, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -10,6 +10,7 @@ import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { DNS_RECORD_TYPE, type DnsRecord, type DnsRecordType } from "../model/schema";
 import { useCreateDnsRecord, useUpdateDnsRecord } from "../hooks/use-dns-records";
+import { IconDns } from "@/shared/ui/icons";
 
 interface DnsRecordFormDialogProps {
   environmentId: string;
@@ -134,7 +135,7 @@ export function DnsRecordFormDialog({ environmentId, record, onClose }: DnsRecor
 
   return (
     <Dialog
-      icon={Globe}
+      icon={IconDns}
       title={isEditing ? t("records.editRecord") : t("records.createRecord")}
       onClose={onClose}
       closeLabel={t("form.cancel")}

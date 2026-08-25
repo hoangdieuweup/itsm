@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Plus, Shield, ShieldCheck, Edit2, Trash2, AlertCircle, Key, Eye } from "lucide-react";
+import { Plus, Shield, Edit2, Trash2, AlertCircle, Key, Eye } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can, RESOURCES, ACTIONS } from "@/entities/permission";
@@ -10,7 +10,10 @@ import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useRoles, isProtectedAdminRole, type Role } from "@/entities/role";
 import { useDeleteRole } from "../hooks/use-delete-role";
 import { RoleFormDialog } from "./role-form-dialog";
+import { RolePermissionsCell } from "./role-permissions-cell";
+import { IconPermission } from "@/shared/ui/icons";
 
+import { m } from "@/shared/lib/motion";
 
 export function RolesPageContent() {
   const t = useTranslations("roles");
@@ -53,15 +56,20 @@ export function RolesPageContent() {
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
+    <m.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-1 min-h-0 flex-col gap-4"
+    >
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="shrink-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
               {t("title")}
             </h1>
-            <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+            <span className="inline-flex items-center rounded-full border border-purple-500/30 bg-purple-500/15 px-2.5 py-0.5 font-mono text-xs font-bold text-purple-600 dark:text-purple-400">
               {page.total}
             </span>
           </div>
@@ -71,7 +79,7 @@ export function RolesPageContent() {
         <Can I={ACTIONS.CREATE} a={RESOURCES.ROLE}>
           <Button
             onClick={handleCreate}
-            className="gap-2 self-start bg-blue-600 font-semibold text-white shadow-xs shadow-blue-500/25 hover:bg-blue-700 sm:self-auto"
+            className="gap-2 self-start bg-gradient-to-r from-blue-600 to-indigo-600 font-semibold text-white shadow-md shadow-blue-500/25 hover:from-blue-700 hover:to-indigo-700 sm:self-auto"
           >
             <Plus className="size-4" />
             {t("createRole")}
@@ -83,38 +91,43 @@ export function RolesPageContent() {
       {errorMessage && (
         <div
           role="alert"
-          className="mb-6 flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/50 dark:text-rose-200"
+          className="shrink-0 flex items-center justify-between rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive backdrop-blur-md"
         >
           <div className="flex items-center gap-2">
-            <AlertCircle className="size-4 shrink-0 text-rose-600 dark:text-rose-400" />
+            <AlertCircle className="size-4 shrink-0 text-destructive" />
             <span>{errorMessage}</span>
           </div>
           <button
             onClick={() => setErrorMessage(null)}
-            className="text-rose-500 hover:text-rose-700 dark:hover:text-rose-300"
+            className="text-xs text-destructive hover:underline cursor-pointer"
           >
-            &times;
+            {tCommon("cancel")}
           </button>
         </div>
       )}
 
-      {/* Roles List Table */}
-      <div className="rounded-xl border border-border/80 bg-card shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* Roles List Table - High Tech Glass Card */}
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-3xl border border-border/50 bg-card/75 backdrop-blur-xl shadow-lg shadow-black/5 dark:shadow-black/20">
+        <div className="flex-1 overflow-auto">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-border/60 bg-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <thead className="sticky top-0 z-10 border-b border-border/40 bg-card/95 backdrop-blur-md text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
               <tr>
-                <th className="px-6 py-3.5">{t("columns.name")}</th>
-                <th className="px-6 py-3.5">{t("columns.type")}</th>
-                <th className="px-6 py-3.5">{t("columns.permissions")}</th>
-                <th className="px-6 py-3.5 text-right">{t("columns.actions")}</th>
+                <th className="px-6 py-4 font-bold text-foreground/80">{t("columns.name")}</th>
+                <th className="px-6 py-4 font-bold text-foreground/80">{t("columns.type")}</th>
+                <th className="px-6 py-4 font-bold text-foreground/80">{t("columns.permissions")}</th>
+                <th className="px-6 py-4 text-right font-bold text-foreground/80">{t("columns.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
               {page.items.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">
-                    {t("empty")}
+                  <td colSpan={4} className="px-6 py-16 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center gap-2.5">
+                      <div className="flex size-12 items-center justify-center rounded-2xl bg-muted/60">
+                        <Shield className="size-6 text-muted-foreground/60" />
+                      </div>
+                      <p className="font-medium">{t("empty")}</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -126,31 +139,27 @@ export function RolesPageContent() {
                   return (
                     <tr
                       key={role.id}
-                      className="transition-colors hover:bg-muted/30"
+                      className="transition-colors hover:bg-muted/40"
                     >
-                      <td className="px-6 py-4 font-medium text-foreground">
+                      <td className="px-6 py-4 font-semibold text-foreground">
                         <div className="flex items-center gap-2.5">
-                          {isSystem ? (
-                            <ShieldCheck className="size-4 shrink-0 text-indigo-500" />
-                          ) : (
-                            <Shield className="size-4 shrink-0 text-muted-foreground" />
-                          )}
+                          <IconPermission className="size-5 shrink-0 rounded-lg shadow-2xs" />
                           <span>{role.name}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
                           <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            className={`inline-flex items-center rounded-lg px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider ${
                               isSystem
-                                ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300"
-                                : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                                ? "border border-indigo-500/30 bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 shadow-2xs"
+                                : "border border-border/70 bg-muted/60 text-foreground"
                             }`}
                           >
                             {isSystem ? t("types.system") : t("types.custom")}
                           </span>
                           {isProtectedAdminRole(role) && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" title={t("actions.adminProtectedTooltip")}>
+                            <span className="inline-flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300 shadow-2xs" title={t("actions.adminProtectedTooltip")}>
                               <Key className="size-3" />
                               {t("badges.adminProtected")}
                             </span>
@@ -158,9 +167,11 @@ export function RolesPageContent() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="inline-flex rounded-md border border-border/60 bg-muted/50 px-2 py-0.5 font-mono text-xs font-semibold text-foreground">
-                          {t("permissionsCount", { count: role.permissions.length })}
-                        </span>
+                        <RolePermissionsCell
+                          permissions={role.permissions}
+                          roleName={role.name}
+                          isSystem={role.isSystem}
+                        />
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -190,7 +201,7 @@ export function RolesPageContent() {
                                 variant="ghost"
                                 disabled={isDeleting}
                                 onClick={() => handleDelete(role)}
-                                className="size-8 p-0 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/50"
+                                className="size-8 p-0 text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 dark:hover:bg-rose-950/50"
                                 title={t("actions.delete")}
                               >
                                 <Trash2 className="size-3.5" />
@@ -241,6 +252,6 @@ export function RolesPageContent() {
         variant="destructive"
         isLoading={deleteRole.isPending}
       />
-    </div>
+    </m.div>
   );
 }

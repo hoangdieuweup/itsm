@@ -4,6 +4,10 @@
   "createAccount": "Thêm tài khoản",
   "editAccount": "Sửa tài khoản",
   "empty": "Chưa có tài khoản Cloudflare nào.",
+  "emptyTitle": "Chưa cấu hình tài khoản",
+  "edgeZone": "Khu vực Edge",
+  "activeStatus": "Đang hoạt động",
+  "accountIdLabel": "Mã tài khoản:",
   "table": {
     "label": "Tên gợi nhớ",
     "cfAccountId": "Cloudflare Account ID",
@@ -12,6 +16,7 @@
   },
   "actions": {
     "testConnection": "Kiểm tra kết nối",
+    "testingApi": "Đang kiểm tra...",
     "testConnectionSuccess": "Kết nối thành công.",
     "revealToken": "Xem token",
     "hideToken": "Ẩn token",

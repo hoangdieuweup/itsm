@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { FolderKanban } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -11,6 +10,7 @@ import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import type { Project } from "@/entities/project";
 import { useCreateProject } from "../hooks/use-create-project";
 import { useUpdateProject } from "../hooks/use-update-project";
+import { IconProject } from "@/shared/ui/icons";
 
 interface ProjectFormDialogProps {
   isOpen: boolean;
@@ -50,7 +50,7 @@ export function ProjectFormDialog({ isOpen, onClose, project }: ProjectFormDialo
 
   return (
     <Dialog
-      icon={FolderKanban}
+      icon={IconProject}
       title={isEditing ? t("editProject") : t("createProject")}
       onClose={onClose}
       closeLabel={t("form.cancel")}

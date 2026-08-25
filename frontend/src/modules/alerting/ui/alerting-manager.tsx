@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Bell, Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
@@ -12,6 +12,7 @@ import { useAlertRulesQuery } from "../hooks/use-alert-rules";
 import { useDeleteAlertRule } from "../hooks/use-delete-alert-rule";
 import type { AlertRule } from "../model/schema";
 import { AlertRuleFormDialog } from "./alert-rule-form-dialog";
+import { IconNotification } from "@/shared/ui/icons";
 
 /**
  * The reusable alert-rule-management surface — table, create/edit/delete —
@@ -30,21 +31,53 @@ export function AlertingManager({ environmentId }: { environmentId: string }) {
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <section className="flex flex-col gap-3 rounded-xl border bg-card p-5">
+      <section className="flex flex-col gap-4 rounded-3xl border border-border/60 bg-gradient-to-br from-card via-card/90 to-amber-500/5 p-6 backdrop-blur-xl shadow-lg shadow-black/5 dark:shadow-black/20">
         <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <Bell className="size-4 text-primary" aria-hidden="true" /> {t("title")}
-          </h2>
+          <div className="flex items-center gap-3">
+            <IconNotification className="size-8 shrink-0 rounded-xl shadow-xs" />
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-foreground">
+                {t("title")}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Automated incident triggers & multi-channel routing
+              </p>
+            </div>
+          </div>
           <Can I={ACTIONS.CREATE} a={PERMISSIONS.ALERT_RULE.RESOURCE}>
-            <Button size="sm" onClick={() => setFormTarget("create")}>
-              <Plus className="mr-1.5 size-3.5" aria-hidden="true" /> {t("addRule")}
+            <Button
+              size="sm"
+              onClick={() => setFormTarget("create")}
+              className="gap-1.5 bg-gradient-to-r from-amber-600 to-orange-600 font-semibold text-white shadow-md shadow-amber-500/20 hover:from-amber-700 hover:to-orange-700 cursor-pointer"
+            >
+              <Plus className="size-3.5" aria-hidden="true" /> {t("addRule")}
             </Button>
           </Can>
         </div>
 
-        {isLoading && <div className="h-24 w-full animate-pulse rounded-xl bg-muted/50" />}
+        {isLoading && <div className="h-28 w-full animate-pulse rounded-2xl bg-muted/50" />}
 
-        {!isLoading && rules.length === 0 && <p className="text-sm text-muted-foreground">{t("empty")}</p>}
+        {!isLoading && rules.length === 0 && (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 py-10 px-4 text-center">
+            <IconNotification className="size-12 rounded-2xl shadow-xs mb-3 opacity-90" />
+            <h3 className="text-sm font-bold text-foreground">
+              {t("empty")}
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+              Define metric thresholds and LogQL conditions to trigger automated alerts across Telegram, Discord & Slack.
+            </p>
+            <Can I={ACTIONS.CREATE} a={PERMISSIONS.ALERT_RULE.RESOURCE}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setFormTarget("create")}
+                className="mt-4 gap-1.5 shadow-2xs cursor-pointer"
+              >
+                <Plus className="size-3.5" aria-hidden="true" /> {t("addRule")}
+              </Button>
+            </Can>
+          </div>
+        )}
 
         {!isLoading && rules.length > 0 && (
           <div className="overflow-x-auto">

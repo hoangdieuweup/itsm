@@ -4,6 +4,10 @@
   "createAccount": "New Account",
   "editAccount": "Edit Account",
   "empty": "No Cloudflare accounts yet.",
+  "emptyTitle": "No accounts configured",
+  "edgeZone": "Edge Zone",
+  "activeStatus": "Active",
+  "accountIdLabel": "Account ID:",
   "table": {
     "label": "Label",
     "cfAccountId": "Cloudflare Account ID",
@@ -12,6 +16,7 @@
   },
   "actions": {
     "testConnection": "Test Connection",
+    "testingApi": "Testing API...",
     "testConnectionSuccess": "Connection succeeded.",
     "revealToken": "Reveal Token",
     "hideToken": "Hide Token",

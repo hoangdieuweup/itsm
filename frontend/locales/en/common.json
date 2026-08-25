@@ -47,7 +47,33 @@
     "roleManagementTitle": "Roles & Permissions",
     "roleManagementDesc": "Configure custom roles and assign fine-grained permissions.",
     "serviceDeskTitle": "Service Desk",
-    "serviceDeskDesc": "Incident and ticket management widgets coming in next milestone."
+    "serviceDeskDesc": "Incident and ticket management widgets coming in next milestone.",
+    "systemStatus": "System Status",
+    "liveOperational": "All systems operational",
+    "operationalStatus": "Operational Status: Active",
+    "nodeVersion": "Production Node v2.4",
+    "telemetry": "Real-time Telemetry",
+    "quickLaunchpad": "Quick Launchpad",
+    "recentActivity": "Recent System Audit Activity",
+    "viewAll": "View all",
+    "stats": {
+      "cloudflareAccounts": "Cloudflare Accounts",
+      "cloudflareDesc": "Edge & DNS Infrastructure",
+      "activeIncidents": "Open Incidents",
+      "incidentsDesc": "High Priority Events",
+      "activeProjects": "Projects & Environments",
+      "projectsDesc": "Active Deployments",
+      "securityAudit": "Audit Log Events",
+      "securityDesc": "Recorded in last 24h"
+    },
+    "actions": {
+      "manageUsers": "User Directory",
+      "manageRoles": "Role Matrix",
+      "manageProjects": "Projects Hub",
+      "manageCloudflare": "Cloudflare Edge",
+      "viewIncidents": "Incident Control",
+      "viewAuditLog": "Audit Trail"
+    }
   },
   "noPermission": {
     "title": "Access Denied",
@@ -56,5 +82,15 @@
   "confirmDialog": {
     "confirm": "Confirm",
     "cancel": "Cancel"
+  },
+  "pagination": {
+    "showing": "Showing",
+    "to": "to",
+    "of": "of",
+    "results": "results",
+    "perPage": "/ page",
+    "prev": "Previous",
+    "next": "Next",
+    "page": "Page"
   }
 }

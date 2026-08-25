@@ -62,13 +62,13 @@ describe("Dialog", () => {
   it("calls onClose when the backdrop is clicked", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
-    const { container } = render(
+    render(
       <Dialog icon={Shield} title="Create Role" onClose={onClose} closeLabel="Cancel">
         <p>Form body</p>
       </Dialog>,
     );
 
-    const backdrop = container.querySelector('[aria-hidden="true"]');
+    const backdrop = document.body.querySelector('[aria-hidden="true"]');
     expect(backdrop).not.toBeNull();
     await user.click(backdrop as Element);
     expect(onClose).toHaveBeenCalledTimes(1);

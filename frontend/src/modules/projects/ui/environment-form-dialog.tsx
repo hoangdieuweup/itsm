@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Server } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -11,6 +10,7 @@ import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { ENVIRONMENT_TYPE, type Environment, type EnvironmentType } from "@/entities/environment";
 import { useCreateEnvironment } from "../hooks/use-create-environment";
 import { useUpdateEnvironment } from "../hooks/use-update-environment";
+import { IconServer } from "@/shared/ui/icons";
 
 interface EnvironmentFormDialogProps {
   isOpen: boolean;
@@ -62,7 +62,7 @@ export function EnvironmentFormDialog({
 
   return (
     <Dialog
-      icon={Server}
+      icon={IconServer}
       title={isEditing ? t("editEnvironment") : t("createEnvironment")}
       onClose={onClose}
       closeLabel={t("form.cancel")}

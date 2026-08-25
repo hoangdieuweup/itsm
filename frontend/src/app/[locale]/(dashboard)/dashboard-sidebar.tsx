@@ -1,20 +1,12 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type ComponentType } from "react";
 import { useTranslations } from "next-intl";
 import {
-  LayoutDashboard,
-  Users,
-  Shield,
-  FolderKanban,
-  ScrollText,
-  Cloud,
-  Siren,
   ChevronLeft,
   ChevronRight,
   LogOut,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import { Link, usePathname } from "@/shared/lib/i18n/navigation";
 import { ROUTES } from "@/shared/constants/routes";
@@ -26,6 +18,16 @@ import { useLogout } from "@/modules/auth/hooks/use-logout";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { AnimatePresence, m } from "@/shared/lib/motion";
 import { cn } from "@/shared/lib/utils";
+import {
+  IconAuditLogs,
+  IconCloudflare,
+  IconPermission,
+  IconProject,
+  IconDashboard,
+  IconUsers,
+  IconNotification,
+  BrandLogo,
+} from "@/shared/ui/icons";
 
 interface DashboardSidebarProps {
   mobileOpen: boolean;
@@ -35,7 +37,7 @@ interface DashboardSidebarProps {
 interface NavItem {
   href: string;
   label: string;
-  icon: LucideIcon;
+  icon: ComponentType<{ className?: string; size?: number | string }>;
   active: boolean;
   permission: { action: string; resource: string } | null;
 }
@@ -53,7 +55,7 @@ const sidebarStore = {
   },
   getServerSnapshot: () => false,
   subscribe: (callback: () => void) => {
-    if (typeof window === "undefined") return () => {};
+    if (typeof window === "undefined") return () => { };
     window.addEventListener("sidebar-toggle", callback);
     window.addEventListener("storage", callback);
     return () => {
@@ -65,7 +67,7 @@ const sidebarStore = {
     try {
       localStorage.setItem(SIDEBAR_STORAGE_KEY, String(!current));
       window.dispatchEvent(new Event("sidebar-toggle"));
-    } catch {}
+    } catch { }
   },
 };
 
@@ -102,9 +104,7 @@ function SidebarBrand({
         className="flex items-center gap-3 overflow-hidden transition-opacity hover:opacity-90"
         title={appName}
       >
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-black text-base shadow-sm shadow-blue-500/25">
-          W
-        </div>
+        <BrandLogo className="size-9 shrink-0 drop-shadow-sm" alt={appName} />
         {!isCollapsed && (
           <div className="flex flex-col overflow-hidden whitespace-nowrap">
             <div className="flex items-center gap-1.5">
@@ -438,42 +438,42 @@ export function DashboardSidebar({
     {
       href: ROUTES.dashboard,
       label: t("dashboard"),
-      icon: LayoutDashboard,
+      icon: IconDashboard,
       active: pathname === ROUTES.dashboard,
       permission: null,
     },
     {
       href: ROUTES.adminUsers,
       label: t("users"),
-      icon: Users,
+      icon: IconUsers,
       active: pathname.startsWith(ROUTES.adminUsers),
       permission: { action: ACTIONS.READ, resource: RESOURCES.USER },
     },
     {
       href: ROUTES.adminRoles,
       label: t("roles"),
-      icon: Shield,
+      icon: IconPermission,
       active: pathname.startsWith(ROUTES.adminRoles),
       permission: { action: ACTIONS.READ, resource: RESOURCES.ROLE },
     },
     {
       href: ROUTES.adminProjects,
       label: t("projects"),
-      icon: FolderKanban,
+      icon: IconProject,
       active: pathname.startsWith(ROUTES.adminProjects),
       permission: { action: ACTIONS.READ, resource: RESOURCES.PROJECT },
     },
     {
       href: ROUTES.adminAuditLog,
       label: t("auditLog"),
-      icon: ScrollText,
+      icon: IconAuditLogs,
       active: pathname.startsWith(ROUTES.adminAuditLog),
       permission: { action: ACTIONS.READ, resource: RESOURCES.AUDIT_LOG },
     },
     {
       href: ROUTES.adminCloudflareAccounts,
       label: t("cloudflareAccounts"),
-      icon: Cloud,
+      icon: IconCloudflare,
       active:
         pathname.startsWith(ROUTES.adminCloudflareAccounts) ||
         pathname.startsWith(ROUTES.adminEnvironments),
@@ -482,7 +482,7 @@ export function DashboardSidebar({
     {
       href: ROUTES.adminIncidents,
       label: t("incidents"),
-      icon: Siren,
+      icon: IconNotification,
       active: pathname.startsWith(ROUTES.adminIncidents),
       permission: { action: ACTIONS.READ, resource: RESOURCES.INCIDENT },
     },

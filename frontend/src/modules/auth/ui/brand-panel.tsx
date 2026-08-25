@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Monitor, ShieldAlert, TicketCheck } from "lucide-react";
 
 import { m } from "@/shared/lib/motion";
+import { BrandLogo } from "@/shared/ui/icons";
 
 export function BrandPanel() {
   const t = useTranslations("auth.brand");
@@ -28,14 +29,14 @@ export function BrandPanel() {
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
-          className="flex items-center gap-3"
+          className="flex items-center gap-3.5"
         >
-          <div className="flex size-9 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
-            <span className="text-lg font-extrabold leading-none">W</span>
+          <div className="flex size-11 items-center justify-center rounded-2xl bg-white/20 p-1.5 backdrop-blur-md shadow-md ring-1 ring-white/25">
+            <BrandLogo className="size-full object-contain drop-shadow-sm" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-xl font-bold tracking-wide">WEUP</span>
-            <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold tracking-widest">
+            <span className="text-2xl font-extrabold tracking-wide">WEUP</span>
+            <span className="rounded-md border border-white/30 bg-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase">
               ITSM
             </span>
           </div>

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { UserPlus } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Label } from "@/shared/ui/label";
 import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
@@ -12,6 +11,7 @@ import { API_CONFIG } from "@/shared/constants/api";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useAssignCloudflareAccountManager } from "../hooks/use-assign-cloudflare-account-manager";
 import { ACCESS_LEVEL, type AccessLevel } from "../api/fetchers";
+import { IconUsers } from "@/shared/ui/icons";
 
 interface CloudflareAccountManagerFormDialogProps {
   accountId: string;
@@ -64,7 +64,7 @@ export function CloudflareAccountManagerFormDialog({
   };
 
   return (
-    <Dialog icon={UserPlus} title={t("managers.assign")} onClose={onClose} closeLabel={t("form.cancel")}>
+    <Dialog icon={IconUsers} title={t("managers.assign")} onClose={onClose} closeLabel={t("form.cancel")}>
       <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto p-6">
         {errorMessage && <DialogErrorAlert message={errorMessage} />}
 

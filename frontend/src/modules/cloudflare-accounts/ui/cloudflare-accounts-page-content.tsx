@@ -13,6 +13,8 @@ import { useCloudflareAccountsQuery, type CloudflareAccount } from "@/entities/c
 import { useDeleteCloudflareAccount } from "../hooks/use-delete-cloudflare-account";
 import { CloudflareAccountFormDialog } from "./cloudflare-account-form-dialog";
 
+import { m } from "@/shared/lib/motion";
+
 export function CloudflareAccountsPageContent() {
   const t = useTranslations("cloudflareAccounts");
   const { data: accounts } = useCloudflareAccountsQuery();
@@ -22,14 +24,30 @@ export function CloudflareAccountsPageContent() {
   const [deleteTarget, setDeleteTarget] = useState<CloudflareAccount | null>(null);
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <m.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-1 min-h-0 flex-col gap-4"
+    >
+      <div className="shrink-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">{t("title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("description")}</p>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+              {t("title")}
+            </h1>
+            <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/15 px-2.5 py-0.5 font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
+              {accounts.length}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">{t("description")}</p>
         </div>
+
         <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
-          <Button onClick={() => setFormTarget("create")}>
+          <Button
+            onClick={() => setFormTarget("create")}
+            className="gap-2 self-start bg-gradient-to-r from-blue-600 to-cyan-600 font-semibold text-white shadow-md shadow-blue-500/25 hover:from-blue-700 hover:to-cyan-700 sm:self-auto"
+          >
             <Plus className="size-4" aria-hidden="true" />
             {t("createAccount")}
           </Button>
@@ -37,54 +55,62 @@ export function CloudflareAccountsPageContent() {
       </div>
 
       {accounts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-16 text-center">
-          <Cloud className="size-10 text-muted-foreground mb-3" aria-hidden="true" />
-          <p className="text-sm text-muted-foreground">{t("empty")}</p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-3xl border border-border/50 bg-card/75 py-16 text-center backdrop-blur-xl shadow-lg">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+            <Cloud className="size-6" aria-hidden="true" />
+          </div>
+          <h2 className="text-lg font-bold text-foreground">{t("emptyTitle")}</h2>
+          <p className="max-w-sm text-sm text-muted-foreground">{t("empty")}</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-muted-foreground">
+        <div className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-3xl border border-border/50 bg-card/75 backdrop-blur-xl shadow-lg shadow-black/5 dark:shadow-black/20">
+          <div className="flex-1 overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10 border-b border-border/40 bg-card/95 backdrop-blur-md text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
               <tr>
-                <th className="px-4 py-3 font-medium">{t("table.label")}</th>
-                <th className="px-4 py-3 font-medium">{t("table.cfAccountId")}</th>
-                <th className="px-4 py-3 font-medium">{t("table.createdAt")}</th>
-                <th className="px-4 py-3 font-medium text-right">{t("table.actions")}</th>
+                <th className="px-6 py-4 font-bold text-foreground/80">{t("table.label")}</th>
+                <th className="px-6 py-4 font-bold text-foreground/80">{t("table.cfAccountId")}</th>
+                <th className="px-6 py-4 font-bold text-foreground/80">{t("table.createdAt")}</th>
+                <th className="px-6 py-4 text-right font-bold text-foreground/80">{t("table.actions")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-border/40">
               {accounts.map((account) => (
-                <tr key={account.id} className="hover:bg-muted/30">
-                  <td className="px-4 py-3">
+                <tr key={account.id} className="transition-colors hover:bg-muted/40">
+                  <td className="px-6 py-4 font-semibold text-foreground">
                     <Link
                       href={`${ROUTES.adminCloudflareAccounts}/${account.id}`}
-                      className="font-medium text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      className="text-primary hover:underline"
                     >
                       {account.label}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{account.cfAccountId}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td className="px-6 py-4 font-mono text-xs text-muted-foreground">
+                    {account.cfAccountId}
+                  </td>
+                  <td className="px-6 py-4 font-mono text-xs text-muted-foreground">
                     {new Date(account.createdAt).toLocaleDateString()}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-2">
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-1.5">
                       <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
                         <Button
                           variant="ghost"
-                          size="icon-sm"
+                          size="sm"
                           onClick={() => setFormTarget(account)}
+                          className="size-8 p-0 text-muted-foreground hover:text-foreground"
                           aria-label={t("editAccount")}
                         >
-                          <Pencil className="size-4" aria-hidden="true" />
+                          <Pencil className="size-3.5" aria-hidden="true" />
                         </Button>
                         <Button
                           variant="ghost"
-                          size="icon-sm"
+                          size="sm"
                           onClick={() => setDeleteTarget(account)}
+                          className="size-8 p-0 text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 dark:hover:bg-rose-950/50"
                           aria-label={t("deleteConfirm.title")}
                         >
-                          <Trash2 className="size-4 text-destructive" aria-hidden="true" />
+                          <Trash2 className="size-3.5" aria-hidden="true" />
                         </Button>
                       </Can>
                     </div>
@@ -94,6 +120,7 @@ export function CloudflareAccountsPageContent() {
             </tbody>
           </table>
         </div>
+      </div>
       )}
 
       {formTarget !== null && (
@@ -103,20 +130,18 @@ export function CloudflareAccountsPageContent() {
         />
       )}
 
-      {deleteTarget !== null && (
-        <ConfirmDialog
-          isOpen
-          onClose={() => setDeleteTarget(null)}
-          onConfirm={async () => {
-            await deleteAccount.mutateAsync(deleteTarget.id);
-            setDeleteTarget(null);
-          }}
-          title={t("deleteConfirm.title")}
-          description={t("deleteConfirm.description")}
-          variant="destructive"
-          isLoading={deleteAccount.isPending}
-        />
-      )}
-    </div>
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (deleteTarget) {
+            deleteAccount.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) });
+          }
+        }}
+        title={t("deleteConfirm.title")}
+        description={t("deleteConfirm.description", { label: deleteTarget?.label ?? "" })}
+        isLoading={deleteAccount.isPending}
+      />
+    </m.div>
   );
 }

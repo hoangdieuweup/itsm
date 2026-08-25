@@ -1,4 +1,5 @@
 {
+  "drawerSubtitle": "Nhật ký truy vấn Grafana Loki & Cloudflare Audit Log",
   "environmentTypes": {
     "dev": "Phát triển",
     "staging": "Staging",

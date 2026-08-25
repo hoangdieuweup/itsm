@@ -1,7 +1,9 @@
 {
   "title": "Tunnels",
+  "subtitle": "Cloudflare edge tunnel connectors & ingress routing",
+  "drawerSubtitle": "Cloudflare Tunnels & Public Edge Routing",
   "addTunnel": "Add Tunnel",
-  "empty": "No tunnels yet.",
+  "empty": "No active tunnel daemon connected to this environment yet.",
   "refreshStatus": "Refresh status",
   "revealToken": "Reveal connector token",
   "status": {
@@ -29,8 +31,14 @@
   },
   "hostnames": {
     "title": "Public Hostnames",
+    "subtitle": "Public DNS routing & reverse proxy bindings",
+    "target": "Target",
+    "publicUrl": "Public URL",
+    "serviceHint": "Local backend port or container endpoint (e.g. http://localhost:3000)",
+    "copied": "Copied!",
+    "copyLink": "Copy https:// link",
     "add": "Add Hostname",
-    "empty": "No hostnames matched to this environment. Either this environment's Base URL doesn't exactly match a hostname this tunnel routes, or none exist on Cloudflare yet — use \"Add Hostname\" above to create one.",
+    "empty": "No public hostnames mapped to this tunnel connector yet.",
     "noneMatched": "No public host matched to this environment yet",
     "mapping": "{hostname} → {service}",
     "edit": "Edit hostname",

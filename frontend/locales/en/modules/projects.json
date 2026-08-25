@@ -18,12 +18,24 @@
     "closeLogsDrawer": "Close logs panel",
     "closeAlertingDrawer": "Close alerting panel",
     "manageLogs": "View Logs",
-    "manageAlerting": "Manage Alerting"
+    "manageAlerting": "Manage Alerting",
+    "inspect": "Inspect",
+    "edit": "Edit",
+    "delete": "Delete"
   },
   "table": {
     "name": "Name",
     "description": "Description"
   },
+  "workspace": "Workspace",
+  "activeWorkspace": "Active Workspace",
+  "noDescription": "No project description provided.",
+  "environmentsAndConfig": "Environments & Config",
+  "environmentsCount": "{count} Environments",
+  "heroDescription": "Production workspace configuration and environment bindings.",
+  "edgeDns": "Edge DNS",
+  "lokiLogs": "Loki Logs",
+  "alerts": "Alerts",
   "sections": {
     "environments": "Environments",
     "links": "External Links"

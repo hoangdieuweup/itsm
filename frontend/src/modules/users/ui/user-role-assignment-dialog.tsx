@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { Shield, Check, Lock } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
@@ -15,6 +15,7 @@ import {
   type Role,
 } from "@/entities/role";
 import { useAssignUserRoles } from "../hooks/use-assign-user-roles";
+import { IconPermission } from "@/shared/ui/icons";
 
 interface UserRoleAssignmentDialogProps {
   isOpen: boolean;
@@ -52,15 +53,19 @@ function UserRoleAssignmentInner({
 
   const availableRoles = useMemo(() => rolesPage?.items ?? [], [rolesPage]);
 
-  const initialRoleIds = useMemo(() => {
-    const userRoleNamesSet = new Set(
-      user.roleNames && user.roleNames.length > 0
-        ? user.roleNames
-        : user.roleName
-          ? [user.roleName]
-          : [SYSTEM_ROLE_NAMES.MEMBER],
-    );
+  const userRoleNamesSet = useMemo(
+    () =>
+      new Set(
+        user.roleNames && user.roleNames.length > 0
+          ? user.roleNames
+          : user.roleName
+            ? [user.roleName]
+            : [SYSTEM_ROLE_NAMES.MEMBER],
+      ),
+    [user],
+  );
 
+  const defaultRoleIds = useMemo(() => {
     const ids = new Set<string>();
     for (const r of availableRoles) {
       if (userRoleNamesSet.has(r.name)) {
@@ -68,24 +73,24 @@ function UserRoleAssignmentInner({
       }
     }
     return ids;
-  }, [availableRoles, user]);
+  }, [availableRoles, userRoleNamesSet]);
 
-  const [selectedRoleIds, setSelectedRoleIds] = useState<Set<string>>(initialRoleIds);
+  const [customRoleIds, setCustomRoleIds] = useState<Set<string> | null>(null);
+  const selectedRoleIds = customRoleIds ?? defaultRoleIds;
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Check if target user has protected admin status
   const isTargetAdmin = isProtectedAdminRole(user.roleName) || user.roleNames?.includes(SYSTEM_ROLE_NAMES.ADMIN);
 
   const toggleRole = (role: Role) => {
     if (!canAssignRole) return;
 
-    // If user is protected admin and this is the admin role, don't allow unchecking
     if (isTargetAdmin && role.name === SYSTEM_ROLE_NAMES.ADMIN && selectedRoleIds.has(role.id)) {
       return;
     }
 
-    setSelectedRoleIds((prev) => {
-      const next = new Set(prev);
+    setCustomRoleIds(() => {
+      const next = new Set(selectedRoleIds);
       if (next.has(role.id)) {
         next.delete(role.id);
       } else {
@@ -118,7 +123,7 @@ function UserRoleAssignmentInner({
 
   return (
     <Dialog
-      icon={Shield}
+      icon={IconPermission}
       title={t("actions.assignRolesDialogTitle")}
       onClose={onClose}
       closeLabel={t("actions.closeRolesDialog")}
@@ -126,8 +131,8 @@ function UserRoleAssignmentInner({
       disableClose={assignRoles.isPending}
     >
       {/* Body */}
-      <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
+      <form onSubmit={handleSubmit} className="flex flex-1 min-h-0 flex-col overflow-hidden">
+        <div className="flex flex-1 min-h-0 flex-col gap-5 overflow-y-auto px-7 sm:px-8 py-5">
           {/* Error Banner */}
           {(errorMessage || rolesFetchError) && (
             <DialogErrorAlert
@@ -137,8 +142,8 @@ function UserRoleAssignmentInner({
 
           {/* Protected Admin Notice */}
           {isTargetAdmin && (
-            <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-50/60 p-3.5 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-950/40 dark:text-amber-300">
-              <Lock className="size-4 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2.5 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-xs text-amber-800 dark:text-amber-300">
+              <Lock className="size-4.5 shrink-0 mt-0.5" />
               <span>{t("actions.adminRoleProtected")}</span>
             </div>
           )}
@@ -150,11 +155,11 @@ function UserRoleAssignmentInner({
           {/* Roles Checkbox List */}
           {isRolesLoading ? (
             <div className="flex flex-col gap-2 py-4">
-              <div className="h-12 w-full animate-pulse rounded-xl bg-muted/50" />
-              <div className="h-12 w-full animate-pulse rounded-xl bg-muted/50" />
+              <div className="h-12 w-full animate-pulse rounded-2xl bg-muted/50" />
+              <div className="h-12 w-full animate-pulse rounded-2xl bg-muted/50" />
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2.5">
               {availableRoles.map((role) => {
                 const isChecked = selectedRoleIds.has(role.id);
                 const isLockedAdmin =
@@ -164,33 +169,33 @@ function UserRoleAssignmentInner({
                   <div
                     key={role.id}
                     onClick={() => toggleRole(role)}
-                    className={`flex cursor-pointer items-center justify-between rounded-xl border p-3.5 transition-colors select-none ${
+                    className={`flex cursor-pointer items-center justify-between rounded-2xl border p-3.5 transition-colors select-none ${
                       isChecked
-                        ? "border-primary/40 bg-primary/5 dark:border-primary/30 dark:bg-primary/10"
-                        : "border-border/60 bg-muted/20 hover:bg-muted/40"
+                        ? "border-blue-500/40 bg-blue-500/10 text-foreground font-medium dark:border-blue-500/30 dark:bg-blue-500/15 shadow-2xs"
+                        : "border-border/40 bg-card/60 hover:border-border/70 hover:bg-muted/40"
                     } ${isLockedAdmin ? "cursor-not-allowed opacity-90" : ""}`}
                   >
                     <div className="flex items-center gap-3">
                       <div
-                        className={`flex size-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                        className={`flex size-5 shrink-0 items-center justify-center rounded-lg border transition-colors ${
                           isChecked
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-muted-foreground/40 bg-background"
+                            ? "border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500 shadow-2xs"
+                            : "border-muted-foreground/30 bg-background"
                         }`}
                       >
-                        {isChecked && <Check className="size-3.5 stroke-[3]" />}
+                        {isChecked && <Check className="size-3 stroke-[3]" />}
                       </div>
 
                       <div className="flex flex-col">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">
+                          <span className="text-sm font-bold text-foreground">
                             {role.name}
                           </span>
                           <span
-                            className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                            className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                               role.isSystem
                                 ? "border border-amber-500/30 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-950/60 dark:text-amber-300"
-                                : "border border-border/80 bg-muted/60 text-muted-foreground"
+                                : "border border-border/60 bg-muted/60 text-muted-foreground"
                             }`}
                           >
                             {role.isSystem ? tRoles("types.system") : tRoles("types.custom")}
@@ -214,21 +219,21 @@ function UserRoleAssignmentInner({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-border/60 bg-muted/20 px-6 py-4">
+        {/* Footer - Pinned nicely at bottom */}
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border/30 bg-card/80 px-7 sm:px-8 py-4 backdrop-blur-md">
           <Button
             type="button"
             variant="outline"
             onClick={onClose}
             disabled={assignRoles.isPending}
-            className="font-medium"
+            className="rounded-xl font-medium"
           >
             {tRoles("form.cancel")}
           </Button>
           <Button
             type="submit"
             disabled={assignRoles.isPending || !canAssignRole}
-            className="font-medium shadow-2xs"
+            className="rounded-xl bg-blue-600 font-semibold text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 shadow-xs cursor-pointer"
           >
             {assignRoles.isPending ? t("actions.savingRoles") : t("actions.saveRoles")}
           </Button>

@@ -12,6 +12,9 @@ import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useDeleteNotificationChannel } from "../hooks/use-delete-channel";
 import { useTestSendNotificationChannel } from "../hooks/use-test-send-channel";
 import { NotificationChannelFormDialog } from "./notification-channel-form-dialog";
+import { IconNotification } from "@/shared/ui/icons";
+
+import { m } from "@/shared/lib/motion";
 
 function TestSendButton({ channelId }: { channelId: string }) {
   const t = useTranslations("notifications");
@@ -25,7 +28,8 @@ function TestSendButton({ channelId }: { channelId: string }) {
         onClick={() => testSend.mutate({ id: channelId })}
         disabled={testSend.isPending}
         aria-label={t("actions.sendTest")}
-        className="cursor-pointer text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-muted-foreground transition-all hover:border-primary/40 hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer shadow-2xs"
+        title={t("actions.sendTest")}
       >
         <Send className="size-3.5" aria-hidden="true" />
       </button>
@@ -33,13 +37,13 @@ function TestSendButton({ channelId }: { channelId: string }) {
         <span
           role="status"
           aria-atomic="true"
-          className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"
+          className="flex items-center gap-1 font-mono text-xs text-emerald-600 dark:text-emerald-400 font-semibold"
         >
           <CheckCircle2 className="size-3.5" aria-hidden="true" /> {t("actions.testSendSuccess")}
         </span>
       )}
       {testSend.isError && (
-        <span role="alert" className="flex items-center gap-1 text-xs text-destructive">
+        <span role="alert" className="flex items-center gap-1 font-mono text-xs text-destructive">
           <XCircle className="size-3.5" aria-hidden="true" /> {getErrorMessage(testSend.error)}
         </span>
       )}
@@ -56,62 +60,113 @@ export function NotificationChannelsSection({ projectId }: { projectId: string }
   const [deleteTarget, setDeleteTarget] = useState<NotificationChannel | null>(null);
 
   return (
-    <section className="flex flex-col gap-3 rounded-xl border bg-card p-5">
+    <m.section
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: 0.15 }}
+      className="mt-6 flex flex-col gap-5 rounded-3xl border border-border/50 bg-card/75 p-6 backdrop-blur-xl shadow-lg shadow-black/5 dark:shadow-black/20"
+    >
       <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-sm font-bold text-foreground">
-          <Bell className="size-4" aria-hidden="true" /> {t("section.title")}
-        </h2>
+        <div className="flex items-center gap-2.5">
+          <IconNotification className="size-8 shrink-0 rounded-xl shadow-xs" />
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">
+                {t("section.title")}
+              </h2>
+              <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 font-mono text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                {channels.length}
+              </span>
+            </div>
+          </div>
+        </div>
+
         <Can I={ACTIONS.CREATE} a={RESOURCES.NOTIFICATION_CHANNEL}>
-          <Button size="sm" onClick={() => setFormTarget("create")}>
-            <Plus className="mr-1.5 size-3.5" aria-hidden="true" /> {t("actions.add")}
+          <Button
+            size="sm"
+            onClick={() => setFormTarget("create")}
+            className="gap-1.5 bg-gradient-to-r from-amber-600 to-orange-600 font-semibold text-white shadow-xs hover:from-amber-700 hover:to-orange-700"
+          >
+            <Plus className="size-3.5" aria-hidden="true" /> {t("actions.add")}
           </Button>
         </Can>
       </div>
 
-      {channels.length === 0 && <p className="text-sm text-muted-foreground">{t("section.empty")}</p>}
-
-      <div className="flex flex-col divide-y">
-        {channels.map((channel) => (
-          <div key={channel.id} className="flex items-center justify-between py-2 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-foreground">{channel.name}</span>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">
-                {t(`types.${channel.type}`)}
-              </span>
-              {!channel.isActive && (
-                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
-                  {t("section.inactive")}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              <Can I={ACTIONS.UPDATE} a={RESOURCES.NOTIFICATION_CHANNEL}>
-                <TestSendButton channelId={channel.id} />
-              </Can>
-              <Can I={ACTIONS.UPDATE} a={RESOURCES.NOTIFICATION_CHANNEL}>
-                <button
-                  type="button"
-                  onClick={() => setFormTarget(channel)}
-                  aria-label={t("actions.edit")}
-                  className="cursor-pointer text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                >
-                  <Pencil className="size-3.5" aria-hidden="true" />
-                </button>
-              </Can>
-              <Can I={ACTIONS.DELETE} a={RESOURCES.NOTIFICATION_CHANNEL}>
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(channel)}
-                  aria-label={t("actions.delete")}
-                  className="cursor-pointer text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                >
-                  <Trash2 className="size-3.5" aria-hidden="true" />
-                </button>
-              </Can>
-            </div>
+      {channels.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 py-10 text-center">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground mb-2">
+            <Bell className="size-5" aria-hidden="true" />
           </div>
-        ))}
-      </div>
+          <p className="text-sm font-medium text-muted-foreground">{t("section.empty")}</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {channels.map((channel) => (
+            <div
+              key={channel.id}
+              className="flex items-center justify-between rounded-2xl border border-border/60 bg-card/80 p-4 backdrop-blur-md transition-all hover:border-amber-500/40 hover:shadow-md shadow-2xs"
+            >
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted/60 text-foreground font-bold font-mono text-xs">
+                  {channel.type.slice(0, 2).toUpperCase()}
+                </div>
+                <div className="flex flex-col overflow-hidden">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-sm text-foreground truncate">{channel.name}</span>
+                    <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
+                      {t(`types.${channel.type}`)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span
+                      className={`inline-flex items-center gap-1 text-[11px] font-medium ${
+                        channel.isActive
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-amber-600 dark:text-amber-400"
+                      }`}
+                    >
+                      <span
+                        className={`size-1.5 rounded-full ${
+                          channel.isActive ? "bg-emerald-500" : "bg-amber-500"
+                        }`}
+                      />
+                      {channel.isActive ? "Active" : t("section.inactive")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0 ml-2">
+                <Can I={ACTIONS.UPDATE} a={RESOURCES.NOTIFICATION_CHANNEL}>
+                  <TestSendButton channelId={channel.id} />
+                </Can>
+                <Can I={ACTIONS.UPDATE} a={RESOURCES.NOTIFICATION_CHANNEL}>
+                  <button
+                    type="button"
+                    onClick={() => setFormTarget(channel)}
+                    aria-label={t("actions.edit")}
+                    className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
+                    title={t("actions.edit")}
+                  >
+                    <Pencil className="size-3.5" aria-hidden="true" />
+                  </button>
+                </Can>
+                <Can I={ACTIONS.DELETE} a={RESOURCES.NOTIFICATION_CHANNEL}>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(channel)}
+                    aria-label={t("actions.delete")}
+                    className="flex size-7 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 dark:hover:bg-rose-950/50 cursor-pointer"
+                    title={t("actions.delete")}
+                  >
+                    <Trash2 className="size-3.5" aria-hidden="true" />
+                  </button>
+                </Can>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {formTarget !== null && (
         <NotificationChannelFormDialog
@@ -135,6 +190,6 @@ export function NotificationChannelsSection({ projectId }: { projectId: string }
         variant="destructive"
         isLoading={deleteChannel.isPending}
       />
-    </section>
+    </m.section>
   );
 }

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Link2 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -11,6 +10,7 @@ import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import type { ProjectLink } from "../api/fetchers";
 import { useCreateProjectLink } from "../hooks/use-create-project-link";
 import { useUpdateProjectLink } from "../hooks/use-update-project-link";
+import { IconProject } from "@/shared/ui/icons";
 
 interface ProjectLinkFormDialogProps {
   isOpen: boolean;
@@ -52,7 +52,7 @@ export function ProjectLinkFormDialog({ isOpen, onClose, projectId, link }: Proj
 
   return (
     <Dialog
-      icon={Link2}
+      icon={IconProject}
       title={isEditing ? t("editLink") : t("createLink")}
       onClose={onClose}
       closeLabel={t("form.cancel")}

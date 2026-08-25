@@ -1,6 +1,7 @@
 {
   "title": "Quy tắc cảnh báo",
   "subtitle": "Định nghĩa khi nào môi trường này tạo sự cố và ai sẽ được thông báo.",
+  "drawerSubtitle": "Quy tắc cảnh báo chủ động & phát thông báo đa kênh",
   "addRule": "Thêm quy tắc",
   "empty": "Chưa có quy tắc cảnh báo nào được cấu hình.",
   "table": {

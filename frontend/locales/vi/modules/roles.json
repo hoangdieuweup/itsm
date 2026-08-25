@@ -28,7 +28,11 @@
     "user": "Người dùng (User)",
     "project": "Dự án (Project)",
     "environment": "Môi trường (Environment)",
-    "audit_log": "Nhật ký kiểm toán (Audit Log)"
+    "audit_log": "Nhật ký kiểm toán (Audit Log)",
+    "cloudflare_account": "Tài khoản Cloudflare",
+    "notification_channel": "Kênh thông báo",
+    "alert_rule": "Quy tắc cảnh báo",
+    "incident": "Quản lý sự cố"
   },
   "catalog": {
     "permissions": {
@@ -60,6 +64,29 @@
       },
       "audit_log": {
         "read": "Xem nhật ký kiểm toán hệ thống"
+      },
+      "cloudflare_account": {
+        "manage": "Quản lý cấu hình & DNS Cloudflare",
+        "view": "Xem thông tin & DNS Cloudflare",
+        "manage_all": "Toàn quyền quản trị tài khoản Cloudflare"
+      },
+      "notification_channel": {
+        "create": "Tạo kênh thông báo mới",
+        "read": "Xem danh sách kênh thông báo",
+        "update": "Chỉnh sửa & test gửi thông báo",
+        "delete": "Xóa kênh thông báo"
+      },
+      "alert_rule": {
+        "create": "Tạo quy tắc cảnh báo",
+        "read": "Xem quy tắc cảnh báo",
+        "update": "Chỉnh sửa quy tắc cảnh báo",
+        "delete": "Xóa quy tắc cảnh báo"
+      },
+      "incident": {
+        "create": "Tạo sự cố thủ công",
+        "read": "Xem danh sách & chi tiết sự cố",
+        "acknowledge": "Tiếp nhận xử lý sự cố",
+        "resolve": "Đóng sự cố đã xử lý"
       }
     }
   },
@@ -103,6 +130,11 @@
     "rbac_unknown_permission_id": "Mã quyền hạn không hợp lệ."
   },
   "empty": "Không tìm thấy vai trò nào.",
+  "permissionsPopover": {
+    "title": "Danh sách quyền hạn",
+    "description": "Chi tiết {count} quyền hạn thuộc vai trò {roleName}",
+    "close": "Đóng"
+  },
   "messages": {
     "created": "Tạo vai trò thành công.",
     "updated": "Cập nhật vai trò thành công.",

@@ -39,6 +39,13 @@
     "rbac_target_user_not_found": "Target user not found."
   },
   "empty": "No users found.",
+  "rolePopover": {
+    "more": "+{count}",
+    "title": "Assigned Roles",
+    "description": "User has {count} roles in the system",
+    "manageRoles": "Manage Roles",
+    "close": "Close"
+  },
   "messages": {
     "statusUpdated": "User status updated.",
     "rolesAssigned": "User roles updated successfully."
