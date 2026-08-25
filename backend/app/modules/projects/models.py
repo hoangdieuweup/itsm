@@ -90,3 +90,41 @@ class ProjectMember(Base):
     )
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    project_role_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("project_roles.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+class ProjectRole(Base):
+    """A role scoped to exactly one project — an assignable bundle of the
+    global permission catalog's atoms, restricted at the service layer to
+    ProjectScopedPermissionCatalog.ASSIGNABLE."""
+
+    __tablename__ = "project_roles"
+    __table_args__ = (UniqueConstraint("project_id", "name", name="project_roles_project_id_name_key"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(ProjectLimits.MAX_PROJECT_ROLE_NAME_LENGTH))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ProjectRolePermission(Base):
+    """The project_role -> permission matrix. permission_id FKs the rbac
+    module's `permissions` table by table name only — no Python import of
+    app.modules.rbac anywhere in this file."""
+
+    __tablename__ = "project_role_permissions"
+    __table_args__ = (PrimaryKeyConstraint("project_role_id", "permission_id"),)
+
+    project_role_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("project_roles.id", ondelete="CASCADE")
+    )
+    permission_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("permissions.id", ondelete="CASCADE")
+    )
