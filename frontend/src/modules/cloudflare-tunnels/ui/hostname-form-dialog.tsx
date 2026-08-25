@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Globe } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -15,6 +14,7 @@ import {
   useUpdateTunnelHostname,
 } from "../hooks/use-tunnel-hostnames";
 import type { TunnelPublicHostname } from "../model/schema";
+import { IconDns } from "@/shared/ui/icons";
 
 function subdomainFor(hostname: string, zoneName: string): string {
   const suffix = `.${zoneName}`;
@@ -78,37 +78,40 @@ function useHostnameFormSubmit({
   };
 }
 
-function DomainSuffix({ configLoading, zoneName }: { configLoading: boolean; zoneName: string | undefined }) {
-  if (configLoading) return <span className="whitespace-nowrap text-sm text-muted-foreground">…</span>;
-  return <span className="whitespace-nowrap text-sm text-muted-foreground">. {zoneName ?? "—"}</span>;
-}
-
 export function HostnameFormDialog({
   environmentId,
   tunnelId,
   hostname,
+  zoneName: initialZoneName,
   onClose,
 }: {
   environmentId: string;
   tunnelId: string;
   hostname: TunnelPublicHostname | null;
+  zoneName?: string;
   onClose: () => void;
 }) {
   const t = useTranslations("cloudflareTunnels");
   const { data: config, isLoading: configLoading } = useCloudflareConfigQuery(environmentId);
+  const effectiveZoneName = initialZoneName ?? config?.zoneName;
   const isEditing = hostname !== null;
-  const isBound = !configLoading && config !== undefined;
-  const [subdomain, setSubdomain] = useState(hostname?.hostname ?? "");
-  const [service, setService] = useState(hostname?.service ?? "");
-  const hostnameValue = config ? `${subdomain}.${config.zoneName}` : subdomain;
+  const isBound = Boolean(effectiveZoneName) || (!configLoading && config !== undefined);
 
-  const hasSplitSubdomain = useRef(false);
-  useEffect(() => {
-    if (hostname && config && !hasSplitSubdomain.current) {
-      hasSplitSubdomain.current = true;
-      setSubdomain(subdomainFor(hostname.hostname, config.zoneName));
+  const [subdomain, setSubdomain] = useState(() => {
+    if (!hostname) return "";
+    if (effectiveZoneName) {
+      return subdomainFor(hostname.hostname, effectiveZoneName);
     }
-  }, [hostname, config]);
+    return hostname.hostname;
+  });
+  const [service, setService] = useState(hostname?.service ?? "");
+  const hostnameValue = effectiveZoneName ? `${subdomain}.${effectiveZoneName}` : subdomain;
+
+  useEffect(() => {
+    if (hostname && effectiveZoneName && subdomain === hostname.hostname) {
+      setSubdomain(subdomainFor(hostname.hostname, effectiveZoneName));
+    }
+  }, [hostname, effectiveZoneName, subdomain]);
 
   const { submit, errorMessage, isSaving } = useHostnameFormSubmit({
     environmentId,
@@ -121,48 +124,72 @@ export function HostnameFormDialog({
 
   return (
     <Dialog
-      icon={Globe}
+      icon={IconDns}
       title={isEditing ? t("hostnames.editTitle") : t("hostnames.addTitle")}
       onClose={onClose}
       closeLabel={t("hostnames.cancel")}
     >
-      <form onSubmit={submit} className="space-y-4 overflow-y-auto p-6">
+      <form onSubmit={submit} className="space-y-5 overflow-y-auto p-6">
         {errorMessage && <DialogErrorAlert message={errorMessage} />}
-        {!isBound && <DialogErrorAlert message={t("hostnames.domainRequiresBinding")} />}
+        {!isBound && !configLoading && <DialogErrorAlert message={t("hostnames.domainRequiresBinding")} />}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="hostname-subdomain">{t("hostnames.subdomainLabel")}</Label>
-          <div className="flex items-center gap-1.5">
-            <Input
+        <div className="space-y-2">
+          <Label htmlFor="hostname-subdomain" className="text-xs font-semibold text-foreground">
+            {t("hostnames.subdomainLabel")}
+          </Label>
+          <div className="group flex h-11 w-full items-center rounded-xl border border-input bg-muted/20 px-3.5 shadow-xs transition-all focus-within:border-primary/60 focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/20">
+            <input
               id="hostname-subdomain"
               value={subdomain}
               onChange={(event) => setSubdomain(event.target.value)}
               disabled={!isBound}
               required
+              placeholder="e.g. app, api, staging"
               autoFocus={!isEditing}
-              className="flex-1"
+              className="flex-1 bg-transparent font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/40 disabled:cursor-not-allowed disabled:opacity-50"
             />
-            <DomainSuffix configLoading={configLoading} zoneName={config?.zoneName} />
+            <span className="shrink-0 select-none pl-1 font-mono text-sm font-medium text-muted-foreground/70">
+              .{effectiveZoneName ?? (configLoading ? "…" : "—")}
+            </span>
           </div>
+
+          {subdomain && effectiveZoneName && (
+            <div className="flex items-center gap-2 rounded-xl bg-blue-500/10 border border-blue-500/20 px-3.5 py-2 text-xs font-mono text-blue-600 dark:text-blue-400">
+              <span className="font-bold">{t("hostnames.publicUrl")}:</span>
+              <span className="text-foreground select-all">https://{subdomain}.{effectiveZoneName}</span>
+            </div>
+          )}
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="hostname-service">{t("hostnames.serviceLabel")}</Label>
-          <Input
-            id="hostname-service"
-            value={service}
-            onChange={(event) => setService(event.target.value)}
-            placeholder="http://localhost:8080"
-            required
-            autoFocus={isEditing}
-          />
+        <div className="space-y-2">
+          <Label htmlFor="hostname-service" className="text-xs font-semibold text-foreground">
+            {t("hostnames.serviceLabel")}
+          </Label>
+          <div className="group flex h-11 w-full items-center rounded-xl border border-input bg-muted/20 px-3.5 shadow-xs transition-all focus-within:border-primary/60 focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/20">
+            <input
+              id="hostname-service"
+              value={service}
+              onChange={(event) => setService(event.target.value)}
+              placeholder="http://localhost:8080"
+              required
+              autoFocus={isEditing}
+              className="w-full bg-transparent font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/40"
+            />
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {t("hostnames.serviceHint")}
+          </p>
         </div>
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+        <div className="flex justify-end gap-2.5 pt-3">
+          <Button type="button" variant="outline" onClick={onClose} className="rounded-xl cursor-pointer">
             {t("hostnames.cancel")}
           </Button>
-          <Button type="submit" disabled={isSaving || !isBound}>
+          <Button
+            type="submit"
+            disabled={isSaving || !isBound}
+            className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 font-semibold text-white shadow-md shadow-blue-500/20 hover:from-blue-700 hover:to-indigo-700 cursor-pointer"
+          >
             {isSaving ? t("hostnames.saving") : t("hostnames.save")}
           </Button>
         </div>

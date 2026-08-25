@@ -17,6 +17,8 @@ class TestCloudflareAccountConnection(AbstractUseCase):
     surfaced as a manual "Test Connection" button so a user can re-verify a
     token hasn't since been revoked on Cloudflare's side."""
 
+    __test__ = False
+
     def __init__(self, uow: AbstractCloudflareUnitOfWork, client: CloudflareClient) -> None:
         self._uow = uow
         self._client = client

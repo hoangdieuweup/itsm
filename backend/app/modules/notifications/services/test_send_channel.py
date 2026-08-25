@@ -20,6 +20,8 @@ from app.modules.users.public import UserRead
 
 
 class TestSendNotificationChannel(AbstractUseCase):
+    __test__ = False
+
     def __init__(
         self,
         uow: AbstractNotificationsUnitOfWork,

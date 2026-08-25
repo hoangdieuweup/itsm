@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { ScrollText, Eye, EyeOff, Plus } from "lucide-react";
+import { Eye, EyeOff, Plus } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -10,6 +10,7 @@ import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { LOKI_AUTH_TYPE, type LokiAuthType, type LokiConfig } from "../model/schema";
 import { useCreateLokiConfig, useUpdateLokiConfig } from "../hooks/use-loki-config";
+import { IconGrafana } from "@/shared/ui/icons";
 
 interface LokiConfigFormDialogProps {
   environmentId: string;
@@ -123,7 +124,7 @@ export function LokiConfigFormDialog({ environmentId, config, onClose }: LokiCon
 
   return (
     <Dialog
-      icon={ScrollText}
+      icon={IconGrafana}
       title={isEditing ? t("config.edit") : t("config.title")}
       onClose={onClose}
       closeLabel={t("form.cancel")}

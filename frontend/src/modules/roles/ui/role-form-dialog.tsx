@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { Shield, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -16,7 +16,7 @@ import {
 } from "@/entities/role";
 import { useCreateRole } from "../hooks/use-create-role";
 import { useUpdateRole } from "../hooks/use-update-role";
-
+import { IconPermission } from "@/shared/ui/icons";
 
 interface RoleFormDialogProps {
   isOpen: boolean;
@@ -117,7 +117,7 @@ function RoleFormInner({
 
   return (
     <Dialog
-      icon={Shield}
+      icon={IconPermission}
       title={
         isAdminRole
           ? `${t("actions.view")} - ${role?.name}`
@@ -132,14 +132,14 @@ function RoleFormInner({
       {/* Modal Body / Form */}
       <form
         onSubmit={handleSubmit}
-        className="flex flex-1 flex-col overflow-hidden"
+        className="flex flex-1 min-h-0 flex-col overflow-hidden h-[min(620px,70vh)]"
       >
-        <div className="flex-1 space-y-6 overflow-y-auto p-6">
+        <div className="flex-1 min-h-0 space-y-6 overflow-y-auto px-7 sm:px-8 py-5">
           {errorMessage && <DialogErrorAlert message={errorMessage} />}
 
           {isAdminRole && (
-            <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-50/80 p-3.5 text-xs text-amber-900 dark:border-amber-500/20 dark:bg-amber-950/40 dark:text-amber-200">
-              <Shield className="size-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+            <div className="flex items-start gap-2.5 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-xs text-amber-900 dark:text-amber-200">
+              <IconPermission className="size-5 shrink-0 mt-0.5" />
               <div>
                 <span className="font-semibold">{t("badges.adminProtected")}:</span>{" "}
                 {t("form.adminProtectedAlert")}
@@ -157,10 +157,12 @@ function RoleFormInner({
             systemRoleHint={t("form.systemRoleHint")}
           />
 
-          {/* Permissions List */}
-          <div className="space-y-3">
-            <Label>{t("form.permissionsLabel")}</Label>
-            <div className="space-y-4 rounded-xl border bg-muted/20 p-4">
+          {/* Permissions List - Clean layout without rigid outer boxes */}
+          <div className="space-y-4">
+            <Label className="text-sm font-bold text-foreground">
+              {t("form.permissionsLabel")}
+            </Label>
+            <div className="space-y-6">
               {Object.entries(groupedPermissions).map(([resource, perms]) => (
                 <PermissionResourceGroup
                   key={resource}
@@ -179,10 +181,10 @@ function RoleFormInner({
           </div>
         </div>
 
-        {/* Modal Footer */}
-        <div className="flex items-center justify-end gap-3 border-t bg-muted/10 px-6 py-4">
+        {/* Modal Footer - Pinned nicely at bottom */}
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border/30 bg-card/80 px-7 sm:px-8 py-4 backdrop-blur-md">
           {isAdminRole ? (
-            <Button type="button" onClick={onClose}>
+            <Button type="button" onClick={onClose} className="rounded-xl">
               {t("form.cancel")}
             </Button>
           ) : (
@@ -192,10 +194,15 @@ function RoleFormInner({
                 variant="outline"
                 onClick={onClose}
                 disabled={isPending}
+                className="rounded-xl font-medium"
               >
                 {t("form.cancel")}
               </Button>
-              <Button type="submit" disabled={isSubmitDisabled}>
+              <Button
+                type="submit"
+                disabled={isSubmitDisabled}
+                className="rounded-xl bg-blue-600 font-semibold text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 shadow-xs cursor-pointer"
+              >
                 {isPending
                   ? t("form.saving")
                   : isEditing
@@ -229,7 +236,7 @@ function RoleNameField({
 }) {
   return (
     <div className="space-y-2">
-      <Label htmlFor="role-name">{label}</Label>
+      <Label htmlFor="role-name" className="text-sm font-semibold">{label}</Label>
       <Input
         id="role-name"
         value={name}
@@ -237,7 +244,7 @@ function RoleNameField({
         placeholder={placeholder}
         disabled={isSystemRole || isPending}
         required
-        className="h-10"
+        className="h-11 rounded-2xl border-border/40 bg-muted/20 px-4 text-sm transition-colors focus:bg-background"
       />
       {isSystemRole && (
         <p className="text-xs text-muted-foreground">
@@ -275,7 +282,8 @@ function PermissionResourceGroup({
 
   return (
     <div className="space-y-2.5">
-      <div className="flex items-center justify-between border-b border-border/60 pb-1.5">
+      {/* Group Header - Clean without divider line */}
+      <div className="flex items-center justify-between pt-1">
         <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           {resourceTitle}
         </span>
@@ -283,7 +291,7 @@ function PermissionResourceGroup({
           <button
             type="button"
             onClick={() => onToggleGroup(perms, !allSelected)}
-            className="cursor-pointer text-xs font-semibold text-primary hover:underline"
+            className="cursor-pointer text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline"
           >
             {allSelected ? deselectAllLabel : selectAllLabel}
           </button>
@@ -323,39 +331,37 @@ function PermissionCheckboxItem({
   const label = t.has(catalogKey) ? t(catalogKey) : perm.action;
 
   return (
-    <label
-      className={`flex items-center gap-3 rounded-xl border p-3 text-xs transition-all ${
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={isChecked}
+      disabled={isDisabled}
+      onClick={() => onToggle(perm.id)}
+      className={`flex w-full text-left items-center gap-3 rounded-2xl border p-3.5 text-xs transition-all select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 ${
         isDisabled ? "cursor-default opacity-85" : "cursor-pointer"
       } ${
         isChecked
-          ? "border-blue-500/50 bg-blue-50/70 text-foreground font-medium dark:bg-blue-950/40 shadow-2xs"
-          : "border-border/80 bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+          ? "border-blue-500/40 bg-blue-500/10 text-foreground font-medium dark:border-blue-500/30 dark:bg-blue-500/15 shadow-2xs"
+          : "border-border/40 bg-card/60 text-muted-foreground hover:border-border/70 hover:bg-muted/40 hover:text-foreground"
       }`}
     >
-      <input
-        type="checkbox"
-        checked={isChecked}
-        disabled={isDisabled}
-        onChange={() => onToggle(perm.id)}
-        className="sr-only"
-      />
       <div
-        className={`flex size-4.5 shrink-0 items-center justify-center rounded-md border transition-colors ${
+        className={`flex size-5 shrink-0 items-center justify-center rounded-lg border transition-colors ${
           isChecked
-            ? "border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500"
-            : "border-muted-foreground/40 bg-background"
+            ? "border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500 shadow-2xs"
+            : "border-muted-foreground/30 bg-background"
         }`}
       >
         {isChecked && <Check className="size-3 stroke-[3]" />}
       </div>
       <div className="flex flex-col overflow-hidden">
-        <span className="text-xs font-semibold text-foreground leading-tight">
+        <span className="text-xs font-bold text-foreground leading-tight">
           {label}
         </span>
         <span className="font-mono text-[10px] text-muted-foreground leading-tight mt-0.5">
           {perm.resource}:{perm.action}
         </span>
       </div>
-    </label>
+    </button>
   );
 }

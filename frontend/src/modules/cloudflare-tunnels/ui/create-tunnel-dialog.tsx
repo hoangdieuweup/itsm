@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Waypoints } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useCreateTunnel } from "../hooks/use-tunnels";
+import { IconCloudflare } from "@/shared/ui/icons";
 
 export function CreateTunnelDialog({ environmentId, onClose }: { environmentId: string; onClose: () => void }) {
   const t = useTranslations("cloudflareTunnels");
@@ -29,7 +29,7 @@ export function CreateTunnelDialog({ environmentId, onClose }: { environmentId: 
 
   return (
     <Dialog
-      icon={Waypoints}
+      icon={IconCloudflare}
       title={t("createDialog.title")}
       onClose={onClose}
       closeLabel={t("createDialog.cancel")}

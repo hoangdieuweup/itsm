@@ -18,6 +18,16 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "ITSM",
   description: "IT service management for WeUpBook",
+  icons: {
+    icon: [
+      { url: "/icons/logo.png", type: "image/png" },
+      { url: "/icons/logo.png", sizes: "32x32", type: "image/png" },
+    ],
+    shortcut: "/icons/logo.png",
+    apple: [
+      { url: "/icons/logo.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 export default async function LocaleLayout({

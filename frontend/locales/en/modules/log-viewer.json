@@ -1,4 +1,5 @@
 {
+  "drawerSubtitle": "Grafana Loki & Cloudflare Audit Log Telemetry",
   "environmentTypes": {
     "dev": "Development",
     "staging": "Staging",

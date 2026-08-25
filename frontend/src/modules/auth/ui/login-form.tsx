@@ -7,6 +7,7 @@ import { LogIn, AlertCircle } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { m } from "@/shared/lib/motion";
 import { API_CONFIG } from "@/shared/constants/api";
+import { BrandLogo } from "@/shared/ui/icons";
 import { BrandPanel } from "./brand-panel";
 import { LanguageSwitch } from "./language-switch";
 
@@ -34,9 +35,20 @@ export function LoginForm() {
           transition={{ duration: 0.35, delay: 0.15, ease: "easeOut" }}
           className="w-full max-w-md"
         >
-          {/* ── Language switch ── */}
-          <div className="mb-12 flex justify-end">
-            <LanguageSwitch />
+          {/* ── Mobile brand logo & Language switch ── */}
+          <div className="mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-2.5 lg:hidden">
+              <BrandLogo className="size-9 shrink-0 drop-shadow-sm" />
+              <div className="flex items-center gap-1.5 font-bold tracking-tight text-gray-900">
+                <span className="text-lg font-extrabold">WEUP</span>
+                <span className="rounded-md bg-blue-600/10 px-1.5 py-0.5 text-[10px] font-extrabold tracking-widest text-blue-600 uppercase">
+                  ITSM
+                </span>
+              </div>
+            </div>
+            <div className="ml-auto">
+              <LanguageSwitch />
+            </div>
           </div>
 
           {/* ── Heading ── */}

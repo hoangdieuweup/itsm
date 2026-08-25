@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { ScrollText, Pencil, Trash2, Play, RefreshCw, AlertTriangle, Radio, Pause } from "lucide-react";
+import { Pencil, Trash2, Play, RefreshCw, AlertTriangle, Radio, Pause } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -17,6 +17,7 @@ import { useLogTail } from "../hooks/use-log-tail";
 import { useCloudflareAuditLogsQuery } from "../hooks/use-cloudflare-audit-logs";
 import type { LogEntry } from "../model/schema";
 import { LokiConfigFormDialog } from "./loki-config-form-dialog";
+import { IconGrafana } from "@/shared/ui/icons";
 
 type TabKey = "loki" | "cloudflareAuditLog";
 
@@ -312,48 +313,78 @@ export function LogViewerManager({ environmentId }: { environmentId: string }) {
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      {configLoading && <Skeleton className="h-24 w-full" />}
+      {configLoading && <Skeleton className="h-28 w-full rounded-2xl" />}
 
       {!configLoading && !config && (
-        <section className="flex flex-col gap-3 rounded-xl border bg-card p-5">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <ScrollText className="size-4 text-primary" aria-hidden="true" /> {t("config.title")}
-          </h2>
-          <p className="text-sm text-muted-foreground">{t("config.description")}</p>
-          <Can I={ACTIONS.UPDATE} a={RESOURCES.ENVIRONMENT}>
-            <div>
-              <Button size="sm" onClick={() => setFormOpen(true)}>
+        <section className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-card via-card/90 to-purple-500/5 p-7 backdrop-blur-xl shadow-lg shadow-black/5 dark:shadow-black/20">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+            <div className="flex items-start gap-4">
+              <IconGrafana className="size-12 shrink-0 rounded-2xl shadow-xs" />
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold tracking-tight text-foreground">
+                    {t("config.title")}
+                  </h2>
+                  <span className="rounded-full bg-purple-500/10 px-2.5 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                    LogQL
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed max-w-md">
+                  {t("config.description")}
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    ⚡ Live Tail Streaming
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    🔒 Multi-Tenant Auth
+                  </span>
+                </div>
+              </div>
+            </div>
+            <Can I={ACTIONS.UPDATE} a={RESOURCES.ENVIRONMENT}>
+              <Button
+                size="sm"
+                onClick={() => setFormOpen(true)}
+                className="shrink-0 bg-gradient-to-r from-purple-600 to-indigo-600 font-semibold text-white shadow-md shadow-purple-500/20 hover:from-purple-700 hover:to-indigo-700 self-start sm:self-auto cursor-pointer"
+              >
                 {t("config.configure")}
               </Button>
-            </div>
-          </Can>
+            </Can>
+          </div>
         </section>
       )}
 
       {!configLoading && config && (
         <>
-          <section className="flex flex-col gap-3 rounded-xl border bg-card p-5">
+          <section className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card/80 p-5 backdrop-blur-xl shadow-xs">
             <div className="flex items-center justify-between">
-              <h2 className="flex items-center gap-2 text-sm font-bold text-foreground">
-                <ScrollText className="size-4 text-primary" aria-hidden="true" /> {config.endpointUrl}
-              </h2>
+              <div className="flex items-center gap-3">
+                <IconGrafana className="size-8 shrink-0 rounded-xl shadow-xs" />
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Endpoint</span>
+                  <h2 className="text-sm font-bold font-mono text-foreground truncate max-w-sm">
+                    {config.endpointUrl}
+                  </h2>
+                </div>
+              </div>
               <Can I={ACTIONS.UPDATE} a={RESOURCES.ENVIRONMENT}>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setFormOpen(true)}
                     aria-label={t("config.edit")}
-                    className="cursor-pointer text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
                   >
-                    <Pencil className="size-3.5" aria-hidden="true" />
+                    <Pencil className="size-4" aria-hidden="true" />
                   </button>
                   <button
                     type="button"
                     onClick={() => setDeleteConfirmOpen(true)}
                     aria-label={t("config.delete")}
-                    className="cursor-pointer text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-rose-500/10 transition-colors cursor-pointer"
                   >
-                    <Trash2 className="size-3.5" aria-hidden="true" />
+                    <Trash2 className="size-4" aria-hidden="true" />
                   </button>
                 </div>
               </Can>

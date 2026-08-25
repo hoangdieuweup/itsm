@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Bell, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -16,6 +16,7 @@ import { useAvailableAlertsQuery } from "../hooks/use-alert-rules";
 import { useCreateAlertRule } from "../hooks/use-create-alert-rule";
 import { useUpdateAlertRule } from "../hooks/use-update-alert-rule";
 import { ChannelMultiselect } from "./channel-multiselect";
+import { IconNotification } from "@/shared/ui/icons";
 
 interface AlertRuleFormDialogProps {
   environmentId: string;
@@ -279,7 +280,7 @@ export function AlertRuleFormDialog({ environmentId, projectId, alertRule, onClo
 
   return (
     <Dialog
-      icon={Bell}
+      icon={IconNotification}
       title={isEditing ? t("form.editTitle") : t("form.createTitle")}
       onClose={onClose}
       closeLabel={t("form.cancel")}

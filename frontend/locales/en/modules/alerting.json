@@ -1,6 +1,7 @@
 {
   "title": "Alert Rules",
-  "subtitle": "Define when this environment raises an incident and who gets notified.",
+  "subtitle": "Define when this environment creates an incident and who gets notified.",
+  "drawerSubtitle": "Proactive Alert Rules & Multi-Channel Broadcasts",
   "addRule": "Add Rule",
   "empty": "No alert rules configured yet.",
   "table": {

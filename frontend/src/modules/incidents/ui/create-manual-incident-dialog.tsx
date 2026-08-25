@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Siren } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -12,6 +11,7 @@ import { useProjectsQuery } from "@/entities/project";
 import { useProjectEnvironmentsQuery } from "@/entities/environment";
 import { ALERT_SEVERITY, INCIDENT_CATEGORY } from "@/entities/incident";
 import { useCreateManualIncident } from "../hooks/use-create-manual-incident";
+import { IconNotification } from "@/shared/ui/icons";
 
 /** useProjectEnvironmentsQuery is a Suspense query with no built-in
  * "disabled" mode — this is only ever mounted once a project is picked,
@@ -71,7 +71,7 @@ export function CreateManualIncidentDialog({ onClose }: { onClose: () => void })
 
   return (
     <Dialog
-      icon={Siren}
+      icon={IconNotification}
       title={t("create.title")}
       onClose={onClose}
       closeLabel={t("create.cancel")}

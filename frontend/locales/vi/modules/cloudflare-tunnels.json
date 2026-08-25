@@ -1,7 +1,9 @@
 {
   "title": "Tunnel",
+  "subtitle": "Kết nối Cloudflare Edge Tunnel & định tuyến Ingress",
+  "drawerSubtitle": "Cloudflare Tunnels & Định tuyến Edge",
   "addTunnel": "Thêm Tunnel",
-  "empty": "Chưa có tunnel nào.",
+  "empty": "Chưa có tunnel nào kết nối với môi trường này.",
   "refreshStatus": "Làm mới trạng thái",
   "revealToken": "Hiện token kết nối",
   "status": {
@@ -29,8 +31,14 @@
   },
   "hostnames": {
     "title": "Hostname công khai",
+    "subtitle": "Định tuyến DNS công khai & cấu hình Reverse Proxy",
+    "target": "Đích đến",
+    "publicUrl": "URL công khai",
+    "serviceHint": "Cổng backend cục bộ hoặc endpoint container (ví dụ: http://localhost:3000)",
+    "copied": "Đã sao chép!",
+    "copyLink": "Sao chép liên kết https://",
     "add": "Thêm Hostname",
-    "empty": "Chưa có hostname nào khớp với môi trường này. Có thể do Base URL của môi trường chưa khớp chính xác với hostname mà tunnel này định tuyến, hoặc trên Cloudflare chưa có hostname nào — dùng \"Thêm Hostname\" ở trên để tạo mới.",
+    "empty": "Chưa có hostname công khai nào được ánh xạ tới tunnel này.",
     "noneMatched": "Chưa có public host nào khớp với môi trường này",
     "mapping": "{hostname} → {service}",
     "edit": "Sửa hostname",

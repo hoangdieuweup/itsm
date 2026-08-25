@@ -28,7 +28,11 @@
     "user": "Users",
     "project": "Projects",
     "environment": "Environments",
-    "audit_log": "Audit Logs"
+    "audit_log": "Audit Logs",
+    "cloudflare_account": "Cloudflare Accounts",
+    "notification_channel": "Notification Channels",
+    "alert_rule": "Alert Rules",
+    "incident": "Incident Management"
   },
   "catalog": {
     "permissions": {
@@ -60,6 +64,29 @@
       },
       "audit_log": {
         "read": "View system audit logs"
+      },
+      "cloudflare_account": {
+        "manage": "Manage Cloudflare configs & DNS",
+        "view": "View Cloudflare details & DNS",
+        "manage_all": "Full administrative access to Cloudflare accounts"
+      },
+      "notification_channel": {
+        "create": "Create notification channels",
+        "read": "View notification channels",
+        "update": "Edit & test-send notification channels",
+        "delete": "Delete notification channels"
+      },
+      "alert_rule": {
+        "create": "Create alert rules",
+        "read": "View alert rules",
+        "update": "Edit alert rules",
+        "delete": "Delete alert rules"
+      },
+      "incident": {
+        "create": "Create manual incidents",
+        "read": "View incidents and details",
+        "acknowledge": "Acknowledge active incidents",
+        "resolve": "Resolve incidents"
       }
     }
   },
@@ -103,6 +130,11 @@
     "rbac_unknown_permission_id": "Unknown permission id."
   },
   "empty": "No roles found.",
+  "permissionsPopover": {
+    "title": "Role Permissions",
+    "description": "Details of {count} permissions assigned to {roleName}",
+    "close": "Close"
+  },
   "messages": {
     "created": "Role created successfully.",
     "updated": "Role updated successfully.",

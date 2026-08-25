@@ -18,12 +18,24 @@
     "closeLogsDrawer": "Đóng bảng điều khiển Log",
     "closeAlertingDrawer": "Đóng bảng điều khiển Cảnh báo",
     "manageLogs": "Xem Log",
-    "manageAlerting": "Quản lý Cảnh báo"
+    "manageAlerting": "Quản lý Cảnh báo",
+    "inspect": "Chi tiết",
+    "edit": "Sửa",
+    "delete": "Xóa"
   },
   "table": {
     "name": "Tên",
     "description": "Mô tả"
   },
+  "workspace": "Không gian làm việc",
+  "activeWorkspace": "Không gian đang hoạt động",
+  "noDescription": "Chưa có mô tả dự án.",
+  "environmentsAndConfig": "Môi trường & Cấu hình",
+  "environmentsCount": "{count} Môi trường",
+  "heroDescription": "Cấu hình không gian làm việc sản xuất và liên kết môi trường.",
+  "edgeDns": "DNS Cloudflare",
+  "lokiLogs": "Nhật ký Loki",
+  "alerts": "Cảnh báo",
   "sections": {
     "environments": "Môi trường",
     "links": "Liên kết ngoài"
@@ -46,6 +58,9 @@
     "description": "Tạo dự án đầu tiên để bắt đầu quản lý môi trường, Cloudflare và log.",
     "environments": "Chưa có môi trường nào.",
     "links": "Chưa có liên kết nào."
+  },
+  "noPermission": {
+    "environments": "Bạn không có quyền xem môi trường của dự án này."
   },
   "form": {
     "nameLabel": "Tên",

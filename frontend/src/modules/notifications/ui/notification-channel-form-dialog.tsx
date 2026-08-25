@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Bell, Eye, EyeOff, Plus } from "lucide-react";
+import { Eye, EyeOff, Plus } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -13,8 +13,15 @@ import {
   type NotificationChannel,
   type NotificationChannelType,
 } from "@/entities/notification-channel";
+import { IconGmail, IconTelegram, IconNotification } from "@/shared/ui/icons";
 import { useCreateNotificationChannel } from "../hooks/use-create-channel";
 import { useUpdateNotificationChannel } from "../hooks/use-update-channel";
+
+function getChannelIcon(channelType: NotificationChannelType) {
+  if (channelType === NOTIFICATION_CHANNEL_TYPE.EMAIL) return IconGmail;
+  if (channelType === NOTIFICATION_CHANNEL_TYPE.TELEGRAM) return IconTelegram;
+  return IconNotification;
+}
 
 interface NotificationChannelFormDialogProps {
   projectId: string;
@@ -353,7 +360,7 @@ export function NotificationChannelFormDialog({
 
   return (
     <Dialog
-      icon={Bell}
+      icon={getChannelIcon(type)}
       title={isEditing ? t("form.editTitle") : t("form.createTitle")}
       onClose={onClose}
       closeLabel={t("form.cancel")}

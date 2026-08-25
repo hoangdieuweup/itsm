@@ -39,6 +39,13 @@
     "rbac_target_user_not_found": "Không tìm thấy người dùng đích để gán vai trò."
   },
   "empty": "Không tìm thấy người dùng nào.",
+  "rolePopover": {
+    "more": "+{count}",
+    "title": "Vai trò được gán",
+    "description": "Người dùng sở hữu {count} vai trò trong hệ thống",
+    "manageRoles": "Quản lý vai trò",
+    "close": "Đóng"
+  },
   "messages": {
     "statusUpdated": "Cập nhật trạng thái người dùng thành công.",
     "rolesAssigned": "Cập nhật vai trò người dùng thành công."

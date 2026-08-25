@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Cloud, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -11,6 +11,7 @@ import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import type { CloudflareAccount } from "@/entities/cloudflare-account";
 import { useCreateCloudflareAccount } from "../hooks/use-create-cloudflare-account";
 import { useUpdateCloudflareAccount } from "../hooks/use-update-cloudflare-account";
+import { IconCloudflare } from "@/shared/ui/icons";
 
 interface CloudflareAccountFormDialogProps {
   account: CloudflareAccount | null;
@@ -47,8 +48,8 @@ export function CloudflareAccountFormDialog({ account, onClose }: CloudflareAcco
 
   return (
     <Dialog
-      icon={Cloud}
-      title={isEditing ? t("editAccount") : t("createAccount")}
+      icon={IconCloudflare}
+      title={isEditing ? t("form.editTitle") : t("form.createTitle")}
       onClose={onClose}
       closeLabel={t("form.cancel")}
     >
