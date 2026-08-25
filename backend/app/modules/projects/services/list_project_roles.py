@@ -22,17 +22,22 @@ class ListProjectRoles(AbstractUseCase):
             raise ProjectNotFound()
 
         rows = await self._uow.project_roles.list_for_project(project_id)
-        result: list[ProjectRoleRead] = []
-        for row in rows:
-            permissions = await self._rbac_api.get_permissions_by_ids(row.permission_ids)
-            result.append(
-                ProjectRoleRead(
-                    id=row.id,
-                    project_id=row.project_id,
-                    name=row.name,
-                    permissions=permissions,
-                    created_at=row.created_at,
-                    updated_at=row.updated_at,
-                )
+
+        all_permission_ids = {pid for row in rows for pid in row.permission_ids}
+        permissions_by_id = {
+            p.id: p for p in await self._rbac_api.get_permissions_by_ids(list(all_permission_ids))
+        }
+
+        return [
+            ProjectRoleRead(
+                id=row.id,
+                project_id=row.project_id,
+                name=row.name,
+                permissions=[
+                    permissions_by_id[pid] for pid in row.permission_ids if pid in permissions_by_id
+                ],
+                created_at=row.created_at,
+                updated_at=row.updated_at,
             )
-        return result
+            for row in rows
+        ]
