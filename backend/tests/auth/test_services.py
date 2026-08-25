@@ -417,7 +417,9 @@ class TestLogoutUser:
     async def test_revokes_dx_token_clears_link_and_blacklists_both_app_tokens(self, cache_client) -> None:
         dx_tokens = FakeDxTokenRepository()
         user_id = uuid4()
-        await dx_tokens.save(user_id, FakeDxTokenSet(access_token="plain-dx-token"), expires_at=datetime.now(UTC))
+        await dx_tokens.save(
+            user_id, FakeDxTokenSet(access_token="plain-dx-token"), expires_at=datetime.now(UTC)
+        )
         dx_client = FakeDxCoreClient()
         use_case = LogoutUser(dx_tokens, dx_client, cache_client)
         access = self._valid_token(sub=str(user_id))
@@ -451,7 +453,12 @@ class TestLogoutUser:
 
 class TestRefreshToken:
     @staticmethod
-    def _create_token(sub: str = "1", token_type: str = TokenType.REFRESH, jti: str = "test-jti", exp_offset: int = 3600) -> str:
+    def _create_token(
+        sub: str = "1",
+        token_type: str = TokenType.REFRESH,
+        jti: str = "test-jti",
+        exp_offset: int = 3600,
+    ) -> str:
         payload = {
             "sub": sub,
             "type": token_type,
@@ -464,7 +471,9 @@ class TestRefreshToken:
     async def test_refreshes_tokens_with_valid_refresh_token_and_rotates(self, cache_client) -> None:
         users_api = FakeUsersApi()
         user_id = uuid4()
-        users_api._rows[user_id] = UserRead(id=user_id, email="alice@example.com", name="Alice", status=UserStatus.ACTIVE)
+        users_api._rows[user_id] = UserRead(
+            id=user_id, email="alice@example.com", name="Alice", status=UserStatus.ACTIVE
+        )
         issue_tokens = IssueTokens()
         use_case = RefreshToken(cast(UsersApi, users_api), issue_tokens, cache_client)
 
@@ -497,7 +506,9 @@ class TestRefreshToken:
     async def test_raises_not_authenticated_for_blacklisted_token(self, cache_client) -> None:
         users_api = FakeUsersApi()
         user_id = uuid4()
-        users_api._rows[user_id] = UserRead(id=user_id, email="alice@example.com", name="Alice", status=UserStatus.ACTIVE)
+        users_api._rows[user_id] = UserRead(
+            id=user_id, email="alice@example.com", name="Alice", status=UserStatus.ACTIVE
+        )
         use_case = RefreshToken(cast(UsersApi, users_api), IssueTokens(), cache_client)
 
         token = self._create_token(sub=str(user_id), jti="blacklisted-jti")
@@ -510,7 +521,9 @@ class TestRefreshToken:
     async def test_raises_user_blocked_when_user_is_blocked(self, cache_client) -> None:
         users_api = FakeUsersApi()
         user_id = uuid4()
-        users_api._rows[user_id] = UserRead(id=user_id, email="blocked@example.com", name="Blocked", status=UserStatus.BLOCKED)
+        users_api._rows[user_id] = UserRead(
+            id=user_id, email="blocked@example.com", name="Blocked", status=UserStatus.BLOCKED
+        )
         use_case = RefreshToken(cast(UsersApi, users_api), IssueTokens(), cache_client)
 
         token = self._create_token(sub=str(user_id))

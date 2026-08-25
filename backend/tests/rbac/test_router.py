@@ -137,7 +137,9 @@ class TestAssignUserRole:
             engine, email="protected-rbac@example.com", external_user_id="dx-protected-rbac"
         )
 
-        response = await client.patch(f"/api/v1/rbac/users/{target_user_id}/role", json={"roleId": str(role_id)})
+        response = await client.patch(
+            f"/api/v1/rbac/users/{target_user_id}/role", json={"roleId": str(role_id)}
+        )
 
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "rbac_cannot_modify_protected_admin"
