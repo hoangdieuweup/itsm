@@ -32,6 +32,10 @@ export const API_CONFIG = {
       MEMBERS: (projectId: string) => `/projects/${projectId}/members`,
       MEMBER_DETAIL: (projectId: string, userId: string) => `/projects/${projectId}/members/${userId}`,
       PERMISSIONS: (projectId: string) => `/projects/${projectId}/permissions`,
+      ROLES: (projectId: string) => `/projects/${projectId}/roles`,
+      ROLE_DETAIL: (id: string) => `/project-roles/${id}`,
+      MEMBER_ROLE: (projectId: string, userId: string) => `/projects/${projectId}/members/${userId}/role`,
+      ASSIGNABLE_PERMISSIONS: () => `/projects/assignable-permissions`,
     },
     AUDIT_LOGS: {
       ROOT: "/audit-logs",

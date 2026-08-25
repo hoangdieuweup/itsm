@@ -27,9 +27,19 @@
     "permission": "Permissions",
     "user": "Users",
     "project": "Projects",
+    "project_member": "Project Members",
+    "project_link": "Project Links",
+    "project_role": "Project Roles",
     "environment": "Environments",
     "audit_log": "Audit Logs",
     "cloudflare_account": "Cloudflare Accounts",
+    "cloudflare_manager": "CF Account Managers",
+    "cloudflare_config": "CF Zone Binding",
+    "cloudflare_tunnel": "CF Tunnels",
+    "cloudflare_hostname": "CF Public Hostnames",
+    "cloudflare_dns": "CF DNS Records",
+    "cloudflare_audit": "CF Audit Logs",
+    "loki_config": "Loki / Log Viewer",
     "notification_channel": "Notification Channels",
     "alert_rule": "Alert Rules",
     "incident": "Incident Management"
@@ -53,9 +63,21 @@
       "project": {
         "create": "Create new projects",
         "read": "View projects and details",
-        "update": "Edit projects and links",
+        "update": "Edit project name & description",
         "delete": "Delete projects",
         "manage_all": "Full administrative access to every project, regardless of membership"
+      },
+      "project_member": {
+        "read": "View project members",
+        "manage": "Add / Remove project members"
+      },
+      "project_link": {
+        "read": "View project links (Git, Jira, …)",
+        "manage": "Add / Edit / Remove project links"
+      },
+      "project_role": {
+        "read": "View project roles",
+        "manage": "Create / Edit / Delete project roles and assign them to members"
       },
       "environment": {
         "create": "Create deployment environments",
@@ -67,15 +89,55 @@
         "read": "View system audit logs"
       },
       "cloudflare_account": {
-        "manage": "Manage Cloudflare configs & DNS",
-        "view": "View Cloudflare details & DNS",
+        "create": "Add new Cloudflare accounts",
+        "read": "View Cloudflare account details",
+        "update": "Edit account name / Rotate token",
+        "delete": "Delete Cloudflare accounts",
+        "test_connection": "Test Cloudflare token connection",
+        "reveal_token": "Reveal decrypted API token",
         "manage_all": "Full administrative access to Cloudflare accounts"
+      },
+      "cloudflare_manager": {
+        "read": "View account managers",
+        "manage": "Add / Edit / Remove account managers"
+      },
+      "cloudflare_config": {
+        "read": "View zone binding configuration",
+        "manage": "Bind / Unbind zone to environment"
+      },
+      "cloudflare_tunnel": {
+        "read": "View tunnels",
+        "create": "Create new tunnels",
+        "delete": "Delete tunnels",
+        "sync": "Sync tunnels from Cloudflare",
+        "reveal_token": "Reveal tunnel connector token",
+        "refresh_status": "Refresh tunnel connection status"
+      },
+      "cloudflare_hostname": {
+        "read": "View public hostnames",
+        "create": "Add public hostnames",
+        "update": "Edit hostname service target",
+        "delete": "Remove public hostnames"
+      },
+      "cloudflare_dns": {
+        "read": "View DNS records",
+        "create": "Create DNS records",
+        "update": "Edit DNS records",
+        "delete": "Delete DNS records"
+      },
+      "cloudflare_audit": {
+        "read": "View Cloudflare audit logs"
+      },
+      "loki_config": {
+        "read": "View Loki config & query logs",
+        "manage": "Create / Edit / Delete Loki config"
       },
       "notification_channel": {
         "create": "Create notification channels",
         "read": "View notification channels",
-        "update": "Edit & test-send notification channels",
-        "delete": "Delete notification channels"
+        "update": "Edit notification channels",
+        "delete": "Delete notification channels",
+        "test_send": "Send test notification"
       },
       "alert_rule": {
         "create": "Create alert rules",

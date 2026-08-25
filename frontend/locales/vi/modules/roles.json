@@ -27,9 +27,19 @@
     "permission": "Quyền hạn (Permission)",
     "user": "Người dùng (User)",
     "project": "Dự án (Project)",
+    "project_member": "Thành viên Dự án",
+    "project_link": "Liên kết Dự án",
+    "project_role": "Vai trò dự án",
     "environment": "Môi trường (Environment)",
     "audit_log": "Nhật ký kiểm toán (Audit Log)",
     "cloudflare_account": "Tài khoản Cloudflare",
+    "cloudflare_manager": "Người quản trị CF",
+    "cloudflare_config": "Cấu hình Zone CF",
+    "cloudflare_tunnel": "Tunnel Cloudflare",
+    "cloudflare_hostname": "Hostname công khai CF",
+    "cloudflare_dns": "DNS Records CF",
+    "cloudflare_audit": "Nhật ký CF",
+    "loki_config": "Loki / Xem Log",
     "notification_channel": "Kênh thông báo",
     "alert_rule": "Quy tắc cảnh báo",
     "incident": "Quản lý sự cố"
@@ -53,9 +63,21 @@
       "project": {
         "create": "Tạo dự án mới",
         "read": "Xem danh sách & chi tiết dự án",
-        "update": "Chỉnh sửa dự án & liên kết",
+        "update": "Chỉnh sửa tên & mô tả dự án",
         "delete": "Xóa dự án",
         "manage_all": "Toàn quyền quản trị mọi dự án, không phụ thuộc vào việc là thành viên"
+      },
+      "project_member": {
+        "read": "Xem thành viên dự án",
+        "manage": "Thêm / Xóa thành viên dự án"
+      },
+      "project_link": {
+        "read": "Xem liên kết dự án (Git, Jira, …)",
+        "manage": "Thêm / Sửa / Xóa liên kết dự án"
+      },
+      "project_role": {
+        "read": "Xem vai trò dự án",
+        "manage": "Tạo / Sửa / Xóa vai trò dự án và gán cho thành viên"
       },
       "environment": {
         "create": "Tạo môi trường triển khai",
@@ -67,15 +89,55 @@
         "read": "Xem nhật ký kiểm toán hệ thống"
       },
       "cloudflare_account": {
-        "manage": "Quản lý cấu hình & DNS Cloudflare",
-        "view": "Xem thông tin & DNS Cloudflare",
+        "create": "Thêm tài khoản Cloudflare mới",
+        "read": "Xem thông tin tài khoản Cloudflare",
+        "update": "Đổi tên / Xoay token tài khoản",
+        "delete": "Xóa tài khoản Cloudflare",
+        "test_connection": "Kiểm tra kết nối token",
+        "reveal_token": "Hiển thị API token đã giải mã",
         "manage_all": "Toàn quyền quản trị tài khoản Cloudflare"
+      },
+      "cloudflare_manager": {
+        "read": "Xem người quản trị tài khoản",
+        "manage": "Thêm / Sửa / Xóa người quản trị"
+      },
+      "cloudflare_config": {
+        "read": "Xem cấu hình zone binding",
+        "manage": "Gán / Hủy zone cho môi trường"
+      },
+      "cloudflare_tunnel": {
+        "read": "Xem danh sách tunnel",
+        "create": "Tạo tunnel mới",
+        "delete": "Xóa tunnel",
+        "sync": "Đồng bộ tunnel từ Cloudflare",
+        "reveal_token": "Hiển thị connector token",
+        "refresh_status": "Làm mới trạng thái kết nối tunnel"
+      },
+      "cloudflare_hostname": {
+        "read": "Xem hostname công khai",
+        "create": "Thêm hostname mới",
+        "update": "Sửa service target",
+        "delete": "Xóa hostname"
+      },
+      "cloudflare_dns": {
+        "read": "Xem DNS records",
+        "create": "Tạo DNS record",
+        "update": "Sửa DNS record",
+        "delete": "Xóa DNS record"
+      },
+      "cloudflare_audit": {
+        "read": "Xem nhật ký hoạt động Cloudflare"
+      },
+      "loki_config": {
+        "read": "Xem cấu hình Loki & truy vấn log",
+        "manage": "Tạo / Sửa / Xóa cấu hình Loki"
       },
       "notification_channel": {
         "create": "Tạo kênh thông báo mới",
         "read": "Xem danh sách kênh thông báo",
-        "update": "Chỉnh sửa & test gửi thông báo",
-        "delete": "Xóa kênh thông báo"
+        "update": "Chỉnh sửa kênh thông báo",
+        "delete": "Xóa kênh thông báo",
+        "test_send": "Gửi thử thông báo"
       },
       "alert_rule": {
         "create": "Tạo quy tắc cảnh báo",

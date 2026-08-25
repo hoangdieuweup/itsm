@@ -7,10 +7,14 @@
   "editEnvironment": "Edit Environment",
   "createLink": "Add Link",
   "editLink": "Edit Link",
+  "createProjectRole": "Create Project Role",
+  "editProjectRole": "Edit Project Role",
+  "projectRolePermissionCount": "{count} permissions",
   "actions": {
     "create": "New Project",
     "addEnvironment": "Add",
     "addLink": "Add",
+    "addProjectRole": "Add Role",
     "manageDns": "Manage DNS",
     "manageTunnels": "Manage Tunnels",
     "closeDnsDrawer": "Close DNS panel",
@@ -41,7 +45,8 @@
   "sections": {
     "environments": "Environments",
     "links": "External Links",
-    "members": "Members"
+    "members": "Members",
+    "projectRoles": "Project Roles"
   },
   "environmentTypes": {
     "dev": "Dev",
@@ -61,10 +66,14 @@
     "description": "Create your first project to start managing environments, Cloudflare, and logs.",
     "environments": "No environments yet.",
     "links": "No links yet.",
-    "members": "No members yet."
+    "members": "No members yet.",
+    "projectRoles": "No project roles yet."
   },
   "noPermission": {
     "environments": "You don't have permission to view this project's environments."
+  },
+  "members": {
+    "noRole": "No project role"
   },
   "form": {
     "nameLabel": "Name",
@@ -79,7 +88,10 @@
     "saving": "Saving...",
     "addMemberTitle": "Add Member",
     "selectUserLabel": "User",
-    "selectUser": "Select a user"
+    "selectUser": "Select a user",
+    "projectRoleLabel": "Project role",
+    "noProjectRole": "No project role",
+    "permissionsLabel": "Permissions"
   },
   "deleteConfirm": {
     "title": "Delete project?",
@@ -89,7 +101,9 @@
     "linkTitle": "Delete link?",
     "linkDescription": "This will permanently delete the \"{name}\" link.",
     "memberTitle": "Remove member?",
-    "memberDescription": "This will remove \"{name}\" from this project. They will lose access to it."
+    "memberDescription": "This will remove \"{name}\" from this project. They will lose access to it.",
+    "projectRoleTitle": "Delete project role?",
+    "projectRoleDescription": "This will permanently delete the \"{name}\" role. Members holding it revert to their global permissions."
   },
   "errors": {
     "projects_project_not_found": "Project not found.",
@@ -97,7 +111,11 @@
     "projects_environment_type_already_exists": "This project already has an environment of that type.",
     "projects_project_link_not_found": "Link not found.",
     "projects_insufficient_project_access": "You are not a member of this project.",
-    "projects_project_member_already_exists": "This user is already a member of the project."
+    "projects_project_member_already_exists": "This user is already a member of the project.",
+    "projects_project_role_not_found": "Project role not found.",
+    "projects_duplicate_project_role_name": "A project role with this name already exists.",
+    "projects_permission_not_project_assignable": "This permission cannot be granted through a project role.",
+    "projects_project_permission_denied": "You don't have permission to do that in this project."
   },
   "messages": {
     "projectCreated": "Project created successfully.",
@@ -110,6 +128,10 @@
     "linkUpdated": "Link updated successfully.",
     "linkDeleted": "Link removed successfully.",
     "memberAdded": "Member added successfully.",
-    "memberRemoved": "Member removed successfully."
+    "memberRemoved": "Member removed successfully.",
+    "projectRoleCreated": "Project role created successfully.",
+    "projectRoleUpdated": "Project role updated successfully.",
+    "projectRoleDeleted": "Project role deleted successfully.",
+    "memberRoleAssigned": "Member's project role updated successfully."
   }
 }

@@ -7,10 +7,14 @@
   "editEnvironment": "Sửa môi trường",
   "createLink": "Thêm liên kết",
   "editLink": "Sửa liên kết",
+  "createProjectRole": "Tạo vai trò dự án",
+  "editProjectRole": "Sửa vai trò dự án",
+  "projectRolePermissionCount": "{count} quyền",
   "actions": {
     "create": "Dự án mới",
     "addEnvironment": "Thêm",
     "addLink": "Thêm",
+    "addProjectRole": "Thêm vai trò",
     "manageDns": "Quản lý DNS",
     "manageTunnels": "Quản lý Tunnel",
     "closeDnsDrawer": "Đóng bảng điều khiển DNS",
@@ -41,7 +45,8 @@
   "sections": {
     "environments": "Môi trường",
     "links": "Liên kết ngoài",
-    "members": "Thành viên"
+    "members": "Thành viên",
+    "projectRoles": "Vai trò dự án"
   },
   "environmentTypes": {
     "dev": "Dev",
@@ -61,10 +66,14 @@
     "description": "Tạo dự án đầu tiên để bắt đầu quản lý môi trường, Cloudflare và log.",
     "environments": "Chưa có môi trường nào.",
     "links": "Chưa có liên kết nào.",
-    "members": "Chưa có thành viên nào."
+    "members": "Chưa có thành viên nào.",
+    "projectRoles": "Chưa có vai trò dự án nào."
   },
   "noPermission": {
     "environments": "Bạn không có quyền xem môi trường của dự án này."
+  },
+  "members": {
+    "noRole": "Không có vai trò dự án"
   },
   "form": {
     "nameLabel": "Tên",
@@ -79,7 +88,10 @@
     "saving": "Đang lưu...",
     "addMemberTitle": "Thêm thành viên",
     "selectUserLabel": "Người dùng",
-    "selectUser": "Chọn người dùng"
+    "selectUser": "Chọn người dùng",
+    "projectRoleLabel": "Vai trò dự án",
+    "noProjectRole": "Không có vai trò dự án",
+    "permissionsLabel": "Quyền"
   },
   "deleteConfirm": {
     "title": "Xoá dự án?",
@@ -89,7 +101,9 @@
     "linkTitle": "Xoá liên kết?",
     "linkDescription": "Thao tác này sẽ xoá vĩnh viễn liên kết \"{name}\".",
     "memberTitle": "Xóa thành viên?",
-    "memberDescription": "Thao tác này sẽ xóa \"{name}\" khỏi dự án. Người này sẽ mất quyền truy cập."
+    "memberDescription": "Thao tác này sẽ xóa \"{name}\" khỏi dự án. Người này sẽ mất quyền truy cập.",
+    "projectRoleTitle": "Xóa vai trò dự án?",
+    "projectRoleDescription": "Thao tác này sẽ xóa vĩnh viễn vai trò \"{name}\". Thành viên đang giữ vai trò này sẽ quay về quyền hạn toàn cục."
   },
   "errors": {
     "projects_project_not_found": "Không tìm thấy dự án.",
@@ -97,7 +111,11 @@
     "projects_environment_type_already_exists": "Dự án đã có môi trường loại này.",
     "projects_project_link_not_found": "Không tìm thấy liên kết.",
     "projects_insufficient_project_access": "Bạn không phải là thành viên của dự án này.",
-    "projects_project_member_already_exists": "Người dùng này đã là thành viên của dự án."
+    "projects_project_member_already_exists": "Người dùng này đã là thành viên của dự án.",
+    "projects_project_role_not_found": "Không tìm thấy vai trò dự án.",
+    "projects_duplicate_project_role_name": "Vai trò dự án với tên này đã tồn tại.",
+    "projects_permission_not_project_assignable": "Quyền này không thể cấp qua vai trò dự án.",
+    "projects_project_permission_denied": "Bạn không có quyền thực hiện thao tác này trong dự án."
   },
   "messages": {
     "projectCreated": "Tạo dự án thành công.",
@@ -110,6 +128,10 @@
     "linkUpdated": "Cập nhật liên kết thành công.",
     "linkDeleted": "Xóa liên kết thành công.",
     "memberAdded": "Thêm thành viên thành công.",
-    "memberRemoved": "Xóa thành viên thành công."
+    "memberRemoved": "Xóa thành viên thành công.",
+    "projectRoleCreated": "Tạo vai trò dự án thành công.",
+    "projectRoleUpdated": "Cập nhật vai trò dự án thành công.",
+    "projectRoleDeleted": "Xóa vai trò dự án thành công.",
+    "memberRoleAssigned": "Cập nhật vai trò dự án của thành viên thành công."
   }
 }
