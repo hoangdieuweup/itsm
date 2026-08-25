@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Server, Link2, Globe, Waypoints, ScrollText, Siren } from "lucide-react";
+import { Plus, Pencil, Trash2, Server, Link2, Waypoints, ScrollText, Siren } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
@@ -19,13 +19,11 @@ import { ProjectLinkFormDialog } from "./project-link-form-dialog";
 
 export function ProjectDetailView({
   projectId,
-  onManageDns,
   onManageTunnels,
   onManageLogs,
   onManageAlerting,
 }: {
   projectId: string;
-  onManageDns: (environment: Environment) => void;
   onManageTunnels: (environment: Environment) => void;
   onManageLogs: (environment: Environment) => void;
   onManageAlerting: (environment: Environment) => void;
@@ -77,16 +75,6 @@ export function ProjectDetailView({
                 {t(`environmentTypes.${env.type}`)}
               </span>
               <span className="text-muted-foreground">{env.name}</span>
-              <Can I={ACTIONS.VIEW} a={RESOURCES.CLOUDFLARE_ACCOUNT}>
-                <button
-                  type="button"
-                  onClick={() => onManageDns(env)}
-                  className="cursor-pointer text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  aria-label={t("actions.manageDns")}
-                >
-                  <Globe className="size-3.5" />
-                </button>
-              </Can>
               <Can I={ACTIONS.VIEW} a={RESOURCES.CLOUDFLARE_ACCOUNT}>
                 <button
                   type="button"
