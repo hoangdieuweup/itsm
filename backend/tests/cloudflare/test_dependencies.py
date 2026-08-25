@@ -8,7 +8,11 @@ import pytest
 
 from app.modules.cloudflare.access import resolve_account_access_grant
 from app.modules.cloudflare.constants import AccessLevel
-from app.modules.cloudflare.dependencies import require_account_access, require_account_access_for_environment
+from app.modules.cloudflare.dependencies import (
+    require_account_access,
+    require_account_access_for_environment,
+    require_cloudflare_environment_access,
+)
 from app.modules.cloudflare.exceptions import CloudflareConfigNotFound, InsufficientAccountAccess
 from app.modules.cloudflare.repository import CloudflareAccountManagerRow
 from app.modules.users.public import UserRead
@@ -29,12 +33,14 @@ class FakeAuthApi:
 
 
 class FakeRbacApi:
-    def __init__(self, *, manage_all: bool) -> None:
+    def __init__(self, *, manage_all: bool, global_permissions: list[str] | None = None) -> None:
         self._manage_all = manage_all
+        self._global_permissions = set(global_permissions or [])
 
     async def has_permission(self, user_id, resource, action) -> bool:
-        assert (resource, action) == ("cloudflare_account", "manage_all")
-        return self._manage_all
+        if (resource, action) == ("cloudflare_account", "manage_all"):
+            return self._manage_all
+        return f"{resource}.{action}" in self._global_permissions
 
 
 class FakeAccountManagers:
@@ -173,4 +179,83 @@ async def test_require_account_access_for_environment_raises_when_unbound() -> N
             auth_api=FakeAuthApi(_FAKE_USER),
             rbac_api=FakeRbacApi(manage_all=False),
             uow=FakeUowWithConfigs(None, None),
+        )
+
+
+class _FakeEnvironment:
+    def __init__(self, id, project_id) -> None:
+        self.id = id
+        self.project_id = project_id
+
+
+class FakeProjectsApi:
+    def __init__(self, environment=None, permissions: frozenset[str] = frozenset()) -> None:
+        self._environment = environment
+        self._permissions = permissions
+
+    async def get_environment_by_id(self, environment_id):
+        return self._environment
+
+    async def resolve_effective_permissions(self, project_id, user, rbac_api):
+        return self._permissions
+
+
+async def test_require_cloudflare_environment_access_existing_account_manager_path_unchanged() -> None:
+    """A user who already passes today's check (global permission + account-
+    manager row) must succeed via the FIRST branch — proves zero behavior
+    change for existing users, the core promise of D3."""
+    account_id = uuid4()
+    row = CloudflareAccountManagerRow(
+        cloudflare_account_id=account_id,
+        user_id=_FAKE_USER.id,
+        access_level=AccessLevel.EDITOR,
+        created_at=datetime.now(UTC),
+    )
+    check = require_cloudflare_environment_access("cloudflare_dns", "create", AccessLevel.EDITOR)
+
+    grant = await check(
+        environment_id=uuid4(),
+        auth_api=FakeAuthApi(_FAKE_USER),
+        rbac_api=FakeRbacApi(manage_all=False, global_permissions=["cloudflare_dns.create"]),
+        uow=FakeUowWithConfigs(row, account_id),
+        projects_api=FakeProjectsApi(),  # never consulted on this path
+    )
+
+    assert grant.held_level is AccessLevel.EDITOR
+
+
+async def test_require_cloudflare_environment_access_falls_back_to_project_role_grant() -> None:
+    environment_id = uuid4()
+    account_id = uuid4()
+    check = require_cloudflare_environment_access("cloudflare_dns", "create", AccessLevel.EDITOR)
+
+    grant = await check(
+        environment_id=environment_id,
+        auth_api=FakeAuthApi(_FAKE_USER),
+        rbac_api=FakeRbacApi(manage_all=False, global_permissions=[]),
+        uow=FakeUowWithConfigs(None, account_id),
+        projects_api=FakeProjectsApi(
+            environment=_FakeEnvironment(id=environment_id, project_id=uuid4()),
+            permissions=frozenset({"cloudflare_dns.create"}),
+        ),
+    )
+
+    assert grant.held_level is None  # bypassed via project role, mirrors manage_all's own signal
+
+
+async def test_require_cloudflare_environment_access_raises_when_both_paths_fail() -> None:
+    environment_id = uuid4()
+    account_id = uuid4()
+    check = require_cloudflare_environment_access("cloudflare_dns", "create", AccessLevel.EDITOR)
+
+    with pytest.raises(InsufficientAccountAccess):
+        await check(
+            environment_id=environment_id,
+            auth_api=FakeAuthApi(_FAKE_USER),
+            rbac_api=FakeRbacApi(manage_all=False, global_permissions=[]),
+            uow=FakeUowWithConfigs(None, account_id),
+            projects_api=FakeProjectsApi(
+                environment=_FakeEnvironment(id=environment_id, project_id=uuid4()),
+                permissions=frozenset(),
+            ),
         )

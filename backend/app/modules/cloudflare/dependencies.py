@@ -15,7 +15,7 @@ from app.modules.audit.public import AuditApi, get_audit_api
 from app.modules.auth.public import AuthApi, get_auth_api
 from app.modules.cloudflare.access import resolve_account_access_grant
 from app.modules.cloudflare.constants import AccessLevel
-from app.modules.cloudflare.exceptions import CloudflareConfigNotFound
+from app.modules.cloudflare.exceptions import CloudflareConfigNotFound, InsufficientAccountAccess
 from app.modules.cloudflare.schemas import AccountAccessGrant
 from app.modules.cloudflare.services.add_tunnel_hostname import AddTunnelHostname
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
@@ -107,6 +107,63 @@ def require_account_access_for_environment(min_level: AccessLevel):
         return await resolve_account_access_grant(
             config.cloudflare_account_id, user, rbac_api, uow, min_level
         )
+
+    return check
+
+
+def require_cloudflare_environment_access(resource: str, action: str, min_level: AccessLevel):
+    """Composed check for environment-scoped Cloudflare routes (DNS, Tunnel,
+    hostnames, config-read, audit-log-read) — never used on account
+    administration or binding/unbinding routes, which stay exclusively
+    gated by require_account_access*/require_account_access_for_environment.
+
+    Tries the EXISTING account-manager path first: global resource.action
+    permission AND sufficient cloudflare_account_managers level (or
+    cloudflare_account:manage_all) — byte-for-byte today's combined
+    Layer-1+Layer-2 behavior, same queries, same success shape, for every
+    user who already passes it. Only on failure does it fall back to the
+    caller's project-scoped effective permission grant (global UNION
+    project role) for the environment's project — additive, never a
+    narrowing of what account-manager-based access already allows. Both
+    paths failing always raises InsufficientAccountAccess, so the error
+    code a caller sees never depends on which branch was tried.
+
+    held_level=None on the returned grant signals 'bypassed via a
+    mechanism other than a literal cloudflare_account_managers row' —
+    the exact same signal cloudflare_account:manage_all already uses,
+    so any code inspecting held_level treats this identically to a
+    manage_all bypass (deliberate: neither carries a real per-account
+    tier, both should satisfy any level check downstream)."""
+
+    async def check(
+        environment_id: UUID,
+        auth_api: AuthApi = Depends(get_auth_api),
+        rbac_api: RbacApi = Depends(get_rbac_api),
+        uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+        projects_api: ProjectsApi = Depends(get_projects_api),
+    ) -> AccountAccessGrant:
+        user = auth_api.current_user()
+        config = await uow.configs.get_by_environment_id(environment_id)
+        if config is None:
+            raise CloudflareConfigNotFound()
+
+        if await rbac_api.has_permission(user.id, resource, action):
+            try:
+                return await resolve_account_access_grant(
+                    config.cloudflare_account_id, user, rbac_api, uow, min_level
+                )
+            except InsufficientAccountAccess:
+                pass
+
+        environment = await projects_api.get_environment_by_id(environment_id)
+        if environment is not None:
+            permissions = await projects_api.resolve_effective_permissions(
+                environment.project_id, user, rbac_api
+            )
+            if f"{resource}.{action}" in permissions:
+                return AccountAccessGrant(user=user, held_level=None)
+
+        raise InsufficientAccountAccess()
 
     return check
 
