@@ -40,6 +40,7 @@ from app.modules.projects.services.update_environment import UpdateEnvironment
 from app.modules.projects.services.update_project import UpdateProject
 from app.modules.projects.services.update_project_link import UpdateProjectLink
 from app.modules.projects.uow import AbstractProjectsUnitOfWork
+from app.modules.rbac.schemas import PermissionRead, RoleSummary
 from app.modules.users.public import UserRead
 
 
@@ -565,13 +566,9 @@ class FakeRbacApi:
         return self._manage_all
 
     async def role_summary_for_user(self, user_id):
-        from app.modules.rbac.schemas import RoleSummary
-
         return RoleSummary(roles=[], permissions=self._global_permissions, role_name=None)
 
     async def get_permissions_by_ids(self, ids: list[UUID]):
-        from app.modules.rbac.schemas import PermissionRead
-
         return [
             PermissionRead(id=pid, resource=key.split(".")[0], action=key.split(".")[1], description_key="x")
             for pid, key in self._catalog_by_id.items()
@@ -579,8 +576,6 @@ class FakeRbacApi:
         ]
 
     async def list_permission_catalog(self):
-        from app.modules.rbac.schemas import PermissionRead
-
         return [
             PermissionRead(id=pid, resource=key.split(".")[0], action=key.split(".")[1], description_key="x")
             for pid, key in self._catalog_by_id.items()
