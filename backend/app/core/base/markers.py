@@ -34,7 +34,7 @@ class _MethodMarker:
         functools.update_wrapper(self, func)
         self._func = func
         setattr(func, "__layer__", self.layer)  # noqa: B010 -- dynamic attribute, not a fixed attr of Callable
-        setattr(self, "__layer__", self.layer)
+        self.__layer__ = self.layer
 
     def __get__(self, obj: Any, objtype: type | None = None) -> Any:
         """Delegate binding to the wrapped function — sync and async both bind correctly this way."""
