@@ -2,13 +2,17 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Siren } from "lucide-react";
+import { Plus, Siren } from "lucide-react";
+import { Button } from "@/shared/ui/button";
 import { Label } from "@/shared/ui/label";
+import { Can } from "@/entities/permission";
+import { ACTIONS, RESOURCES } from "@/shared/constants/permissions";
 import { useProjectsQuery } from "@/entities/project";
 import { useProjectEnvironmentsQuery } from "@/entities/environment";
 import { INCIDENT_STATUS, useIncidentsQuery } from "@/entities/incident";
 import { IncidentStatusBadge } from "./incident-status-badge";
 import { IncidentDetailPanel } from "./incident-detail-panel";
+import { CreateManualIncidentDialog } from "./create-manual-incident-dialog";
 
 function ProjectSelect({ projectId, onChange }: { projectId: string; onChange: (value: string) => void }) {
   const t = useTranslations("incidents");
@@ -123,6 +127,7 @@ export function IncidentsPageContent() {
   const [environmentId, setEnvironmentId] = useState("");
   const [status, setStatus] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data: incidents = [], isLoading } = useIncidentsQuery({
     projectId: projectId || undefined,
@@ -134,9 +139,17 @@ export function IncidentsPageContent() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-bold text-foreground">{t("title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("description")}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-bold text-foreground">{t("title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("description")}</p>
+        </div>
+        <Can I={ACTIONS.CREATE} a={RESOURCES.INCIDENT}>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-1.5 size-3.5" aria-hidden="true" />
+            {t("create.trigger")}
+          </Button>
+        </Can>
       </div>
 
       <IncidentsFilterBar
@@ -192,6 +205,8 @@ export function IncidentsPageContent() {
       </section>
 
       {selectedIncident && <IncidentDetailPanel incident={selectedIncident} />}
+
+      {createOpen && <CreateManualIncidentDialog onClose={() => setCreateOpen(false)} />}
     </div>
   );
 }
