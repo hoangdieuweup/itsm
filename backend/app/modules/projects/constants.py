@@ -82,10 +82,23 @@ class ProjectScopedPermissionCatalog:
     """The subset of the global rbac.Permission catalog a ProjectRole may
     ever grant. Bounded deliberately: project.delete (cascades every
     downstream Cloudflare/Loki/alerting row), project.manage_all,
-    project_member.manage, and both project_role.* atoms are permanently
-    excluded — managing roles/members and deleting a project always
-    require a GLOBAL atom, never a project-scoped one, closing the
-    mint-yourself-more-power loop a naive union would open."""
+    project_member.manage, both project_role.* atoms, all Cloudflare
+    ACCOUNT-administration atoms (cloudflare_account.*, cloudflare_manager.*),
+    and cloudflare_config.manage (binding/unbinding an environment to an
+    account is a trust-establishing action, same class as account
+    administration — someone binding an environment already had real
+    Cloudflare account access at that moment; a project role must never be
+    able to grant that trust itself, only OPERATE within a binding someone
+    else already established) are permanently excluded — closing the
+    mint-yourself-more-power loop a naive union would open.
+
+    Environment-scoped OPERATIONAL Cloudflare/Loki/Alerting atoms ARE
+    assignable: viewing/editing DNS records, creating/deleting/syncing
+    Tunnels and their hostnames, revealing a TUNNEL's own connector token
+    (narrow blast radius — not the account's api_token), reading the
+    account/zone binding and audit logs, configuring Loki, and managing
+    alert rules/incidents. See docs/superpowers/plans/2026-08-25-
+    environment-scoped-cloudflare-loki-alerting-project-roles.md."""
 
     ASSIGNABLE: frozenset[tuple[str, str]] = frozenset(
         {
@@ -98,5 +111,31 @@ class ProjectScopedPermissionCatalog:
             ("project_link", "read"),
             ("project_link", "manage"),
             ("project_member", "read"),
+            ("cloudflare_config", "read"),
+            ("cloudflare_dns", "read"),
+            ("cloudflare_dns", "create"),
+            ("cloudflare_dns", "update"),
+            ("cloudflare_dns", "delete"),
+            ("cloudflare_tunnel", "read"),
+            ("cloudflare_tunnel", "create"),
+            ("cloudflare_tunnel", "delete"),
+            ("cloudflare_tunnel", "sync"),
+            ("cloudflare_tunnel", "reveal_token"),
+            ("cloudflare_tunnel", "refresh_status"),
+            ("cloudflare_hostname", "read"),
+            ("cloudflare_hostname", "create"),
+            ("cloudflare_hostname", "update"),
+            ("cloudflare_hostname", "delete"),
+            ("cloudflare_audit", "read"),
+            ("loki_config", "read"),
+            ("loki_config", "manage"),
+            ("alert_rule", "create"),
+            ("alert_rule", "read"),
+            ("alert_rule", "update"),
+            ("alert_rule", "delete"),
+            ("incident", "create"),
+            ("incident", "read"),
+            ("incident", "acknowledge"),
+            ("incident", "resolve"),
         }
     )
