@@ -9,12 +9,15 @@ from app.modules.projects.access import resolve_project_membership
 from app.modules.projects.config import projects_settings
 from app.modules.projects.constants import EnvironmentType, ProjectLinkType
 from app.modules.projects.exceptions import (
+    DuplicateProjectRoleName,
     EnvironmentNotFound,
     EnvironmentTypeAlreadyExists,
     InsufficientProjectAccess,
+    PermissionNotProjectAssignable,
     ProjectLinkNotFound,
     ProjectMemberAlreadyExists,
     ProjectNotFound,
+    ProjectRoleNotFound,
 )
 from app.modules.projects.repository import (
     AbstractEnvironmentRepository,
@@ -27,9 +30,11 @@ from app.modules.projects.repository import (
 )
 from app.modules.projects.schemas import EnvironmentRead, ProjectLinkRead, ProjectRead
 from app.modules.projects.services.add_project_member import AddProjectMember
+from app.modules.projects.services.assign_member_project_role import AssignMemberProjectRole
 from app.modules.projects.services.create_environment import CreateEnvironment
 from app.modules.projects.services.create_project import CreateProject
 from app.modules.projects.services.create_project_link import CreateProjectLink
+from app.modules.projects.services.create_project_role import CreateProjectRole
 from app.modules.projects.services.delete_environment import DeleteEnvironment
 from app.modules.projects.services.delete_project import DeleteProject
 from app.modules.projects.services.delete_project_link import DeleteProjectLink
@@ -748,4 +753,91 @@ class TestRemoveProjectMember:
         with pytest.raises(ProjectNotFound):
             await RemoveProjectMember(uow, FakeAuditApi()).execute(
                 uuid4(), uuid4(), actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
+
+
+class TestCreateProjectRole:
+    async def test_creates_role_with_assignable_permissions(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="A", description=None, created_by=None)
+        perm_id = uuid4()
+        rbac_api = FakeRbacApi(manage_all=False, catalog_by_id={perm_id: "environment.update"})
+
+        role = await CreateProjectRole(uow, rbac_api, FakeAuditApi()).execute(
+            project.id, "env-editor", [perm_id], actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        assert role.name == "env-editor"
+        assert role.permissions[0].resource == "environment"
+
+    async def test_rejects_non_assignable_permission(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="A", description=None, created_by=None)
+        perm_id = uuid4()
+        rbac_api = FakeRbacApi(manage_all=False, catalog_by_id={perm_id: "user.update_status"})
+
+        with pytest.raises(PermissionNotProjectAssignable):
+            await CreateProjectRole(uow, rbac_api, FakeAuditApi()).execute(
+                project.id, "sneaky", [perm_id], actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
+
+    async def test_rejects_duplicate_name(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="A", description=None, created_by=None)
+        rbac_api = FakeRbacApi(manage_all=False)
+        await CreateProjectRole(uow, rbac_api, FakeAuditApi()).execute(
+            project.id, "editor", [], actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        with pytest.raises(DuplicateProjectRoleName):
+            await CreateProjectRole(uow, rbac_api, FakeAuditApi()).execute(
+                project.id, "editor", [], actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
+
+    async def test_rejects_unknown_project(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        with pytest.raises(ProjectNotFound):
+            await CreateProjectRole(uow, FakeRbacApi(manage_all=False), FakeAuditApi()).execute(
+                uuid4(), "x", [], actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+            )
+
+
+class TestAssignMemberProjectRole:
+    async def test_assigns_role(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="A", description=None, created_by=None)
+        await uow.project_members.add(project.id, ACTOR_ID)
+        role = await uow.project_roles.create(project_id=project.id, name="editor", permission_ids=[])
+
+        await AssignMemberProjectRole(uow, FakeAuditApi()).execute(
+            project.id, ACTOR_ID, role.id, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        member = await uow.project_members.get_by_id((project.id, ACTOR_ID))
+        assert member.project_role_id == role.id
+
+    async def test_clears_role_when_none(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="A", description=None, created_by=None)
+        await uow.project_members.add(project.id, ACTOR_ID)
+        role = await uow.project_roles.create(project_id=project.id, name="editor", permission_ids=[])
+        await uow.project_members.set_project_role(project.id, ACTOR_ID, role.id)
+
+        await AssignMemberProjectRole(uow, FakeAuditApi()).execute(
+            project.id, ACTOR_ID, None, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
+        )
+
+        member = await uow.project_members.get_by_id((project.id, ACTOR_ID))
+        assert member.project_role_id is None
+
+    async def test_rejects_role_from_a_different_project(self) -> None:
+        uow = FakeProjectsUnitOfWork()
+        project_a = await uow.projects.create(name="A", description=None, created_by=None)
+        project_b = await uow.projects.create(name="B", description=None, created_by=None)
+        await uow.project_members.add(project_b.id, ACTOR_ID)
+        role_on_a = await uow.project_roles.create(project_id=project_a.id, name="editor", permission_ids=[])
+
+        with pytest.raises(ProjectRoleNotFound):
+            await AssignMemberProjectRole(uow, FakeAuditApi()).execute(
+                project_b.id, ACTOR_ID, role_on_a.id, actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
             )
