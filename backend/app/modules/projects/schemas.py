@@ -86,3 +86,19 @@ class ProjectLinkUpdate(CustomModel):
 
     name: str | None = None
     url: str | None = None
+
+
+class ProjectMemberRead(FrozenModel):
+    """A project member enriched with the target user's email/name — the
+    repository only knows user_id, resolving identity is the use case's job."""
+
+    user_id: UUID
+    name: str
+    email: str
+    created_at: datetime
+
+
+class ProjectMemberCreate(CustomModel):
+    """Request body for POST /projects/{project_id}/members."""
+
+    user_id: UUID

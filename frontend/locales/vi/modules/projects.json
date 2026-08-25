@@ -21,7 +21,9 @@
     "manageAlerting": "Quản lý Cảnh báo",
     "inspect": "Chi tiết",
     "edit": "Sửa",
-    "delete": "Xóa"
+    "delete": "Xóa",
+    "addMember": "Thêm thành viên",
+    "removeMember": "Xóa thành viên"
   },
   "table": {
     "name": "Tên",
@@ -38,7 +40,8 @@
   "alerts": "Cảnh báo",
   "sections": {
     "environments": "Môi trường",
-    "links": "Liên kết ngoài"
+    "links": "Liên kết ngoài",
+    "members": "Thành viên"
   },
   "environmentTypes": {
     "dev": "Dev",
@@ -57,7 +60,8 @@
     "title": "Chưa có dự án nào",
     "description": "Tạo dự án đầu tiên để bắt đầu quản lý môi trường, Cloudflare và log.",
     "environments": "Chưa có môi trường nào.",
-    "links": "Chưa có liên kết nào."
+    "links": "Chưa có liên kết nào.",
+    "members": "Chưa có thành viên nào."
   },
   "noPermission": {
     "environments": "Bạn không có quyền xem môi trường của dự án này."
@@ -72,7 +76,10 @@
     "cancel": "Huỷ",
     "save": "Lưu",
     "create": "Tạo",
-    "saving": "Đang lưu..."
+    "saving": "Đang lưu...",
+    "addMemberTitle": "Thêm thành viên",
+    "selectUserLabel": "Người dùng",
+    "selectUser": "Chọn người dùng"
   },
   "deleteConfirm": {
     "title": "Xoá dự án?",
@@ -80,13 +87,17 @@
     "environmentTitle": "Xoá môi trường?",
     "environmentDescription": "Thao tác này sẽ xoá vĩnh viễn môi trường \"{name}\".",
     "linkTitle": "Xoá liên kết?",
-    "linkDescription": "Thao tác này sẽ xoá vĩnh viễn liên kết \"{name}\"."
+    "linkDescription": "Thao tác này sẽ xoá vĩnh viễn liên kết \"{name}\".",
+    "memberTitle": "Xóa thành viên?",
+    "memberDescription": "Thao tác này sẽ xóa \"{name}\" khỏi dự án. Người này sẽ mất quyền truy cập."
   },
   "errors": {
     "projects_project_not_found": "Không tìm thấy dự án.",
     "projects_environment_not_found": "Không tìm thấy môi trường.",
     "projects_environment_type_already_exists": "Dự án đã có môi trường loại này.",
-    "projects_project_link_not_found": "Không tìm thấy liên kết."
+    "projects_project_link_not_found": "Không tìm thấy liên kết.",
+    "projects_insufficient_project_access": "Bạn không phải là thành viên của dự án này.",
+    "projects_project_member_already_exists": "Người dùng này đã là thành viên của dự án."
   },
   "messages": {
     "projectCreated": "Tạo dự án thành công.",
@@ -97,6 +108,8 @@
     "environmentDeleted": "Xóa môi trường thành công.",
     "linkCreated": "Thêm liên kết thành công.",
     "linkUpdated": "Cập nhật liên kết thành công.",
-    "linkDeleted": "Xóa liên kết thành công."
+    "linkDeleted": "Xóa liên kết thành công.",
+    "memberAdded": "Thêm thành viên thành công.",
+    "memberRemoved": "Xóa thành viên thành công."
   }
 }

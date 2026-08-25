@@ -12,9 +12,11 @@ from app.integrations.cache.client import CacheClient
 from app.modules.projects.repository import (
     AbstractEnvironmentRepository,
     AbstractProjectLinkRepository,
+    AbstractProjectMemberRepository,
     AbstractProjectRepository,
     EnvironmentRepository,
     ProjectLinkRepository,
+    ProjectMemberRepository,
     ProjectRepository,
 )
 
@@ -27,6 +29,7 @@ class AbstractProjectsUnitOfWork(AbstractUnitOfWork):
     projects: AbstractProjectRepository
     environments: AbstractEnvironmentRepository
     project_links: AbstractProjectLinkRepository
+    project_members: AbstractProjectMemberRepository
 
     @abstractmethod
     def mark_stale(self, entity: str, entity_id: UUID) -> None:
@@ -44,6 +47,7 @@ class ProjectsUnitOfWork(AbstractProjectsUnitOfWork):
         self.projects = ProjectRepository(session, cache)
         self.environments = EnvironmentRepository(session, cache)
         self.project_links = ProjectLinkRepository(session)
+        self.project_members = ProjectMemberRepository(session)
 
     def mark_stale(self, entity: str, entity_id: UUID) -> None:
         """Queue a cache entity for invalidation once this transaction commits."""

@@ -28,6 +28,7 @@ class CreateProject(AbstractUseCase):
             await self._uow.project_links.create(
                 project_id=project.id, type=link_type, name=link_name, url=url, is_default=True
             )
+        await self._uow.project_members.add(project.id, actor_id)
         await self._uow.commit()
         await self._audit_api.log_event(
             type=AuditEventType.AUDIT,

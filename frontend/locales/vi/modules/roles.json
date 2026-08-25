@@ -54,7 +54,8 @@
         "create": "Tạo dự án mới",
         "read": "Xem danh sách & chi tiết dự án",
         "update": "Chỉnh sửa dự án & liên kết",
-        "delete": "Xóa dự án"
+        "delete": "Xóa dự án",
+        "manage_all": "Toàn quyền quản trị mọi dự án, không phụ thuộc vào việc là thành viên"
       },
       "environment": {
         "create": "Tạo môi trường triển khai",

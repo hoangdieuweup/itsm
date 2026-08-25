@@ -29,6 +29,8 @@ export const API_CONFIG = {
       ENVIRONMENT_DETAIL: (id: string) => `/environments/${id}`,
       LINKS: (projectId: string) => `/projects/${projectId}/links`,
       LINK_DETAIL: (id: string) => `/links/${id}`,
+      MEMBERS: (projectId: string) => `/projects/${projectId}/members`,
+      MEMBER_DETAIL: (projectId: string, userId: string) => `/projects/${projectId}/members/${userId}`,
     },
     AUDIT_LOGS: {
       ROOT: "/audit-logs",

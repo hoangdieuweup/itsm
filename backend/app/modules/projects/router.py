@@ -10,16 +10,23 @@ from fastapi import APIRouter, Depends
 from app.core.models import ApiResponse
 from app.core.pagination import Page, PaginationParams, pagination_params
 from app.modules.projects.dependencies import (
+    get_add_project_member,
     get_create_environment,
     get_create_project,
     get_create_project_link,
     get_delete_environment,
     get_delete_project,
     get_delete_project_link,
+    get_list_project_members,
+    get_list_visible_projects,
+    get_remove_project_member,
     get_uow,
     get_update_environment,
     get_update_project,
     get_update_project_link,
+    require_project_membership,
+    require_project_membership_for_environment,
+    require_project_membership_for_link,
 )
 from app.modules.projects.exceptions import EnvironmentNotFound, ProjectNotFound
 from app.modules.projects.schemas import (
@@ -30,15 +37,21 @@ from app.modules.projects.schemas import (
     ProjectLinkCreate,
     ProjectLinkRead,
     ProjectLinkUpdate,
+    ProjectMemberCreate,
+    ProjectMemberRead,
     ProjectRead,
     ProjectUpdate,
 )
+from app.modules.projects.services.add_project_member import AddProjectMember
 from app.modules.projects.services.create_environment import CreateEnvironment
 from app.modules.projects.services.create_project import CreateProject
 from app.modules.projects.services.create_project_link import CreateProjectLink
 from app.modules.projects.services.delete_environment import DeleteEnvironment
 from app.modules.projects.services.delete_project import DeleteProject
 from app.modules.projects.services.delete_project_link import DeleteProjectLink
+from app.modules.projects.services.list_project_members import ListProjectMembers
+from app.modules.projects.services.list_visible_projects import ListVisibleProjects
+from app.modules.projects.services.remove_project_member import RemoveProjectMember
 from app.modules.projects.services.update_environment import UpdateEnvironment
 from app.modules.projects.services.update_project import UpdateProject
 from app.modules.projects.services.update_project_link import UpdateProjectLink
@@ -55,7 +68,8 @@ async def create_project(
     use_case: CreateProject = Depends(get_create_project),
     user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.CREATE)),
 ) -> ApiResponse[ProjectRead]:
-    """Create a new project — auto-attaches the configured default Jira/Git links."""
+    """Create a new project — auto-attaches the configured default Jira/Git
+    links and adds the creator as its first member."""
     project = await use_case.execute(body.name, body.description, actor_id=user.id, actor_email=user.email)
     return ApiResponse[ProjectRead](success=True, data=project)
 
@@ -63,11 +77,12 @@ async def create_project(
 @router.get("/projects")
 async def list_projects(
     pagination: PaginationParams = Depends(pagination_params),
-    uow: AbstractProjectsUnitOfWork = Depends(get_uow),
-    _user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.READ)),
+    use_case: ListVisibleProjects = Depends(get_list_visible_projects),
+    user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.READ)),
 ) -> ApiResponse[Page[ProjectRead]]:
-    """List projects."""
-    items, total = await uow.projects.list_page(pagination.limit, pagination.offset)
+    """List projects visible to the current user — every project if they
+    hold project:manage_all, otherwise only the ones they're a member of."""
+    items, total = await use_case.execute(user.id, pagination.limit, pagination.offset)
     page = Page[ProjectRead](items=items, total=total, limit=pagination.limit, offset=pagination.offset)
     return ApiResponse[Page[ProjectRead]](success=True, data=page)
 
@@ -77,6 +92,7 @@ async def get_project(
     project_id: UUID,
     uow: AbstractProjectsUnitOfWork = Depends(get_uow),
     _user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.READ)),
+    _membership: None = Depends(require_project_membership()),
 ) -> ApiResponse[ProjectRead]:
     """Return one project, 404 if it doesn't exist."""
     project = await uow.projects.get_by_id(project_id)
@@ -91,6 +107,7 @@ async def update_project(
     body: ProjectUpdate,
     use_case: UpdateProject = Depends(get_update_project),
     user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.UPDATE)),
+    _membership: None = Depends(require_project_membership()),
 ) -> ApiResponse[ProjectRead]:
     """Rename and/or redescribe a project."""
     project = await use_case.execute(
@@ -104,6 +121,7 @@ async def delete_project(
     project_id: UUID,
     use_case: DeleteProject = Depends(get_delete_project),
     user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.DELETE)),
+    _membership: None = Depends(require_project_membership()),
 ) -> ApiResponse[None]:
     """Delete a project. Its environments and links cascade at the DB level."""
     await use_case.execute(project_id, actor_id=user.id, actor_email=user.email)
@@ -115,6 +133,7 @@ async def list_environments(
     project_id: UUID,
     uow: AbstractProjectsUnitOfWork = Depends(get_uow),
     _user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.READ)),
+    _membership: None = Depends(require_project_membership()),
 ) -> ApiResponse[list[EnvironmentRead]]:
     """List a project's environments."""
     environments = await uow.environments.list_for_project(project_id)
@@ -127,6 +146,7 @@ async def create_environment(
     body: EnvironmentCreate,
     use_case: CreateEnvironment = Depends(get_create_environment),
     user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.CREATE)),
+    _membership: None = Depends(require_project_membership()),
 ) -> ApiResponse[EnvironmentRead]:
     """Create an environment. Rejected if the project already has one of this type."""
     env = await use_case.execute(
@@ -140,6 +160,7 @@ async def get_environment(
     environment_id: UUID,
     uow: AbstractProjectsUnitOfWork = Depends(get_uow),
     _user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.READ)),
+    _membership: None = Depends(require_project_membership_for_environment()),
 ) -> ApiResponse[EnvironmentRead]:
     """Return one environment, 404 if it doesn't exist."""
     environment = await uow.environments.get_by_id(environment_id)
@@ -154,6 +175,7 @@ async def update_environment(
     body: EnvironmentUpdate,
     use_case: UpdateEnvironment = Depends(get_update_environment),
     user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.UPDATE)),
+    _membership: None = Depends(require_project_membership_for_environment()),
 ) -> ApiResponse[EnvironmentRead]:
     """Rename and/or re-point an environment."""
     env = await use_case.execute(
@@ -167,6 +189,7 @@ async def delete_environment(
     environment_id: UUID,
     use_case: DeleteEnvironment = Depends(get_delete_environment),
     user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.DELETE)),
+    _membership: None = Depends(require_project_membership_for_environment()),
 ) -> ApiResponse[None]:
     """Delete an environment."""
     await use_case.execute(environment_id, actor_id=user.id, actor_email=user.email)
@@ -178,6 +201,7 @@ async def list_project_links(
     project_id: UUID,
     uow: AbstractProjectsUnitOfWork = Depends(get_uow),
     _user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.READ)),
+    _membership: None = Depends(require_project_membership()),
 ) -> ApiResponse[list[ProjectLinkRead]]:
     """List a project's external links."""
     links = await uow.project_links.list_for_project(project_id)
@@ -190,6 +214,7 @@ async def create_project_link(
     body: ProjectLinkCreate,
     use_case: CreateProjectLink = Depends(get_create_project_link),
     _user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.UPDATE)),
+    _membership: None = Depends(require_project_membership()),
 ) -> ApiResponse[ProjectLinkRead]:
     """Add an external link to a project."""
     link = await use_case.execute(project_id, body.type, body.name, body.url)
@@ -202,6 +227,7 @@ async def update_project_link(
     body: ProjectLinkUpdate,
     use_case: UpdateProjectLink = Depends(get_update_project_link),
     _user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.UPDATE)),
+    _membership: None = Depends(require_project_membership_for_link()),
 ) -> ApiResponse[ProjectLinkRead]:
     """Rename and/or re-point a project link."""
     link = await use_case.execute(link_id, name=body.name, url=body.url)
@@ -213,7 +239,46 @@ async def delete_project_link(
     link_id: UUID,
     use_case: DeleteProjectLink = Depends(get_delete_project_link),
     _user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.UPDATE)),
+    _membership: None = Depends(require_project_membership_for_link()),
 ) -> ApiResponse[None]:
     """Remove a project link."""
     await use_case.execute(link_id)
+    return ApiResponse[None](success=True)
+
+
+@router.get("/projects/{project_id}/members")
+async def list_project_members(
+    project_id: UUID,
+    use_case: ListProjectMembers = Depends(get_list_project_members),
+    _user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.READ)),
+    _membership: None = Depends(require_project_membership()),
+) -> ApiResponse[list[ProjectMemberRead]]:
+    """List a project's members."""
+    members = await use_case.execute(project_id)
+    return ApiResponse[list[ProjectMemberRead]](success=True, data=members)
+
+
+@router.post("/projects/{project_id}/members")
+async def add_project_member(
+    project_id: UUID,
+    body: ProjectMemberCreate,
+    use_case: AddProjectMember = Depends(get_add_project_member),
+    user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.UPDATE)),
+    _membership: None = Depends(require_project_membership()),
+) -> ApiResponse[None]:
+    """Add a user as a member of a project."""
+    await use_case.execute(project_id, body.user_id, actor_id=user.id, actor_email=user.email)
+    return ApiResponse[None](success=True)
+
+
+@router.delete("/projects/{project_id}/members/{user_id}")
+async def remove_project_member(
+    project_id: UUID,
+    user_id: UUID,
+    use_case: RemoveProjectMember = Depends(get_remove_project_member),
+    user: UserRead = Depends(require_permission(RbacResources.PROJECT, RbacActions.UPDATE)),
+    _membership: None = Depends(require_project_membership()),
+) -> ApiResponse[None]:
+    """Remove a user's membership on a project."""
+    await use_case.execute(project_id, user_id, actor_id=user.id, actor_email=user.email)
     return ApiResponse[None](success=True)

@@ -6,3 +6,8 @@ export const projectLinksKeys = {
   all: ["projects", "links"] as const,
   forProject: (projectId: string) => [...projectLinksKeys.all, projectId] as const,
 };
+
+export const projectMembersKeys = {
+  all: ["projects", "members"] as const,
+  forProject: (projectId: string) => [...projectMembersKeys.all, projectId] as const,
+};

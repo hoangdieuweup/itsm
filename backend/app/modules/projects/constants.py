@@ -50,6 +50,8 @@ class ErrorCode(StrEnum):
     ENVIRONMENT_NOT_FOUND = "projects_environment_not_found"
     ENVIRONMENT_TYPE_ALREADY_EXISTS = "projects_environment_type_already_exists"
     PROJECT_LINK_NOT_FOUND = "projects_project_link_not_found"
+    INSUFFICIENT_PROJECT_ACCESS = "projects_insufficient_project_access"
+    PROJECT_MEMBER_ALREADY_EXISTS = "projects_project_member_already_exists"
 
 
 class ProjectAuditActions(StrEnum):
@@ -63,3 +65,5 @@ class ProjectAuditActions(StrEnum):
     ENVIRONMENT_CREATED = "ENVIRONMENT_CREATED"
     ENVIRONMENT_UPDATED = "ENVIRONMENT_UPDATED"
     ENVIRONMENT_DELETED = "ENVIRONMENT_DELETED"
+    MEMBER_ADDED = "MEMBER_ADDED"
+    MEMBER_REMOVED = "MEMBER_REMOVED"

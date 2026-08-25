@@ -75,3 +75,27 @@ export async function updateProjectLink(
 export async function deleteProjectLink(id: string): Promise<void> {
   await apiFetch<null>(API_CONFIG.ENDPOINTS.PROJECTS.LINK_DETAIL(id), { method: "DELETE" });
 }
+
+export interface ProjectMember {
+  userId: string;
+  name: string;
+  email: string;
+  createdAt: string;
+}
+
+export async function fetchProjectMembers(projectId: string): Promise<ProjectMember[]> {
+  return apiFetch<ProjectMember[]>(API_CONFIG.ENDPOINTS.PROJECTS.MEMBERS(projectId));
+}
+
+export async function addProjectMember(projectId: string, userId: string): Promise<void> {
+  await apiFetch<null>(API_CONFIG.ENDPOINTS.PROJECTS.MEMBERS(projectId), {
+    method: "POST",
+    data: { userId },
+  });
+}
+
+export async function removeProjectMember(projectId: string, userId: string): Promise<void> {
+  await apiFetch<null>(API_CONFIG.ENDPOINTS.PROJECTS.MEMBER_DETAIL(projectId, userId), {
+    method: "DELETE",
+  });
+}

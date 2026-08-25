@@ -1,6 +1,6 @@
 """Errors owned by the projects module."""
 
-from app.core.exceptions import ConflictError, NotFoundError
+from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError
 from app.modules.projects.constants import ErrorCode
 
 
@@ -30,3 +30,18 @@ class ProjectLinkNotFound(NotFoundError):
 
     code = ErrorCode.PROJECT_LINK_NOT_FOUND
     message = "Project link not found"
+
+
+class InsufficientProjectAccess(ForbiddenError):
+    """Raised when the caller is neither a member of the project nor holds
+    project:manage_all."""
+
+    code = ErrorCode.INSUFFICIENT_PROJECT_ACCESS
+    message = "You are not a member of this project"
+
+
+class ProjectMemberAlreadyExists(ConflictError):
+    """Raised when the target user is already a member of the project."""
+
+    code = ErrorCode.PROJECT_MEMBER_ALREADY_EXISTS
+    message = "This user is already a member of the project"
