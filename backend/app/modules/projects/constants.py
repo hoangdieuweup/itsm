@@ -53,6 +53,10 @@ class ErrorCode(StrEnum):
     PROJECT_LINK_NOT_FOUND = "projects_project_link_not_found"
     INSUFFICIENT_PROJECT_ACCESS = "projects_insufficient_project_access"
     PROJECT_MEMBER_ALREADY_EXISTS = "projects_project_member_already_exists"
+    PROJECT_ROLE_NOT_FOUND = "projects_project_role_not_found"
+    DUPLICATE_PROJECT_ROLE_NAME = "projects_duplicate_project_role_name"
+    PERMISSION_NOT_PROJECT_ASSIGNABLE = "projects_permission_not_project_assignable"
+    PROJECT_PERMISSION_DENIED = "projects_project_permission_denied"
 
 
 class ProjectAuditActions(StrEnum):
@@ -68,6 +72,10 @@ class ProjectAuditActions(StrEnum):
     ENVIRONMENT_DELETED = "ENVIRONMENT_DELETED"
     MEMBER_ADDED = "MEMBER_ADDED"
     MEMBER_REMOVED = "MEMBER_REMOVED"
+    PROJECT_ROLE_CREATED = "PROJECT_ROLE_CREATED"
+    PROJECT_ROLE_UPDATED = "PROJECT_ROLE_UPDATED"
+    PROJECT_ROLE_DELETED = "PROJECT_ROLE_DELETED"
+    MEMBER_ROLE_ASSIGNED = "MEMBER_ROLE_ASSIGNED"
 
 
 class ProjectScopedPermissionCatalog:

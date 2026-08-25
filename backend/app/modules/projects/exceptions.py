@@ -45,3 +45,36 @@ class ProjectMemberAlreadyExists(ConflictError):
 
     code = ErrorCode.PROJECT_MEMBER_ALREADY_EXISTS
     message = "This user is already a member of the project"
+
+
+class ProjectRoleNotFound(NotFoundError):
+    """Raised when no project role matches the requested id."""
+
+    code = ErrorCode.PROJECT_ROLE_NOT_FOUND
+    message = "Project role not found"
+
+
+class DuplicateProjectRoleName(ConflictError):
+    """Raised when a project already has a role with the requested name."""
+
+    code = ErrorCode.DUPLICATE_PROJECT_ROLE_NAME
+    message = "This project already has a role with that name"
+
+
+class PermissionNotProjectAssignable(ConflictError):
+    """Raised when a project role's requested permissions include one
+    outside ProjectScopedPermissionCatalog.ASSIGNABLE."""
+
+    code = ErrorCode.PERMISSION_NOT_PROJECT_ASSIGNABLE
+    message = "One or more permissions cannot be assigned to a project role"
+
+
+class ProjectPermissionDenied(ForbiddenError):
+    """Raised when the caller's effective project permission set (global
+    UNION project role) does not include the required resource.action.
+    Projects-owned rather than reusing rbac's PermissionDenied — that
+    class isn't exported through rbac/public.py, and cross-module error
+    reuse would break the module-owns-its-errors rule."""
+
+    code = ErrorCode.PROJECT_PERMISSION_DENIED
+    message = "You do not have this permission on this project"
