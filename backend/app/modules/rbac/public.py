@@ -11,12 +11,13 @@ from app.modules.rbac.constants import RbacActions, RbacDefaults, RbacResources
 from app.modules.rbac.dependencies import get_uow, require_any_permission, require_permission
 from app.modules.rbac.models import Permission, Role, UserRole
 from app.modules.rbac.rules import RbacRules
-from app.modules.rbac.schemas import RoleSummary
+from app.modules.rbac.schemas import PermissionRead, RoleSummary
 from app.modules.rbac.services.assign_default_role import AssignDefaultRole
 from app.modules.rbac.uow import AbstractRbacUnitOfWork
 
 __all__ = [
     "Permission",
+    "PermissionRead",
     "Role",
     "UserRole",
     "RbacDefaults",
@@ -78,6 +79,19 @@ class RbacApi:
         manage_all bypass inside require_account_access) — require_permission
         is a 403-raising route dependency, not reusable as a plain boolean."""
         return await self._uow.user_roles.user_has_permission(user_id, resource, action)
+
+    @facade
+    async def get_permissions_by_ids(self, ids: list[UUID]) -> list[PermissionRead]:
+        """Resolve permission ids to their resource.action + description —
+        used by a project role's editor UI and by union-permission
+        resolution (see projects/access.py)."""
+        return await self._uow.permissions.find_by_ids(ids)
+
+    @facade
+    async def list_permission_catalog(self) -> list[PermissionRead]:
+        """Return the full, fixed permission catalog — backs the project-
+        role editor's assignable-permissions picker."""
+        return await self._uow.permissions.list_all()
 
 
 async def get_rbac_api(uow: AbstractRbacUnitOfWork = Depends(get_uow)) -> RbacApi:
