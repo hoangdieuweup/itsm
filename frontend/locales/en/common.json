@@ -37,7 +37,8 @@
     "language": "Language",
     "account": "Account",
     "detail": "Detail",
-    "environments": "Environments"
+    "environments": "Environments",
+    "breadcrumb": "Breadcrumb"
   },
   "dashboard": {
     "welcomeBack": "Welcome back, {name}!",

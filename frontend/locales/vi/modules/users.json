@@ -25,6 +25,7 @@
     "assignRoles": "Phân quyền vai trò",
     "assignRolesDialogTitle": "Gán vai trò người dùng",
     "assignRolesDescription": "Chọn các vai trò áp dụng cho người dùng {name} ({email}).",
+    "closeRolesDialog": "Đóng hộp thoại",
     "saveRoles": "Lưu vai trò",
     "savingRoles": "Đang lưu...",
     "adminRoleProtected": "Tài khoản quản trị viên bảo vệ (Break-glass Admin) bắt buộc phải giữ vai trò Quản trị viên."
@@ -37,5 +38,9 @@
     "rbac_cannot_modify_protected_admin": "Tài khoản quản trị viên này được bảo vệ vĩnh viễn, không thể thay đổi vai trò.",
     "rbac_target_user_not_found": "Không tìm thấy người dùng đích để gán vai trò."
   },
-  "empty": "Không tìm thấy người dùng nào."
+  "empty": "Không tìm thấy người dùng nào.",
+  "messages": {
+    "statusUpdated": "Cập nhật trạng thái người dùng thành công.",
+    "rolesAssigned": "Cập nhật vai trò người dùng thành công."
+  }
 }

@@ -65,5 +65,11 @@
     "telegram_rejected": "Telegram từ chối tin nhắn này.",
     "base_vn_unavailable": "Webhook Base.vn không khả dụng — vui lòng thử lại sau.",
     "base_vn_rejected": "Webhook Base.vn từ chối tin nhắn này."
+  },
+  "messages": {
+    "channelCreated": "Tạo kênh thông báo thành công.",
+    "channelUpdated": "Cập nhật kênh thông báo thành công.",
+    "channelDeleted": "Xóa kênh thông báo thành công.",
+    "testSent": "Gửi thông báo thử thành công."
   }
 }

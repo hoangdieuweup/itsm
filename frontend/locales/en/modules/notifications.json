@@ -65,5 +65,11 @@
     "telegram_rejected": "Telegram rejected this message.",
     "base_vn_unavailable": "Base.vn webhook unavailable — please try again later.",
     "base_vn_rejected": "Base.vn webhook rejected this message."
+  },
+  "messages": {
+    "channelCreated": "Notification channel created.",
+    "channelUpdated": "Notification channel updated.",
+    "channelDeleted": "Notification channel deleted.",
+    "testSent": "Test notification sent."
   }
 }

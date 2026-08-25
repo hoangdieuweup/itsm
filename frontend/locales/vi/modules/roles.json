@@ -102,5 +102,10 @@
     "rbac_permission_denied": "Bạn không có quyền thực hiện thao tác này.",
     "rbac_unknown_permission_id": "Mã quyền hạn không hợp lệ."
   },
-  "empty": "Không tìm thấy vai trò nào."
+  "empty": "Không tìm thấy vai trò nào.",
+  "messages": {
+    "created": "Tạo vai trò thành công.",
+    "updated": "Cập nhật vai trò thành công.",
+    "deleted": "Xóa vai trò thành công."
+  }
 }

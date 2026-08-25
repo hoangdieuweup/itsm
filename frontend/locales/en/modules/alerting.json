@@ -55,5 +55,10 @@
     "cloudflare_not_bound_for_alerting": "This environment has no Cloudflare account bound.",
     "missing_cf_alert_type": "Select a Cloudflare alert type before saving.",
     "observability_environment_not_found": "This environment no longer exists."
+  },
+  "messages": {
+    "ruleCreated": "Alert rule created.",
+    "ruleUpdated": "Alert rule updated.",
+    "ruleDeleted": "Alert rule deleted."
   }
 }

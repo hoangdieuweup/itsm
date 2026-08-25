@@ -38,6 +38,18 @@
     "HIGH": "Cao",
     "CRITICAL": "Nghiêm trọng"
   },
+  "create": {
+    "trigger": "Tạo sự cố",
+    "title": "Tạo sự cố thủ công",
+    "selectProject": "Chọn dự án…",
+    "selectEnvironment": "Chọn môi trường…",
+    "selectProjectFirst": "Hãy chọn dự án trước",
+    "titleLabel": "Tiêu đề",
+    "severityLabel": "Mức độ nghiêm trọng",
+    "cancel": "Hủy",
+    "create": "Tạo",
+    "creating": "Đang tạo..."
+  },
   "detail": {
     "detected": "Phát hiện lúc",
     "category": "Danh mục",
@@ -55,5 +67,10 @@
     "incident_not_found": "Sự cố này không còn tồn tại.",
     "invalid_incident_transition": "Không thể thay đổi trạng thái này nữa — có thể ai đó đã cập nhật trước.",
     "observability_environment_not_found": "Môi trường này không còn tồn tại."
+  },
+  "messages": {
+    "created": "Báo cáo sự cố thành công.",
+    "acknowledged": "Xác nhận sự cố thành công.",
+    "resolved": "Xử lý sự cố thành công."
   }
 }

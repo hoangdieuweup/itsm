@@ -62,5 +62,12 @@
     "cloudflare_tunnel_hostname_already_exists": "Hostname này đã được công bố trên tunnel này.",
     "cloudflare_tunnel_ingress_sync_failed": "Cloudflare đã được cập nhật nhưng lưu cục bộ thất bại — vui lòng tải lại và kiểm tra.",
     "cloudflare_tunnel_hostname_domain_mismatch": "Domain của hostname này không khớp với zone Cloudflare mà môi trường đã liên kết."
+  },
+  "messages": {
+    "deleted": "Xóa tunnel thành công.",
+    "statusRefreshed": "Làm mới trạng thái tunnel thành công.",
+    "hostnameAdded": "Thêm hostname thành công.",
+    "hostnameUpdated": "Cập nhật hostname thành công.",
+    "hostnameRemoved": "Xóa hostname thành công."
   }
 }

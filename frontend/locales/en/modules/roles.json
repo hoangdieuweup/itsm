@@ -102,5 +102,10 @@
     "rbac_permission_denied": "You do not have permission to perform this action.",
     "rbac_unknown_permission_id": "Unknown permission id."
   },
-  "empty": "No roles found."
+  "empty": "No roles found.",
+  "messages": {
+    "created": "Role created successfully.",
+    "updated": "Role updated successfully.",
+    "deleted": "Role deleted successfully."
+  }
 }

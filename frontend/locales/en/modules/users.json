@@ -25,6 +25,7 @@
     "assignRoles": "Assign Roles",
     "assignRolesDialogTitle": "Assign User Roles",
     "assignRolesDescription": "Select the roles applied to user {name} ({email}).",
+    "closeRolesDialog": "Close dialog",
     "saveRoles": "Save Roles",
     "savingRoles": "Saving...",
     "adminRoleProtected": "The break-glass admin account must retain the Administrator role."
@@ -37,5 +38,9 @@
     "rbac_cannot_modify_protected_admin": "This administrator account is permanently protected and its roles cannot be modified.",
     "rbac_target_user_not_found": "Target user not found."
   },
-  "empty": "No users found."
+  "empty": "No users found.",
+  "messages": {
+    "statusUpdated": "User status updated.",
+    "rolesAssigned": "User roles updated successfully."
+  }
 }

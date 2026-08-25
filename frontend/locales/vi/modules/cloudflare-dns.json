@@ -58,5 +58,14 @@
     "cloudflare_missing_dns_priority": "Bản ghi MX yêu cầu giá trị độ ưu tiên.",
     "cloudflare_dns_sync_failed": "Cloudflare đã được cập nhật nhưng lưu cục bộ thất bại — vui lòng tải lại và kiểm tra.",
     "cloudflare_dns_records_exist_for_config": "Hãy xóa toàn bộ bản ghi DNS trước khi gỡ liên kết này."
+  },
+  "messages": {
+    "configCreated": "Liên kết cấu hình DNS thành công.",
+    "configUpdated": "Cập nhật cấu hình DNS thành công.",
+    "configDeleted": "Xóa cấu hình DNS thành công.",
+    "recordCreated": "Tạo bản ghi DNS thành công.",
+    "recordUpdated": "Cập nhật bản ghi DNS thành công.",
+    "recordDeleted": "Xóa bản ghi DNS thành công.",
+    "syncCompleted": "Đồng bộ bản ghi DNS thành công."
   }
 }

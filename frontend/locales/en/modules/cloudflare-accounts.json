@@ -56,5 +56,15 @@
     "cloudflare_api_unavailable": "Could not reach Cloudflare. Try again shortly.",
     "cloudflare_insufficient_account_access": "You don't have sufficient access on this account.",
     "cloudflare_last_owner_removal_blocked": "You can't remove or downgrade the last owner of this account."
+  },
+  "messages": {
+    "created": "Cloudflare account added successfully.",
+    "updated": "Cloudflare account updated.",
+    "deleted": "Cloudflare account removed.",
+    "connectionOk": "Connection test passed.",
+    "connectionFailed": "Connection test failed.",
+    "managerAssigned": "Manager assigned successfully.",
+    "managerUpdated": "Manager access updated.",
+    "managerRemoved": "Manager removed."
   }
 }

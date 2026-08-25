@@ -72,5 +72,16 @@
     "projects_environment_not_found": "Environment not found.",
     "projects_environment_type_already_exists": "This project already has an environment of that type.",
     "projects_project_link_not_found": "Link not found."
+  },
+  "messages": {
+    "projectCreated": "Project created successfully.",
+    "projectUpdated": "Project updated successfully.",
+    "projectDeleted": "Project deleted successfully.",
+    "environmentCreated": "Environment created successfully.",
+    "environmentUpdated": "Environment updated successfully.",
+    "environmentDeleted": "Environment deleted successfully.",
+    "linkCreated": "Link added successfully.",
+    "linkUpdated": "Link updated successfully.",
+    "linkDeleted": "Link removed successfully."
   }
 }

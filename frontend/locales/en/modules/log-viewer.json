@@ -73,5 +73,10 @@
     "loki_query_rejected": "Loki rejected this query.",
     "loki_unavailable": "Loki could not be reached.",
     "cloudflare_config_not_found": "This environment is not bound to a Cloudflare account/zone."
+  },
+  "messages": {
+    "configCreated": "Loki config saved.",
+    "configUpdated": "Loki config updated.",
+    "configDeleted": "Loki config removed."
   }
 }
