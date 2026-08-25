@@ -9,6 +9,7 @@ class ProjectLimits:
     MAX_NAME_LENGTH = 255
     MAX_LINK_NAME_LENGTH = 255
     MAX_ENVIRONMENT_NAME_LENGTH = 100
+    MAX_PROJECT_ROLE_NAME_LENGTH = 100
     DEFAULT_PAGE_SIZE = 50
 
 
@@ -52,6 +53,10 @@ class ErrorCode(StrEnum):
     PROJECT_LINK_NOT_FOUND = "projects_project_link_not_found"
     INSUFFICIENT_PROJECT_ACCESS = "projects_insufficient_project_access"
     PROJECT_MEMBER_ALREADY_EXISTS = "projects_project_member_already_exists"
+    PROJECT_ROLE_NOT_FOUND = "projects_project_role_not_found"
+    DUPLICATE_PROJECT_ROLE_NAME = "projects_duplicate_project_role_name"
+    PERMISSION_NOT_PROJECT_ASSIGNABLE = "projects_permission_not_project_assignable"
+    PROJECT_PERMISSION_DENIED = "projects_project_permission_denied"
 
 
 class ProjectAuditActions(StrEnum):
@@ -67,3 +72,31 @@ class ProjectAuditActions(StrEnum):
     ENVIRONMENT_DELETED = "ENVIRONMENT_DELETED"
     MEMBER_ADDED = "MEMBER_ADDED"
     MEMBER_REMOVED = "MEMBER_REMOVED"
+    PROJECT_ROLE_CREATED = "PROJECT_ROLE_CREATED"
+    PROJECT_ROLE_UPDATED = "PROJECT_ROLE_UPDATED"
+    PROJECT_ROLE_DELETED = "PROJECT_ROLE_DELETED"
+    MEMBER_ROLE_ASSIGNED = "MEMBER_ROLE_ASSIGNED"
+
+
+class ProjectScopedPermissionCatalog:
+    """The subset of the global rbac.Permission catalog a ProjectRole may
+    ever grant. Bounded deliberately: project.delete (cascades every
+    downstream Cloudflare/Loki/alerting row), project.manage_all,
+    project_member.manage, and both project_role.* atoms are permanently
+    excluded — managing roles/members and deleting a project always
+    require a GLOBAL atom, never a project-scoped one, closing the
+    mint-yourself-more-power loop a naive union would open."""
+
+    ASSIGNABLE: frozenset[tuple[str, str]] = frozenset(
+        {
+            ("project", "read"),
+            ("project", "update"),
+            ("environment", "create"),
+            ("environment", "read"),
+            ("environment", "update"),
+            ("environment", "delete"),
+            ("project_link", "read"),
+            ("project_link", "manage"),
+            ("project_member", "read"),
+        }
+    )

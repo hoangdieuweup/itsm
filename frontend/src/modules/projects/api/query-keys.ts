@@ -11,3 +11,12 @@ export const projectMembersKeys = {
   all: ["projects", "members"] as const,
   forProject: (projectId: string) => [...projectMembersKeys.all, projectId] as const,
 };
+
+export const projectRolesKeys = {
+  all: ["projects", "roles"] as const,
+  forProject: (projectId: string) => [...projectRolesKeys.all, projectId] as const,
+};
+
+export const assignablePermissionsKeys = {
+  all: ["projects", "assignable-permissions"] as const,
+};

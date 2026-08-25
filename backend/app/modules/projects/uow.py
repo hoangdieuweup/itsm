@@ -14,10 +14,12 @@ from app.modules.projects.repository import (
     AbstractProjectLinkRepository,
     AbstractProjectMemberRepository,
     AbstractProjectRepository,
+    AbstractProjectRoleRepository,
     EnvironmentRepository,
     ProjectLinkRepository,
     ProjectMemberRepository,
     ProjectRepository,
+    ProjectRoleRepository,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,6 +32,7 @@ class AbstractProjectsUnitOfWork(AbstractUnitOfWork):
     environments: AbstractEnvironmentRepository
     project_links: AbstractProjectLinkRepository
     project_members: AbstractProjectMemberRepository
+    project_roles: AbstractProjectRoleRepository
 
     @abstractmethod
     def mark_stale(self, entity: str, entity_id: UUID) -> None:
@@ -48,6 +51,7 @@ class ProjectsUnitOfWork(AbstractProjectsUnitOfWork):
         self.environments = EnvironmentRepository(session, cache)
         self.project_links = ProjectLinkRepository(session)
         self.project_members = ProjectMemberRepository(session)
+        self.project_roles = ProjectRoleRepository(session)
 
     def mark_stale(self, entity: str, entity_id: UUID) -> None:
         """Queue a cache entity for invalidation once this transaction commits."""

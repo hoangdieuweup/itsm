@@ -7,6 +7,8 @@ rationale, simplified to a binary check (no access level to carry)."""
 from uuid import UUID
 
 from app.modules.projects.exceptions import InsufficientProjectAccess
+from app.modules.projects.rules import ProjectRoleRules
+from app.modules.projects.schemas import ProjectPermissionGrant
 from app.modules.projects.uow import AbstractProjectsUnitOfWork
 from app.modules.rbac.public import RbacActions, RbacApi, RbacResources
 from app.modules.users.public import UserRead
@@ -23,3 +25,26 @@ async def resolve_project_membership(
         return
     if not await uow.project_members.is_member(project_id, user.id):
         raise InsufficientProjectAccess()
+
+
+async def resolve_project_permissions(
+    project_id: UUID, user: UserRead, rbac_api: RbacApi, uow: AbstractProjectsUnitOfWork
+) -> ProjectPermissionGrant:
+    """Membership (or project:manage_all) first — the same gate
+    resolve_project_membership already enforces — then compute the
+    effective permission set: the caller's global permissions UNIONed
+    with whatever their assigned ProjectRole grants inside this project.
+    manage_all bypasses MEMBERSHIP only, never adds to the permission set
+    itself — a manage_all holder's grant is still just their own global
+    permissions."""
+    await resolve_project_membership(project_id, user, rbac_api, uow)
+
+    summary = await rbac_api.role_summary_for_user(user.id)
+    global_keys = frozenset(summary.permissions)
+
+    role_permission_ids = await uow.project_roles.permission_ids_for_member(project_id, user.id)
+    project_permissions = await rbac_api.get_permissions_by_ids(role_permission_ids)
+    project_keys = frozenset(f"{p.resource}.{p.action}" for p in project_permissions)
+
+    effective = ProjectRoleRules.effective_permissions(global_keys, project_keys)
+    return ProjectPermissionGrant(user=user, project_id=project_id, permissions=effective)

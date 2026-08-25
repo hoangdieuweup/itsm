@@ -26,6 +26,10 @@ class ListProjectMembers(AbstractUseCase):
         if project is None:
             raise ProjectNotFound()
 
+        role_names = {
+            role.id: role.name for role in await self._uow.project_roles.list_for_project(project_id)
+        }
+
         rows = await self._uow.project_members.list_for_project(project_id)
         result: list[ProjectMemberRead] = []
         for row in rows:
@@ -34,7 +38,12 @@ class ListProjectMembers(AbstractUseCase):
                 continue
             result.append(
                 ProjectMemberRead(
-                    user_id=row.user_id, email=user.email, name=user.name, created_at=row.created_at
+                    user_id=row.user_id,
+                    email=user.email,
+                    name=user.name,
+                    created_at=row.created_at,
+                    project_role_id=row.project_role_id,
+                    project_role_name=role_names.get(row.project_role_id) if row.project_role_id else None,
                 )
             )
         return result

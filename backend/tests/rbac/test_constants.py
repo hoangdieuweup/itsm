@@ -13,4 +13,6 @@ class TestRbacPermissionCatalog:
         assert ("incident", "update") not in resources_actions
         assert ("incident", "delete") not in resources_actions
         assert ("project", "manage_all") in resources_actions
-        assert len(RbacPermissionCatalog.CATALOG) == 33
+        assert ("project_role", "read") in resources_actions
+        assert ("project_role", "manage") in resources_actions
+        assert len(RbacPermissionCatalog.CATALOG) == 65

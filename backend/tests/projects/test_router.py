@@ -65,6 +65,17 @@ async def _login_with_permissions(
     return user_id
 
 
+async def _switch_to(client: AsyncClient, user_id: UUID, *, email: str) -> None:
+    """Re-authenticate `client` as an already-created user, without re-inserting
+    them — for tests that alternate between two previously logged-in identities."""
+    token = JwtCodec.encode(
+        {"sub": str(user_id), "type": "access", "jti": f"test-jti-{email}"},
+        secret=auth_settings.JWT_SECRET,
+        ttl_seconds=3600,
+    )
+    client.cookies.set(AuthCookies.ACCESS_TOKEN, token)
+
+
 class TestCreateProject:
     async def test_requires_project_create_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
         await _login_with_permissions(client, engine, permissions=[])
@@ -120,11 +131,39 @@ class TestGetEnvironment:
     async def test_requires_environment_read_permission(
         self, client: AsyncClient, engine: AsyncEngine
     ) -> None:
+        # require_project_permission_for_environment resolves the environment
+        # (to find its project_id) BEFORE checking the caller's permission —
+        # same "resolve parent first" order Cloudflare's own
+        # require_account_access_for_environment already uses. A permission-
+        # less caller must therefore be tested against a REAL environment,
+        # not a nonexistent one (which 404s regardless of permissions).
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[("project", "create"), ("environment", "create"), ("environment", "read")],
+            email="owner-env-perm@example.com",
+        )
+        project_resp = await client.post("/api/v1/projects", json={"name": "Site"})
+        project_id = project_resp.json()["data"]["id"]
+        env_resp = await client.post(
+            f"/api/v1/projects/{project_id}/environments", json={"type": "dev", "name": "Dev"}
+        )
+        env_id = env_resp.json()["data"]["id"]
+
+        await _login_with_permissions(client, engine, permissions=[], email="no-perms@example.com")
+
+        response = await client.get(f"/api/v1/environments/{env_id}")
+
+        assert response.status_code == 403
+
+    async def test_returns_404_for_unknown_environment_even_without_permission(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
         await _login_with_permissions(client, engine, permissions=[])
 
         response = await client.get(f"/api/v1/environments/{UUID(int=0)}")
 
-        assert response.status_code == 403
+        assert response.status_code == 404
 
 
 class TestProjectEnvironmentsAndLinks:
@@ -140,6 +179,8 @@ class TestProjectEnvironmentsAndLinks:
                 ("environment", "read"),
                 ("environment", "update"),
                 ("environment", "delete"),
+                ("project_link", "read"),
+                ("project_link", "manage"),
             ],
         )
 
@@ -263,7 +304,13 @@ class TestProjectMembership:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("project", "read"), ("project", "update"), ("project", "manage_all")],
+            permissions=[
+                ("project", "read"),
+                ("project", "update"),
+                ("project", "manage_all"),
+                ("project_member", "read"),
+                ("project_member", "manage"),
+            ],
             email="admin2@example.com",
         )
         add_resp = await client.post(
@@ -285,3 +332,137 @@ class TestProjectMembership:
 
         members_after_resp = await client.get(f"/api/v1/projects/{project_id}/members")
         assert target_id not in [UUID(m["userId"]) for m in members_after_resp.json()["data"]]
+
+
+class TestProjectRoleUnionGrant:
+    async def test_project_role_grants_environment_update_scoped_to_one_project(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        """The whole point of the feature: a collaborator with ZERO global
+        environment permissions gets elevated to editor on ONE project via
+        a project role, and the grant never leaks to a sibling project."""
+        admin_id = await _login_with_permissions(
+            client,
+            engine,
+            permissions=[
+                ("project", "create"),
+                ("environment", "create"),
+                ("environment", "update"),
+                ("project_member", "manage"),
+                ("project_role", "manage"),
+                ("project_role", "read"),
+                ("project", "read"),
+                ("permission", "read"),
+            ],
+            email="admin@example.com",
+        )
+        project_a = (await client.post("/api/v1/projects", json={"name": "A"})).json()["data"]
+        project_b = (await client.post("/api/v1/projects", json={"name": "B"})).json()["data"]
+        env_a = (
+            await client.post(
+                f"/api/v1/projects/{project_a['id']}/environments", json={"type": "dev", "name": "dev"}
+            )
+        ).json()["data"]
+        env_b = (
+            await client.post(
+                f"/api/v1/projects/{project_b['id']}/environments", json={"type": "dev", "name": "dev"}
+            )
+        ).json()["data"]
+
+        perms_resp = await client.get("/api/v1/rbac/permissions")
+        env_update_id = next(
+            p["id"]
+            for p in perms_resp.json()["data"]
+            if p["resource"] == "environment" and p["action"] == "update"
+        )
+        role_resp = await client.post(
+            f"/api/v1/projects/{project_a['id']}/roles",
+            json={"name": "env-editor", "permissionIds": [env_update_id]},
+        )
+        assert role_resp.status_code == 200
+        role_id = role_resp.json()["data"]["id"]
+
+        collaborator_id = await _login_with_permissions(
+            client, engine, permissions=[("project", "read")], email="collaborator@example.com"
+        )
+        await _switch_to(client, admin_id, email="admin@example.com")
+        member_body = {"userId": str(collaborator_id)}
+        await client.post(f"/api/v1/projects/{project_a['id']}/members", json=member_body)
+        await client.post(f"/api/v1/projects/{project_b['id']}/members", json=member_body)
+        assign_resp = await client.put(
+            f"/api/v1/projects/{project_a['id']}/members/{collaborator_id}/role",
+            json={"projectRoleId": role_id},
+        )
+        assert assign_resp.status_code == 200
+
+        await _switch_to(client, collaborator_id, email="collaborator@example.com")
+
+        update_a = await client.patch(f"/api/v1/environments/{env_a['id']}", json={"name": "renamed"})
+        assert update_a.status_code == 200
+
+        update_b = await client.patch(f"/api/v1/environments/{env_b['id']}", json={"name": "renamed"})
+        assert update_b.status_code == 403
+        assert update_b.json()["error"]["code"] == "projects_project_permission_denied"
+
+        perms_a = await client.get(f"/api/v1/projects/{project_a['id']}/permissions")
+        assert "environment.update" in perms_a.json()["data"]["permissions"]
+        perms_b = await client.get(f"/api/v1/projects/{project_b['id']}/permissions")
+        assert "environment.update" not in perms_b.json()["data"]["permissions"]
+
+
+class TestProjectRoleAllowlist:
+    async def test_rejects_a_non_assignable_permission_at_the_api_boundary(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[
+                ("project", "create"),
+                ("project_role", "manage"),
+                ("permission", "read"),
+                ("user", "update_status"),
+            ],
+            email="admin2@example.com",
+        )
+        project = (await client.post("/api/v1/projects", json={"name": "A"})).json()["data"]
+        perms_resp = await client.get("/api/v1/rbac/permissions")
+        sneaky_id = next(
+            p["id"]
+            for p in perms_resp.json()["data"]
+            if p["resource"] == "user" and p["action"] == "update_status"
+        )
+
+        resp = await client.post(
+            f"/api/v1/projects/{project['id']}/roles", json={"name": "sneaky", "permissionIds": [sneaky_id]}
+        )
+
+        assert resp.status_code == 409
+        assert resp.json()["error"]["code"] == "projects_permission_not_project_assignable"
+
+
+class TestProjectRoleBackwardCompatibility:
+    async def test_null_project_role_member_still_works_via_global_permission(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[
+                ("project", "create"),
+                ("environment", "create"),
+                ("environment", "update"),
+                ("project", "read"),
+            ],
+            email="solo@example.com",
+        )
+        project = (await client.post("/api/v1/projects", json={"name": "A"})).json()["data"]
+        env = (
+            await client.post(
+                f"/api/v1/projects/{project['id']}/environments", json={"type": "dev", "name": "dev"}
+            )
+        ).json()["data"]
+
+        resp = await client.patch(f"/api/v1/environments/{env['id']}", json={"name": "renamed"})
+
+        assert resp.status_code == 200

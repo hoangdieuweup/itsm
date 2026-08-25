@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Link2, Users } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
-import { Can } from "@/entities/permission";
+import { Can, CanInProject, ProjectPermissionProvider } from "@/entities/permission";
 import { ACTIONS, RESOURCES } from "@/shared/constants/permissions";
 import { useProjectQuery } from "@/entities/project";
 import { useProjectEnvironmentsQuery, type Environment } from "@/entities/environment";
@@ -15,9 +15,13 @@ import { projectLinksKeys, projectMembersKeys } from "../api/query-keys";
 import { useDeleteEnvironment } from "../hooks/use-delete-environment";
 import { useDeleteProjectLink } from "../hooks/use-delete-project-link";
 import { useRemoveProjectMember } from "../hooks/use-remove-project-member";
+import { useAssignMemberProjectRole } from "../hooks/use-assign-member-project-role";
 import { EnvironmentFormDialog } from "./environment-form-dialog";
 import { ProjectLinkFormDialog } from "./project-link-form-dialog";
 import { ProjectMemberFormDialog } from "./project-member-form-dialog";
+import { ProjectRolesSection } from "./project-roles-section";
+import { fetchProjectRoles } from "../api/fetchers";
+import { projectRolesKeys } from "../api/query-keys";
 import { IconDns, IconJira, IconGit, IconNotification, IconGrafana, IconServer } from "@/shared/ui/icons";
 
 import { m, type Variants } from "@/shared/lib/motion";
@@ -86,7 +90,7 @@ function EnvironmentsSection({
               {t("sections.environments")} ({environments.length})
             </h2>
           </div>
-          <Can I={ACTIONS.CREATE} a={RESOURCES.ENVIRONMENT}>
+          <CanInProject I={ACTIONS.CREATE} a={RESOURCES.ENVIRONMENT}>
             <Button
               size="sm"
               onClick={() => setEnvFormTarget("create")}
@@ -94,7 +98,7 @@ function EnvironmentsSection({
             >
               <Plus className="size-3.5" /> {t("actions.addEnvironment")}
             </Button>
-          </Can>
+          </CanInProject>
         </div>
 
         {environments.length === 0 ? (
@@ -125,7 +129,7 @@ function EnvironmentsSection({
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <Can I={ACTIONS.UPDATE} a={RESOURCES.ENVIRONMENT}>
+                      <CanInProject I={ACTIONS.UPDATE} a={RESOURCES.ENVIRONMENT}>
                         <button
                           type="button"
                           onClick={() => setEnvFormTarget(env)}
@@ -134,8 +138,8 @@ function EnvironmentsSection({
                         >
                           <Pencil className="size-3.5" />
                         </button>
-                      </Can>
-                      <Can I={ACTIONS.DELETE} a={RESOURCES.ENVIRONMENT}>
+                      </CanInProject>
+                      <CanInProject I={ACTIONS.DELETE} a={RESOURCES.ENVIRONMENT}>
                         <button
                           type="button"
                           onClick={() => setEnvDeleteTarget(env)}
@@ -144,13 +148,13 @@ function EnvironmentsSection({
                         >
                           <Trash2 className="size-3.5" />
                         </button>
-                      </Can>
+                      </CanInProject>
                     </div>
                   </div>
 
                   {/* High-Tech Operations Launch Buttons */}
                   <div className="mt-5 grid grid-cols-3 gap-2">
-                    <Can I={ACTIONS.VIEW} a={RESOURCES.CLOUDFLARE_ACCOUNT}>
+                    <Can I={ACTIONS.READ} a={RESOURCES.CLOUDFLARE_TUNNEL}>
                       <button
                         type="button"
                         onClick={() => onManageTunnels(env)}
@@ -164,7 +168,7 @@ function EnvironmentsSection({
                       </button>
                     </Can>
 
-                    <Can I={ACTIONS.READ} a={RESOURCES.ENVIRONMENT}>
+                    <Can I={ACTIONS.READ} a={RESOURCES.LOKI_CONFIG}>
                       <button
                         type="button"
                         onClick={() => onManageLogs(env)}
@@ -224,6 +228,37 @@ function EnvironmentsSection({
   );
 }
 
+/**
+ * fetchProjectRoles is already scoped to `projectId`, so a role from a
+ * different project can never appear as an option here.
+ */
+function MemberRoleSelect({ projectId, member }: { projectId: string; member: ProjectMember }) {
+  const t = useTranslations("projects");
+  const { data: roles = [] } = useQuery({
+    queryKey: projectRolesKeys.forProject(projectId),
+    queryFn: () => fetchProjectRoles(projectId),
+  });
+  const assignRole = useAssignMemberProjectRole(projectId);
+
+  return (
+    <select
+      value={member.projectRoleId ?? ""}
+      disabled={assignRole.isPending}
+      onChange={(e) =>
+        assignRole.mutate({ userId: member.userId, projectRoleId: e.target.value || null })
+      }
+      className="mt-1 h-7 max-w-[10rem] rounded-md border bg-background px-1.5 text-xs disabled:opacity-60"
+    >
+      <option value="">{t("members.noRole")}</option>
+      {roles.map((role) => (
+        <option key={role.id} value={role.id}>
+          {role.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function EnvironmentsSectionNoPermission() {
   const t = useTranslations("projects");
   return (
@@ -272,6 +307,7 @@ export function ProjectDetailView({
   const [memberRemoveTarget, setMemberRemoveTarget] = useState<ProjectMember | null>(null);
 
   return (
+    <ProjectPermissionProvider projectId={projectId}>
     <m.div
       variants={containerVariants}
       initial="hidden"
@@ -310,14 +346,14 @@ export function ProjectDetailView({
       </m.div>
 
       {/* 2. Environments Control Matrix */}
-      <Can I={ACTIONS.READ} a={RESOURCES.ENVIRONMENT} fallback={<EnvironmentsSectionNoPermission />}>
+      <CanInProject I={ACTIONS.READ} a={RESOURCES.ENVIRONMENT} fallback={<EnvironmentsSectionNoPermission />}>
         <EnvironmentsSection
           projectId={projectId}
           onManageTunnels={onManageTunnels}
           onManageLogs={onManageLogs}
           onManageAlerting={onManageAlerting}
         />
-      </Can>
+      </CanInProject>
 
       {/* 3. Project Resources & Integrations Hub */}
       <m.section variants={itemVariants} className="space-y-4">
@@ -328,11 +364,11 @@ export function ProjectDetailView({
               {t("sections.links")} ({links.length})
             </h2>
           </div>
-          <Can I={ACTIONS.UPDATE} a={RESOURCES.PROJECT}>
+          <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_LINK}>
             <Button size="sm" variant="outline" onClick={() => setLinkFormTarget("create")} className="gap-1.5 shadow-2xs">
               <Plus className="size-3.5" /> {t("actions.addLink")}
             </Button>
-          </Can>
+          </CanInProject>
         </div>
 
         {links.length === 0 ? (
@@ -370,7 +406,7 @@ export function ProjectDetailView({
                   </div>
                 </div>
 
-                <Can I={ACTIONS.UPDATE} a={RESOURCES.PROJECT}>
+                <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_LINK}>
                   <div className="flex items-center gap-1 shrink-0 ml-2">
                     <button
                       type="button"
@@ -389,7 +425,7 @@ export function ProjectDetailView({
                       <Trash2 className="size-3.5" />
                     </button>
                   </div>
-                </Can>
+                </CanInProject>
               </div>
             ))}
           </div>
@@ -405,7 +441,7 @@ export function ProjectDetailView({
               {t("sections.members")} ({members.length})
             </h2>
           </div>
-          <Can I={ACTIONS.UPDATE} a={RESOURCES.PROJECT}>
+          <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_MEMBER}>
             <Button
               size="sm"
               variant="outline"
@@ -414,7 +450,7 @@ export function ProjectDetailView({
             >
               <Plus className="size-3.5" /> {t("actions.addMember")}
             </Button>
-          </Can>
+          </CanInProject>
         </div>
 
         {members.length === 0 ? (
@@ -431,8 +467,19 @@ export function ProjectDetailView({
                 <div className="flex flex-col overflow-hidden">
                   <span className="font-semibold text-sm text-foreground truncate">{member.name}</span>
                   <span className="font-mono text-xs text-muted-foreground truncate">{member.email}</span>
+                  <CanInProject
+                    I={ACTIONS.MANAGE}
+                    a={RESOURCES.PROJECT_MEMBER}
+                    fallback={
+                      <span className="mt-1 text-xs text-muted-foreground">
+                        {member.projectRoleName ?? t("members.noRole")}
+                      </span>
+                    }
+                  >
+                    <MemberRoleSelect projectId={projectId} member={member} />
+                  </CanInProject>
                 </div>
-                <Can I={ACTIONS.UPDATE} a={RESOURCES.PROJECT}>
+                <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_MEMBER}>
                   <button
                     type="button"
                     onClick={() => setMemberRemoveTarget(member)}
@@ -441,12 +488,15 @@ export function ProjectDetailView({
                   >
                     <Trash2 className="size-3.5" />
                   </button>
-                </Can>
+                </CanInProject>
               </div>
             ))}
           </div>
         )}
       </m.section>
+
+      {/* 5. Project Roles */}
+      <ProjectRolesSection projectId={projectId} />
 
       {/* Dialogs */}
       {linkFormTarget !== null && (
@@ -491,5 +541,6 @@ export function ProjectDetailView({
         isLoading={removeMember.isPending}
       />
     </m.div>
+    </ProjectPermissionProvider>
   );
 }
