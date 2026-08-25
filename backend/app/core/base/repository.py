@@ -1,8 +1,7 @@
 """Abstract repository contract every module's concrete repository implements."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
-from uuid import UUID
+from typing import Generic, TypeVar
 
 EntityT = TypeVar("EntityT")
 IdT = TypeVar("IdT")

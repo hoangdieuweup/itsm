@@ -10,7 +10,6 @@ domain instead of describing it.
 """
 
 from abc import ABC, abstractmethod
-from inspect import isroutine
 from typing import Any
 
 
