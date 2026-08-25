@@ -157,6 +157,17 @@ async def _login_with_permissions(
     return user_id
 
 
+async def _switch_to(client: AsyncClient, user_id: UUID, *, email: str) -> None:
+    """Re-authenticate `client` as an already-created user, without re-inserting
+    them — for tests that alternate between two previously logged-in identities."""
+    token = JwtCodec.encode(
+        {"sub": str(user_id), "type": "access", "jti": f"test-jti-{email}"},
+        secret=auth_settings.JWT_SECRET,
+        ttl_seconds=3600,
+    )
+    client.cookies.set(AuthCookies.ACCESS_TOKEN, token)
+
+
 MANAGE_AND_VIEW = [("cloudflare_account", "manage"), ("cloudflare_account", "view")]
 
 
@@ -333,8 +344,9 @@ async def _bind_environment(
         client,
         engine,
         permissions=[
-            ("cloudflare_account", "manage"),
-            ("cloudflare_account", "view"),
+            ("cloudflare_account", "create"),
+            ("cloudflare_account", "read"),
+            ("cloudflare_config", "manage"),
             ("project", "create"),
             ("environment", "create"),
             ("environment", "read"),
@@ -711,5 +723,105 @@ class TestSyncTunnelsRouter:
 
         response = await client.post(f"/api/v1/environments/{environment_id}/cloudflare-tunnels/sync")
         assert response.status_code == 200, response.text
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+
+class TestProjectRoleGrantsEnvironmentScopedCloudflareAccess:
+    async def test_project_role_grants_tunnel_create_but_never_account_administration(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        """The decisive proof for D1/D2/D3: admin creates a Cloudflare account,
+        binds an environment to it, creates a project role granting
+        cloudflare_tunnel.create (from the ASSIGNABLE set), adds a collaborator
+        to the project (who holds NO cloudflare_account_managers row and NO
+        global cloudflare_tunnel permission), assigns the role. The
+        collaborator succeeds on the in-scope Tunnel-create route, and is
+        STILL rejected on (a) the excluded binding route and (b) account
+        administration — proving the boundary genuinely holds."""
+        cf_client = FakeCloudflareClient(
+            zones=[ZoneOption(id="z1", name="example.com")], create_tunnel_id="tun-proj-role"
+        )
+        app.dependency_overrides[get_cloudflare_client] = lambda: cf_client
+
+        admin_id = await _login_with_permissions(
+            client,
+            engine,
+            permissions=[
+                ("cloudflare_account", "create"),
+                ("cloudflare_account", "read"),
+                ("cloudflare_config", "manage"),
+                ("project", "create"),
+                ("project", "read"),
+                ("environment", "create"),
+                ("environment", "read"),
+                ("project_member", "manage"),
+                ("project_role", "manage"),
+                ("project_role", "read"),
+                ("permission", "read"),
+                ("cloudflare_tunnel", "create"),
+            ],
+            email="cf-admin@example.com",
+        )
+        account_resp = await client.post(
+            "/api/v1/cloudflare-accounts",
+            json={"label": "acct", "cfAccountId": "cf1", "apiToken": "tok"},
+        )
+        assert account_resp.status_code == 200, account_resp.text
+        account_id = account_resp.json()["data"]["id"]
+
+        project_resp = await client.post("/api/v1/projects", json={"name": "P"})
+        project_id = project_resp.json()["data"]["id"]
+        env_resp = await client.post(
+            f"/api/v1/projects/{project_id}/environments", json={"type": "dev", "name": "dev"}
+        )
+        environment_id = env_resp.json()["data"]["id"]
+
+        bind_resp = await client.post(
+            "/api/v1/cloudflare-configs",
+            json={"environmentId": environment_id, "cloudflareAccountId": account_id, "zoneId": "z1"},
+        )
+        assert bind_resp.status_code == 200, bind_resp.text
+
+        perms_resp = await client.get("/api/v1/rbac/permissions")
+        tunnel_create_id = next(
+            p["id"]
+            for p in perms_resp.json()["data"]
+            if p["resource"] == "cloudflare_tunnel" and p["action"] == "create"
+        )
+        role_resp = await client.post(
+            f"/api/v1/projects/{project_id}/roles",
+            json={"name": "tunnel-manager", "permissionIds": [tunnel_create_id]},
+        )
+        assert role_resp.status_code == 200, role_resp.text
+        role_id = role_resp.json()["data"]["id"]
+
+        collaborator_id = await _login_with_permissions(
+            client, engine, permissions=[("project", "read")], email="collaborator@example.com"
+        )
+        await _switch_to(client, admin_id, email="cf-admin@example.com")
+        await client.post(f"/api/v1/projects/{project_id}/members", json={"userId": str(collaborator_id)})
+        assign_resp = await client.put(
+            f"/api/v1/projects/{project_id}/members/{collaborator_id}/role",
+            json={"projectRoleId": role_id},
+        )
+        assert assign_resp.status_code == 200, assign_resp.text
+
+        await _switch_to(client, collaborator_id, email="collaborator@example.com")
+
+        create_tunnel_resp = await client.post(
+            f"/api/v1/environments/{environment_id}/cloudflare-tunnels", json={"name": "t1"}
+        )
+        assert create_tunnel_resp.status_code == 200, create_tunnel_resp.text
+
+        rebind_attempt = await client.patch(
+            f"/api/v1/environments/{environment_id}/cloudflare-config", json={"zoneId": "z2"}
+        )
+        assert rebind_attempt.status_code == 403
+
+        create_account_attempt = await client.post(
+            "/api/v1/cloudflare-accounts", json={"label": "x", "cfAccountId": "cf2", "apiToken": "t"}
+        )
+        assert create_account_attempt.status_code == 403
 
         del app.dependency_overrides[get_cloudflare_client]
