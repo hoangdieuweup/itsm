@@ -36,6 +36,7 @@ from app.modules.cloudflare.exceptions import (
     TunnelConfigLocked,
     TunnelHostnameAlreadyExists,
     TunnelHostnameDomainMismatch,
+    TunnelHostnameEnvironmentMismatch,
     TunnelIngressSyncFailed,
     TunnelPublicHostnameNotFound,
     ZoneNotOwnedByAccount,
@@ -2190,7 +2191,7 @@ class TestListTunnelHostnames:
 
 
 class TestAddTunnelHostname:
-    async def _setup(self, **client_kwargs):
+    async def _setup(self, *, sibling_base_urls: dict[UUID, str | None] | None = None, **client_kwargs):
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
             label="acc",
@@ -2202,12 +2203,22 @@ class TestAddTunnelHostname:
             environment_id=uuid4(), cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
         )
         tunnel = await uow.tunnels.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="t")
+        environments = {config.environment_id: _fake_environment(config.environment_id, None)}
+        for env_id, base_url in (sibling_base_urls or {}).items():
+            await uow.configs.create(
+                environment_id=env_id,
+                cloudflare_account_id=account.id,
+                zone_id="z1",
+                zone_name="example.com",
+            )
+            environments[env_id] = _fake_environment(env_id, base_url)
         client = FakeCloudflareTunnelClient(**client_kwargs)
-        return uow, config, tunnel, client
+        projects_api = FakeProjectsApi(environments)
+        return uow, config, tunnel, client, projects_api
 
     async def test_adds_to_empty_ingress(self) -> None:
-        uow, config, tunnel, client = await self._setup(ingress=[])
-        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        uow, config, tunnel, client, projects_api = await self._setup(ingress=[])
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi(), projects_api)
         actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
 
         created = await use_case.execute(
@@ -2219,8 +2230,8 @@ class TestAddTunnelHostname:
 
     async def test_inserts_before_catch_all_and_preserves_its_unmodeled_fields(self) -> None:
         catch_all = {"service": "http_status:404", "originRequest": {"noTLSVerify": True}}
-        uow, config, tunnel, client = await self._setup(ingress=[catch_all])
-        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        uow, config, tunnel, client, projects_api = await self._setup(ingress=[catch_all])
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi(), projects_api)
         actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
 
         await use_case.execute(
@@ -2233,8 +2244,8 @@ class TestAddTunnelHostname:
 
     async def test_preserves_unrelated_existing_rule_unmodeled_fields(self) -> None:
         existing_rule = {"hostname": "other.example.com", "service": "http://y", "path": "/api/*"}
-        uow, config, tunnel, client = await self._setup(ingress=[existing_rule])
-        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        uow, config, tunnel, client, projects_api = await self._setup(ingress=[existing_rule])
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi(), projects_api)
         actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
 
         await use_case.execute(
@@ -2245,11 +2256,11 @@ class TestAddTunnelHostname:
         assert existing_rule in sent
 
     async def test_duplicate_hostname_on_same_tunnel_rejected_before_calling_cloudflare(self) -> None:
-        uow, config, tunnel, client = await self._setup(ingress=[])
+        uow, config, tunnel, client, projects_api = await self._setup(ingress=[])
         await uow.tunnel_hostnames.create(
             tunnel_id=tunnel.id, hostname="app.example.com", service="http://old", created_by=None
         )
-        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi(), projects_api)
         actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
 
         with pytest.raises(TunnelHostnameAlreadyExists):
@@ -2259,8 +2270,8 @@ class TestAddTunnelHostname:
         assert client.put_calls == []
 
     async def test_hostname_on_wrong_domain_rejected_before_calling_cloudflare(self) -> None:
-        uow, config, tunnel, client = await self._setup(ingress=[])
-        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        uow, config, tunnel, client, projects_api = await self._setup(ingress=[])
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi(), projects_api)
         actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
 
         with pytest.raises(TunnelHostnameDomainMismatch):
@@ -2270,10 +2281,10 @@ class TestAddTunnelHostname:
         assert client.put_calls == []
 
     async def test_lock_already_held_raises_config_locked_without_calling_cloudflare(self) -> None:
-        uow, config, tunnel, client = await self._setup(ingress=[])
+        uow, config, tunnel, client, projects_api = await self._setup(ingress=[])
         cache = FakeCacheClient()
         await cache.try_acquire_lock(f"lock:tunnel:{tunnel.id}", ttl=5)
-        use_case = AddTunnelHostname(uow, client, cache, FakeAuditApi())
+        use_case = AddTunnelHostname(uow, client, cache, FakeAuditApi(), projects_api)
         actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
 
         with pytest.raises(TunnelConfigLocked):
@@ -2283,9 +2294,9 @@ class TestAddTunnelHostname:
         assert client.put_calls == []
 
     async def test_cache_unavailable_propagates_loudly(self) -> None:
-        uow, config, tunnel, client = await self._setup(ingress=[])
+        uow, config, tunnel, client, projects_api = await self._setup(ingress=[])
         cache = FakeCacheClient(raises=CacheUnavailable())
-        use_case = AddTunnelHostname(uow, client, cache, FakeAuditApi())
+        use_case = AddTunnelHostname(uow, client, cache, FakeAuditApi(), projects_api)
         actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
 
         with pytest.raises(CacheUnavailable):
@@ -2294,9 +2305,9 @@ class TestAddTunnelHostname:
             )
 
     async def test_lock_is_released_after_success(self) -> None:
-        uow, config, tunnel, client = await self._setup(ingress=[])
+        uow, config, tunnel, client, projects_api = await self._setup(ingress=[])
         cache = FakeCacheClient()
-        use_case = AddTunnelHostname(uow, client, cache, FakeAuditApi())
+        use_case = AddTunnelHostname(uow, client, cache, FakeAuditApi(), projects_api)
         actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
 
         await use_case.execute(config.environment_id, tunnel.id, "app.example.com", "http://x", actor=actor)
@@ -2305,7 +2316,7 @@ class TestAddTunnelHostname:
 
     async def test_local_write_failure_triggers_compensating_put_back_and_raises_sync_failed(self) -> None:
         starting_ingress = [{"service": "http_status:404"}]
-        uow, config, tunnel, client = await self._setup(ingress=starting_ingress)
+        uow, config, tunnel, client, projects_api = await self._setup(ingress=starting_ingress)
 
         class BrokenHostnameRepo:
             async def list_for_tunnel(self, tunnel_id):
@@ -2315,7 +2326,7 @@ class TestAddTunnelHostname:
                 raise RuntimeError("db exploded")
 
         uow.tunnel_hostnames = BrokenHostnameRepo()
-        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi(), projects_api)
         actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
 
         with pytest.raises(TunnelIngressSyncFailed):
@@ -2328,6 +2339,52 @@ class TestAddTunnelHostname:
             {"service": "http_status:404"},
         ]
         assert client.put_calls[-1] == starting_ingress
+
+    async def test_rejects_hostname_claiming_a_sibling_environments_domain(self) -> None:
+        """The escalation guard (D6): a hostname that exactly matches a
+        DIFFERENT sibling environment's own base_url must never be created
+        from this environment, even though it belongs to the same shared
+        zone and Cloudflare would otherwise happily accept it."""
+        sibling_id = uuid4()
+        uow, config, tunnel, client, projects_api = await self._setup(
+            ingress=[], sibling_base_urls={sibling_id: "https://sibling.example.com"}
+        )
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi(), projects_api)
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(TunnelHostnameEnvironmentMismatch):
+            await use_case.execute(
+                config.environment_id, tunnel.id, "sibling.example.com", "http://x", actor=actor
+            )
+        assert client.put_calls == []
+
+    async def test_allows_hostname_matching_its_own_environment(self) -> None:
+        uow, config, tunnel, client, projects_api = await self._setup(ingress=[])
+        projects_api._environments[config.environment_id] = _fake_environment(
+            config.environment_id, "https://app.example.com"
+        )
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi(), projects_api)
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        created = await use_case.execute(
+            config.environment_id, tunnel.id, "app.example.com", "http://x", actor=actor
+        )
+        assert created.hostname == "app.example.com"
+
+    async def test_allows_hostname_matching_no_environment(self) -> None:
+        """The routine, allowed case — publishing a fresh subdomain with no
+        base_url configured for it anywhere must never be rejected."""
+        sibling_id = uuid4()
+        uow, config, tunnel, client, projects_api = await self._setup(
+            ingress=[], sibling_base_urls={sibling_id: "https://sibling.example.com"}
+        )
+        use_case = AddTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi(), projects_api)
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        created = await use_case.execute(
+            config.environment_id, tunnel.id, "api.example.com", "http://x", actor=actor
+        )
+        assert created.hostname == "api.example.com"
 
 
 class TestUpdateTunnelHostname:

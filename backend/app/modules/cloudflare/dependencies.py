@@ -375,9 +375,10 @@ async def get_add_tunnel_hostname(
     client: CloudflareClient = Depends(get_cloudflare_client),
     cache: CacheClient = Depends(get_cache),
     audit_api: AuditApi = Depends(get_audit_api),
+    projects_api: ProjectsApi = Depends(get_projects_api),
 ) -> AddTunnelHostname:
     """Provide the add-tunnel-hostname use case."""
-    return AddTunnelHostname(uow, client, cache, audit_api)
+    return AddTunnelHostname(uow, client, cache, audit_api, projects_api)
 
 
 async def get_update_tunnel_hostname(
