@@ -58,7 +58,7 @@ class UpdateTunnelHostname(AbstractUseCase):
         ):
             raise CloudflareTunnelNotFound()
         existing = await self._uow.tunnel_hostnames.get_by_id(hostname_id)
-        if existing is None or existing.tunnel_id != tunnel_id:
+        if existing is None or existing.tunnel_id != tunnel_id or existing.environment_id != environment_id:
             raise TunnelPublicHostnameNotFound()
 
         lock_key = CacheKeyBuilder.lock_key("tunnel", tunnel_id)

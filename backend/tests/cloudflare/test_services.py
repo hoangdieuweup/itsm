@@ -37,6 +37,7 @@ from app.modules.cloudflare.exceptions import (
     TunnelHostnameAlreadyExists,
     TunnelHostnameDomainMismatch,
     TunnelIngressSyncFailed,
+    TunnelPublicHostnameNotFound,
     ZoneNotOwnedByAccount,
 )
 from app.modules.cloudflare.repository import (
@@ -2343,7 +2344,11 @@ class TestUpdateTunnelHostname:
         )
         tunnel = await uow.tunnels.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="t")
         hostname_row = await uow.tunnel_hostnames.create(
-            tunnel_id=tunnel.id, hostname="app.example.com", service="http://old", created_by=None
+            tunnel_id=tunnel.id,
+            hostname="app.example.com",
+            service="http://old",
+            created_by=None,
+            environment_id=config.environment_id,
         )
         rule = {"hostname": "app.example.com", "service": "http://old", **(existing_rule_extra or {})}
         client = FakeCloudflareTunnelClient(ingress=[rule])
@@ -2396,6 +2401,36 @@ class TestUpdateTunnelHostname:
 
         assert client.put_calls[-1] == [{"hostname": "app.example.com", "service": "http://old"}]
 
+    async def test_rejects_hostname_belonging_to_a_different_environment(self) -> None:
+        uow, config, tunnel, hostname_row, client = await self._setup_with_hostname()
+        other_environment_id = uuid4()
+        uow.tunnel_hostnames._rows[hostname_row.id] = hostname_row.model_copy(
+            update={"environment_id": other_environment_id}
+        )
+        use_case = UpdateTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(TunnelPublicHostnameNotFound):
+            await use_case.execute(
+                config.environment_id, tunnel.id, hostname_row.id, "http://new", actor=actor
+            )
+        assert client.put_calls == []
+
+    async def test_rejects_hostname_with_no_matched_environment(self) -> None:
+        """NULL-attributed hostnames are rejected too (D7) — the same
+        strict-equality guard DNS records already use, no exemption for
+        the unmatched case."""
+        uow, config, tunnel, hostname_row, client = await self._setup_with_hostname()
+        uow.tunnel_hostnames._rows[hostname_row.id] = hostname_row.model_copy(update={"environment_id": None})
+        use_case = UpdateTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(TunnelPublicHostnameNotFound):
+            await use_case.execute(
+                config.environment_id, tunnel.id, hostname_row.id, "http://new", actor=actor
+            )
+        assert client.put_calls == []
+
 
 class TestRemoveTunnelHostname:
     async def _setup_with_hostname(self):
@@ -2411,7 +2446,11 @@ class TestRemoveTunnelHostname:
         )
         tunnel = await uow.tunnels.create(cloudflare_account_id=account.id, cf_tunnel_id="tun-1", name="t")
         hostname_row = await uow.tunnel_hostnames.create(
-            tunnel_id=tunnel.id, hostname="app.example.com", service="http://x", created_by=None
+            tunnel_id=tunnel.id,
+            hostname="app.example.com",
+            service="http://x",
+            created_by=None,
+            environment_id=config.environment_id,
         )
         catch_all = {"service": "http_status:404"}
         rule = {"hostname": "app.example.com", "service": "http://x"}
@@ -2427,6 +2466,31 @@ class TestRemoveTunnelHostname:
 
         assert client.put_calls[-1] == [catch_all]
         assert await uow.tunnel_hostnames.get_by_id(hostname_row.id) is None
+
+    async def test_rejects_hostname_belonging_to_a_different_environment(self) -> None:
+        uow, config, tunnel, hostname_row, client, _catch_all = await self._setup_with_hostname()
+        other_environment_id = uuid4()
+        uow.tunnel_hostnames._rows[hostname_row.id] = hostname_row.model_copy(
+            update={"environment_id": other_environment_id}
+        )
+        use_case = RemoveTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(TunnelPublicHostnameNotFound):
+            await use_case.execute(config.environment_id, tunnel.id, hostname_row.id, actor=actor)
+        assert client.put_calls == []
+        assert await uow.tunnel_hostnames.get_by_id(hostname_row.id) is not None
+
+    async def test_rejects_hostname_with_no_matched_environment(self) -> None:
+        uow, config, tunnel, hostname_row, client, _catch_all = await self._setup_with_hostname()
+        uow.tunnel_hostnames._rows[hostname_row.id] = hostname_row.model_copy(update={"environment_id": None})
+        use_case = RemoveTunnelHostname(uow, client, FakeCacheClient(), FakeAuditApi())
+        actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
+
+        with pytest.raises(TunnelPublicHostnameNotFound):
+            await use_case.execute(config.environment_id, tunnel.id, hostname_row.id, actor=actor)
+        assert client.put_calls == []
+        assert await uow.tunnel_hostnames.get_by_id(hostname_row.id) is not None
 
     async def test_lock_already_held_raises_config_locked(self) -> None:
         uow, config, tunnel, hostname_row, client, _ = await self._setup_with_hostname()
