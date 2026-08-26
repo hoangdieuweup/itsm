@@ -14,17 +14,16 @@ class TestAssignableKeys:
         assert ("project_role", "manage") not in keys
         assert ("user", "update_status") not in keys
 
-    def test_includes_environment_scoped_cloudflare_loki_alerting_atoms(self) -> None:
+    def test_only_project_prefixed_cloudflare_and_observability_atoms(self) -> None:
         keys = ProjectRoleRules.assignable_keys()
-        assert ("cloudflare_dns", "create") in keys
-        assert ("cloudflare_tunnel", "create") in keys
-        assert ("cloudflare_tunnel", "reveal_token") in keys
-        assert ("cloudflare_hostname", "update") in keys
-        assert ("cloudflare_config", "read") in keys
-        assert ("cloudflare_audit", "read") in keys
-        assert ("loki_config", "manage") in keys
-        assert ("alert_rule", "create") in keys
-        assert ("incident", "acknowledge") in keys
+        assert ("project_cloudflare_dns", "create") in keys
+        assert ("project_cloudflare_tunnel", "create") in keys
+        assert ("project_cloudflare_hostname", "update") in keys
+        assert ("project_cloudflare_config", "read") in keys
+        assert ("project_cloudflare_audit", "read") in keys
+        assert ("project_loki_config", "manage") in keys
+        assert ("project_alert_rule", "create") in keys
+        assert ("project_incident", "acknowledge") in keys
 
     def test_excludes_cloudflare_account_administration_and_binding(self) -> None:
         keys = ProjectRoleRules.assignable_keys()
@@ -35,6 +34,33 @@ class TestAssignableKeys:
         assert ("cloudflare_manager", "read") not in keys
         assert ("cloudflare_manager", "manage") not in keys
         assert ("cloudflare_config", "manage") not in keys
+
+    def test_no_account_level_resource_is_assignable_under_its_old_name(self) -> None:
+        """Regression guard for the exact escalation this split closes: an
+        account-level resource string must NEVER re-enter ASSIGNABLE."""
+        account_level = {
+            "cloudflare_account", "cloudflare_manager", "cloudflare_config",
+            "cloudflare_tunnel", "cloudflare_hostname", "cloudflare_dns",
+            "cloudflare_audit", "loki_config", "alert_rule", "incident",
+        }
+        offenders = [k for k in ProjectRoleRules.assignable_keys() if k[0] in account_level]
+        assert offenders == []
+
+    def test_tunnel_delete_and_reveal_token_are_unassignable_under_any_name(self) -> None:
+        keys = ProjectRoleRules.assignable_keys()
+        assert ("cloudflare_tunnel", "delete") not in keys
+        assert ("cloudflare_tunnel", "reveal_token") not in keys
+        assert ("project_cloudflare_tunnel", "delete") not in keys
+        assert ("project_cloudflare_tunnel", "reveal_token") not in keys
+
+    def test_every_assignable_key_exists_in_the_rbac_catalog(self) -> None:
+        """A tuple in ASSIGNABLE with no matching CATALOG row can never be
+        granted (no Permission id exists) — a silent dead entry."""
+        from app.modules.rbac.constants import RbacPermissionCatalog
+
+        catalog = {(r, a) for r, a, _ in RbacPermissionCatalog.CATALOG}
+        assert ProjectRoleRules.assignable_keys() <= catalog
+        assert len(ProjectRoleRules.assignable_keys()) == 33
 
 
 class TestRejectsUnassignable:
