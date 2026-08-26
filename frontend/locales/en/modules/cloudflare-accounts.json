@@ -24,6 +24,8 @@
     "manageAccess": "Manage Access"
   },
   "form": {
+    "createTitle": "New Cloudflare Account",
+    "editTitle": "Edit Cloudflare Account",
     "label": "Label",
     "cfAccountId": "Cloudflare Account ID",
     "apiToken": "API Token",
@@ -54,6 +56,24 @@
       "description": "They will lose all access to this account."
     }
   },
+  "tabs": {
+    "tunnels": "Tunnels",
+    "dns": "DNS Records",
+    "managers": "Managers",
+    "tunnelsEmpty": "No tunnels found on this account.",
+    "tunnelName": "Name",
+    "tunnelStatus": "Status",
+    "tunnelType": "Type",
+    "tunnelConfig": "Config",
+    "tunnelConns": "Conns",
+    "tunnelCreated": "Created",
+    "dnsEmpty": "No DNS records in this zone.",
+    "noZones": "No zones found on this account.",
+    "dnsType": "Type",
+    "dnsName": "Name",
+    "dnsContent": "Content",
+    "dnsProxy": "Proxy"
+  },
   "errors": {
     "cloudflare_account_not_found": "This Cloudflare account no longer exists.",
     "cloudflare_account_manager_not_found": "This manager no longer exists.",
@@ -61,6 +81,29 @@
     "cloudflare_api_unavailable": "Could not reach Cloudflare. Try again shortly.",
     "cloudflare_insufficient_account_access": "You don't have sufficient access on this account.",
     "cloudflare_last_owner_removal_blocked": "You can't remove or downgrade the last owner of this account."
+  },
+  "tunnelForm": {
+    "createTitle": "Create a Tunnel",
+    "createDesc": "Connect your network to Cloudflare.",
+    "name": "Tunnel name",
+    "namePlaceholder": "my-tunnel",
+    "create": "Add Tunnel",
+    "delete": "Delete",
+    "tokenTitle": "Install connector",
+    "tokenDesc": "Run this command on your server to install the cloudflared connector:",
+    "done": "Done",
+    "deleteConfirmTitle": "Delete this tunnel?",
+    "deleteConfirmDesc": "This will permanently remove the tunnel from Cloudflare. Any services routed through it will go offline."
+  },
+  "dnsForm": {
+    "createTitle": "Add DNS Record",
+    "editTitle": "Edit DNS Record",
+    "desc": "Manage DNS records for this zone.",
+    "create": "Add Record",
+    "proxy": "Proxied",
+    "proxyDesc": "Route traffic through Cloudflare's network.",
+    "deleteConfirmTitle": "Delete this DNS record?",
+    "deleteConfirmDesc": "This record will be removed from Cloudflare immediately."
   },
   "messages": {
     "created": "Cloudflare account added successfully.",
@@ -70,6 +113,11 @@
     "connectionFailed": "Connection test failed.",
     "managerAssigned": "Manager assigned successfully.",
     "managerUpdated": "Manager access updated.",
-    "managerRemoved": "Manager removed."
+    "managerRemoved": "Manager removed.",
+    "tunnelCreated": "Tunnel created.",
+    "tunnelDeleted": "Tunnel deleted.",
+    "dnsCreated": "DNS record created.",
+    "dnsUpdated": "DNS record updated.",
+    "dnsDeleted": "DNS record deleted."
   }
 }

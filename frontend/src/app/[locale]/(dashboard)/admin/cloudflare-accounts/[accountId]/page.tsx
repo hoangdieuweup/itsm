@@ -16,7 +16,7 @@ export default async function AdminCloudflareAccountDetailPage({
   setRequestLocale(locale);
 
   const session = await fetchAuthSession();
-  const canView = hasPermission(session, RESOURCES.CLOUDFLARE_ACCOUNT, ACTIONS.VIEW);
+  const canView = hasPermission(session, RESOURCES.CLOUDFLARE_ACCOUNT, ACTIONS.READ);
 
   const queryClient = createQueryClient();
   if (canView) {
@@ -30,7 +30,7 @@ export default async function AdminCloudflareAccountDetailPage({
     <HydrationBoundary state={dehydrate(queryClient)}>
       <RequirePermission
         resource={RESOURCES.CLOUDFLARE_ACCOUNT}
-        action={ACTIONS.VIEW}
+        action={ACTIONS.READ}
         fallback={<NoPermission />}
       >
         <CloudflareAccountDetailView accountId={accountId} />

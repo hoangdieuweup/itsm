@@ -57,14 +57,15 @@ export default async function AdminProjectDetailPage({
         action={ACTIONS.READ}
         fallback={<NoPermission />}
       >
-        <ProjectDetailClient projectId={projectId} />
-      </RequirePermission>
-      <RequirePermission
-        resource={RESOURCES.NOTIFICATION_CHANNEL}
-        action={ACTIONS.READ}
-        fallback={null}
-      >
-        <NotificationChannelsSection projectId={projectId} />
+        <ProjectDetailClient projectId={projectId}>
+          <RequirePermission
+            resource={RESOURCES.NOTIFICATION_CHANNEL}
+            action={ACTIONS.READ}
+            fallback={null}
+          >
+            <NotificationChannelsSection projectId={projectId} />
+          </RequirePermission>
+        </ProjectDetailClient>
       </RequirePermission>
     </HydrationBoundary>
   );
