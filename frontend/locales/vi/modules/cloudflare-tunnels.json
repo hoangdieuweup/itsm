@@ -69,7 +69,9 @@
     "cloudflare_tunnel_config_locked": "Có người khác đang chỉnh sửa tunnel này — vui lòng thử lại sau.",
     "cloudflare_tunnel_hostname_already_exists": "Hostname này đã được công bố trên tunnel này.",
     "cloudflare_tunnel_ingress_sync_failed": "Cloudflare đã được cập nhật nhưng lưu cục bộ thất bại — vui lòng tải lại và kiểm tra.",
-    "cloudflare_tunnel_hostname_domain_mismatch": "Domain của hostname này không khớp với zone Cloudflare mà môi trường đã liên kết."
+    "cloudflare_tunnel_hostname_domain_mismatch": "Domain của hostname này không khớp với zone Cloudflare mà môi trường đã liên kết.",
+    "cloudflare_tunnel_hostname_environment_mismatch": "Hostname này thuộc về một môi trường khác.",
+    "cloudflare_insufficient_account_access": "Bạn không có đủ quyền truy cập trên tài khoản Cloudflare này để thực hiện thao tác này."
   },
   "messages": {
     "deleted": "Xóa tunnel thành công.",

@@ -34,15 +34,22 @@
     "audit_log": "Nhật ký kiểm toán (Audit Log)",
     "cloudflare_account": "Tài khoản Cloudflare",
     "cloudflare_manager": "Người quản trị CF",
-    "cloudflare_config": "Cấu hình Zone CF",
-    "cloudflare_tunnel": "Tunnel Cloudflare",
-    "cloudflare_hostname": "Hostname công khai CF",
-    "cloudflare_dns": "DNS Records CF",
-    "cloudflare_audit": "Nhật ký CF",
-    "loki_config": "Loki / Xem Log",
+    "cloudflare_config": "Cấu hình Zone CF (cấp tài khoản)",
+    "cloudflare_tunnel": "Tunnel Cloudflare (cấp tài khoản)",
+    "cloudflare_hostname": "Hostname công khai CF (cấp tài khoản)",
+    "cloudflare_dns": "DNS Records CF (cấp tài khoản)",
+    "cloudflare_audit": "Nhật ký CF (cấp tài khoản)",
     "notification_channel": "Kênh thông báo",
-    "alert_rule": "Quy tắc cảnh báo",
-    "incident": "Quản lý sự cố"
+    "alert_rule": "Quy tắc cảnh báo (cấp tài khoản)",
+    "incident": "Quản lý sự cố (cấp tài khoản)",
+    "project_cloudflare_config": "Cấu hình Zone CF (dự án)",
+    "project_cloudflare_dns": "DNS Records CF (dự án)",
+    "project_cloudflare_tunnel": "Tunnel Cloudflare (dự án)",
+    "project_cloudflare_hostname": "Hostname công khai CF (dự án)",
+    "project_cloudflare_audit": "Nhật ký CF (dự án)",
+    "project_loki_config": "Loki / Xem Log (dự án)",
+    "project_alert_rule": "Quy tắc cảnh báo (dự án)",
+    "project_incident": "Quản lý sự cố (dự án)"
   },
   "catalog": {
     "permissions": {
@@ -102,35 +109,31 @@
         "manage": "Thêm / Sửa / Xóa người quản trị"
       },
       "cloudflare_config": {
-        "read": "Xem cấu hình zone binding",
-        "manage": "Gán / Hủy zone cho môi trường"
+        "read": "Xem cấu hình zone binding (mọi tài khoản bạn quản trị)",
+        "manage": "Gán / Hủy zone cho môi trường (mọi tài khoản bạn quản trị)"
       },
       "cloudflare_tunnel": {
-        "read": "Xem danh sách tunnel",
-        "create": "Tạo tunnel mới",
-        "delete": "Xóa tunnel",
-        "sync": "Đồng bộ tunnel từ Cloudflare",
-        "reveal_token": "Hiển thị connector token",
-        "refresh_status": "Làm mới trạng thái kết nối tunnel"
+        "read": "Xem danh sách tunnel (mọi tài khoản bạn quản trị)",
+        "create": "Tạo tunnel mới (mọi tài khoản bạn quản trị)",
+        "delete": "Xóa tunnel — thao tác cấp tài khoản, không thể gán trong vai trò dự án",
+        "sync": "Đồng bộ tunnel từ Cloudflare (mọi tài khoản bạn quản trị)",
+        "reveal_token": "Hiển thị connector token — thao tác cấp tài khoản, không thể gán trong vai trò dự án",
+        "refresh_status": "Làm mới trạng thái kết nối tunnel (mọi tài khoản bạn quản trị)"
       },
       "cloudflare_hostname": {
-        "read": "Xem hostname công khai",
-        "create": "Thêm hostname mới",
-        "update": "Sửa service target",
-        "delete": "Xóa hostname"
+        "read": "Xem hostname công khai (mọi tài khoản bạn quản trị)",
+        "create": "Thêm hostname mới (mọi tài khoản bạn quản trị)",
+        "update": "Sửa service target (mọi tài khoản bạn quản trị)",
+        "delete": "Xóa hostname (mọi tài khoản bạn quản trị)"
       },
       "cloudflare_dns": {
-        "read": "Xem DNS records",
-        "create": "Tạo DNS record",
-        "update": "Sửa DNS record",
-        "delete": "Xóa DNS record"
+        "read": "Xem DNS records (mọi tài khoản bạn quản trị)",
+        "create": "Tạo DNS record (mọi tài khoản bạn quản trị)",
+        "update": "Sửa DNS record (mọi tài khoản bạn quản trị)",
+        "delete": "Xóa DNS record (mọi tài khoản bạn quản trị)"
       },
       "cloudflare_audit": {
-        "read": "Xem nhật ký hoạt động Cloudflare"
-      },
-      "loki_config": {
-        "read": "Xem cấu hình Loki & truy vấn log",
-        "manage": "Tạo / Sửa / Xóa cấu hình Loki"
+        "read": "Xem nhật ký hoạt động Cloudflare (mọi tài khoản bạn quản trị)"
       },
       "notification_channel": {
         "create": "Tạo kênh thông báo mới",
@@ -140,16 +143,50 @@
         "test_send": "Gửi thử thông báo"
       },
       "alert_rule": {
-        "create": "Tạo quy tắc cảnh báo",
-        "read": "Xem quy tắc cảnh báo",
-        "update": "Chỉnh sửa quy tắc cảnh báo",
-        "delete": "Xóa quy tắc cảnh báo"
+        "read": "Xem danh sách loại cảnh báo Cloudflare khả dụng (mọi tài khoản bạn quản trị)"
       },
       "incident": {
-        "create": "Tạo sự cố thủ công",
-        "read": "Xem danh sách & chi tiết sự cố",
-        "acknowledge": "Tiếp nhận xử lý sự cố",
-        "resolve": "Đóng sự cố đã xử lý"
+        "read": "Xem sự cố của mọi dự án"
+      },
+      "project_cloudflare_config": {
+        "read": "Xem cấu hình zone binding của dự án này"
+      },
+      "project_cloudflare_dns": {
+        "read": "Xem DNS records của dự án này",
+        "create": "Tạo DNS record cho dự án này",
+        "update": "Sửa DNS record của dự án này",
+        "delete": "Xóa DNS record của dự án này"
+      },
+      "project_cloudflare_tunnel": {
+        "read": "Xem tunnel phục vụ dự án này",
+        "create": "Tạo tunnel cho dự án này",
+        "sync": "Đồng bộ tunnel của dự án này từ Cloudflare",
+        "refresh_status": "Làm mới trạng thái kết nối tunnel của dự án này"
+      },
+      "project_cloudflare_hostname": {
+        "read": "Xem hostname công khai của dự án này",
+        "create": "Thêm hostname công khai cho dự án này",
+        "update": "Sửa service target hostname của dự án này",
+        "delete": "Xóa hostname công khai của dự án này"
+      },
+      "project_cloudflare_audit": {
+        "read": "Xem nhật ký hoạt động Cloudflare của dự án này"
+      },
+      "project_loki_config": {
+        "read": "Xem cấu hình Loki & truy vấn log của dự án này",
+        "manage": "Tạo / Sửa / Xóa cấu hình Loki của dự án này"
+      },
+      "project_alert_rule": {
+        "create": "Tạo quy tắc cảnh báo cho dự án này",
+        "read": "Xem quy tắc cảnh báo của dự án này",
+        "update": "Chỉnh sửa quy tắc cảnh báo của dự án này",
+        "delete": "Xóa quy tắc cảnh báo của dự án này"
+      },
+      "project_incident": {
+        "create": "Tạo sự cố thủ công cho dự án này",
+        "read": "Xem danh sách & chi tiết sự cố của dự án này",
+        "acknowledge": "Tiếp nhận xử lý sự cố của dự án này",
+        "resolve": "Đóng sự cố đã xử lý của dự án này"
       }
     }
   },
