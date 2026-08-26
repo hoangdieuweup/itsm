@@ -130,9 +130,12 @@ async def run() -> None:
 
     # ── 4. Flush RBAC Redis cache so require_permission sees the new set ─
     try:
-        from redis.asyncio import ConnectionPool, Redis as AsyncRedis
+        # Lazy imports: a missing/broken redis dependency must never crash
+        # the seed itself, only this best-effort flush.
+        from redis.asyncio import ConnectionPool  # noqa: PLC0415
+        from redis.asyncio import Redis as AsyncRedis  # noqa: PLC0415
 
-        from app.integrations.cache.config import cache_settings
+        from app.integrations.cache.config import cache_settings  # noqa: PLC0415
 
         pool = ConnectionPool.from_url(
             str(cache_settings.URL),
