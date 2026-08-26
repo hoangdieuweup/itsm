@@ -83,8 +83,6 @@ class RbacPermissionCatalog:
         ("cloudflare_dns", "update", "permissions.cloudflare_dns.update"),
         ("cloudflare_dns", "delete", "permissions.cloudflare_dns.delete"),
         # ── Cloudflare audit logs (ACCOUNT-level; unused after the
-        #    project-scoped split below, kept for symmetry / a future
-        #    account-level audit route) ──────────────────────────────
         ("cloudflare_audit", "read", "permissions.cloudflare_audit.read"),
         # ── Notification channels ──────────────────────────────────
         ("notification_channel", "create", "permissions.notification_channel.create"),
@@ -97,25 +95,11 @@ class RbacPermissionCatalog:
         # ── Incidents (GLOBAL: cross-project list route only) ───────
         ("incident", "read", "permissions.incident.read"),
         # ── PROJECT-SCOPED twins ───────────────────────────────────
-        # Distinct resource strings, not aliases. These are the ONLY
-        # resources ProjectScopedPermissionCatalog.ASSIGNABLE may ever
-        # contain. Their account-level namesakes above stay reachable only
-        # through a real cloudflare_account_managers grant (the
-        # account-manager path of require_cloudflare_environment_access),
-        # so a project role can never mint account-level power — the
-        # escalation loop a shared resource string left open. See
-        # docs/superpowers/plans/2026-08-26-project-scoped-resource-split-
-        # and-tunnel-hostname-ownership-fix.md.
         ("project_cloudflare_config", "read", "permissions.project_cloudflare_config.read"),
         ("project_cloudflare_dns", "read", "permissions.project_cloudflare_dns.read"),
         ("project_cloudflare_dns", "create", "permissions.project_cloudflare_dns.create"),
         ("project_cloudflare_dns", "update", "permissions.project_cloudflare_dns.update"),
         ("project_cloudflare_dns", "delete", "permissions.project_cloudflare_dns.delete"),
-        # No project_cloudflare_tunnel.delete / .reveal_token, ever: a tunnel
-        # is an ACCOUNT-wide object commonly serving several unrelated
-        # projects at once (CloudflareTunnel has no environment_id column at
-        # all), so deleting one or revealing its live connector token is an
-        # account-tier action no project role may hold.
         ("project_cloudflare_tunnel", "read", "permissions.project_cloudflare_tunnel.read"),
         ("project_cloudflare_tunnel", "create", "permissions.project_cloudflare_tunnel.create"),
         ("project_cloudflare_tunnel", "sync", "permissions.project_cloudflare_tunnel.sync"),
