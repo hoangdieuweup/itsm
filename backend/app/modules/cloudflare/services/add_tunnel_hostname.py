@@ -68,7 +68,7 @@ class AddTunnelHostname(AbstractUseCase):
         if not TunnelHostnameRules.belongs_to_zone(hostname, config.zone_name):
             raise TunnelHostnameDomainMismatch()
         tunnel = await self._uow.tunnels.get_by_id(tunnel_id)
-        if tunnel is None or not TunnelOwnershipRules.verify_tunnel_belongs_to_environment(
+        if tunnel is None or not TunnelOwnershipRules.verify_tunnel_belongs_to_account(
             tunnel, config.cloudflare_account_id
         ):
             raise CloudflareTunnelNotFound()

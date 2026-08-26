@@ -115,6 +115,20 @@ class TunnelHostnameRules:
                 return environment_id
         return None
 
+    @staticmethod
+    @rule
+    def claims_another_environment(
+        hostname: str, environment_id: UUID, candidates: list[tuple[UUID, str | None]]
+    ) -> bool:
+        """True iff hostname exactly matches a DIFFERENT sibling environment's
+        base_url — the one case worth rejecting on create. A hostname
+        matching nothing is the routine, allowed case (publishing a fresh
+        subdomain that has no base_url yet); only a positive claim on
+        another environment's own domain is a real cross-project escalation
+        attempt."""
+        matched_id = TunnelHostnameRules.match_environment_id(hostname, candidates)
+        return matched_id is not None and matched_id != environment_id
+
 
 class TunnelOwnershipRules:
     """Pure decision rules for whether a Tunnel belongs to the Cloudflare
@@ -125,7 +139,7 @@ class TunnelOwnershipRules:
 
     @staticmethod
     @rule
-    def verify_tunnel_belongs_to_environment(
+    def verify_tunnel_belongs_to_account(
         tunnel: CloudflareTunnelRead | None, cloudflare_account_id: UUID
     ) -> bool:
         """True iff tunnel exists and is on the given Cloudflare account."""
