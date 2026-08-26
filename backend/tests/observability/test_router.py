@@ -125,7 +125,11 @@ class TestCreateLokiConfig:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("loki_config", "manage"), ("loki_config", "read"), ("project", "manage_all")],
+            permissions=[
+                ("project_loki_config", "manage"),
+                ("project_loki_config", "read"),
+                ("project", "manage_all"),
+            ],
             email="admin@x.com",
         )
 
@@ -154,7 +158,7 @@ class TestCreateLokiConfig:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("loki_config", "read"), ("project", "manage_all")],
+            permissions=[("project_loki_config", "read"), ("project", "manage_all")],
             email="viewer2@x.com",
         )
 
@@ -167,7 +171,7 @@ class TestCreateLokiConfig:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("loki_config", "manage"), ("project", "manage_all")],
+            permissions=[("project_loki_config", "manage"), ("project", "manage_all")],
             email="admin2@x.com",
         )
         payload = {
@@ -220,7 +224,11 @@ class TestUpdateAndDeleteLokiConfig:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("loki_config", "manage"), ("loki_config", "read"), ("project", "manage_all")],
+            permissions=[
+                ("project_loki_config", "manage"),
+                ("project_loki_config", "read"),
+                ("project", "manage_all"),
+            ],
             email="admin4@x.com",
         )
         await client.post(
@@ -271,7 +279,7 @@ class TestRunLogQuery:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("loki_config", "read"), ("project", "manage_all")],
+            permissions=[("project_loki_config", "read"), ("project", "manage_all")],
             email="reader@x.com",
         )
 
@@ -302,7 +310,7 @@ class TestStreamLogTail:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("loki_config", "read"), ("project", "manage_all")],
+            permissions=[("project_loki_config", "read"), ("project", "manage_all")],
             email="tailreader@x.com",
         )
 
@@ -315,7 +323,11 @@ class TestStreamLogTail:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("loki_config", "manage"), ("loki_config", "read"), ("project", "manage_all")],
+            permissions=[
+                ("project_loki_config", "manage"),
+                ("project_loki_config", "read"),
+                ("project", "manage_all"),
+            ],
             email="tailadmin@x.com",
         )
         await client.post(
@@ -448,7 +460,7 @@ class TestCloudflareWebhookAuth:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("alert_rule", "create"), ("project", "manage_all")],
+            permissions=[("project_alert_rule", "create"), ("project", "manage_all")],
             email="alertadmin@x.com",
         )
         create_resp = await client.post(
@@ -546,10 +558,10 @@ class TestAlertRuleRoutes:
             client,
             engine,
             permissions=[
-                ("alert_rule", "create"),
-                ("alert_rule", "read"),
-                ("alert_rule", "update"),
-                ("alert_rule", "delete"),
+                ("project_alert_rule", "create"),
+                ("project_alert_rule", "read"),
+                ("project_alert_rule", "update"),
+                ("project_alert_rule", "delete"),
                 ("project", "manage_all"),
             ],
             email="alertfull@x.com",
@@ -605,10 +617,11 @@ class TestIncidentRoutes:
             client,
             engine,
             permissions=[
-                ("incident", "create"),
+                ("project_incident", "create"),
+                ("project_incident", "read"),
                 ("incident", "read"),
-                ("incident", "acknowledge"),
-                ("incident", "resolve"),
+                ("project_incident", "acknowledge"),
+                ("project_incident", "resolve"),
                 ("project", "manage_all"),
             ],
             email="incidentfull@x.com",
@@ -653,7 +666,7 @@ class TestIncidentRoutes:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("incident", "create"), ("project", "manage_all")],
+            permissions=[("project_incident", "create"), ("project", "manage_all")],
             email="incidentcreator@x.com",
         )
         create_resp = await client.post(
@@ -681,7 +694,7 @@ class TestIncidentRoutes:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("incident", "create"), ("project", "manage_all")],
+            permissions=[("project_incident", "create"), ("project", "manage_all")],
             email="incidentcreator2@x.com",
         )
         create_resp = await client.post(

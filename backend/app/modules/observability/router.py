@@ -86,7 +86,7 @@ async def create_loki_config(
     body: LokiConfigCreate,
     use_case: CreateLokiConfig = Depends(get_create_loki_config),
     user: UserRead = Depends(
-        require_project_permission_for_environment(RbacResources.LOKI_CONFIG, RbacActions.MANAGE)
+        require_project_permission_for_environment(RbacResources.PROJECT_LOKI_CONFIG, RbacActions.MANAGE)
     ),
 ) -> ApiResponse[LokiConfigRead]:
     config = await use_case.execute(environment_id, **body.model_dump(), actor=user)
@@ -98,7 +98,7 @@ async def get_loki_config(
     environment_id: UUID,
     use_case: GetLokiConfig = Depends(get_get_loki_config),
     _user: UserRead = Depends(
-        require_project_permission_for_environment(RbacResources.LOKI_CONFIG, RbacActions.READ)
+        require_project_permission_for_environment(RbacResources.PROJECT_LOKI_CONFIG, RbacActions.READ)
     ),
 ) -> ApiResponse[LokiConfigRead]:
     config = await use_case.execute(environment_id)
@@ -111,7 +111,7 @@ async def update_loki_config(
     body: LokiConfigUpdate,
     use_case: UpdateLokiConfig = Depends(get_update_loki_config),
     user: UserRead = Depends(
-        require_project_permission_for_environment(RbacResources.LOKI_CONFIG, RbacActions.MANAGE)
+        require_project_permission_for_environment(RbacResources.PROJECT_LOKI_CONFIG, RbacActions.MANAGE)
     ),
 ) -> ApiResponse[LokiConfigRead]:
     config = await use_case.execute(environment_id, **body.model_dump(exclude_unset=True), actor=user)
@@ -123,7 +123,7 @@ async def delete_loki_config(
     environment_id: UUID,
     use_case: DeleteLokiConfig = Depends(get_delete_loki_config),
     user: UserRead = Depends(
-        require_project_permission_for_environment(RbacResources.LOKI_CONFIG, RbacActions.MANAGE)
+        require_project_permission_for_environment(RbacResources.PROJECT_LOKI_CONFIG, RbacActions.MANAGE)
     ),
 ) -> ApiResponse[None]:
     await use_case.execute(environment_id, actor=user)
@@ -136,7 +136,7 @@ async def run_log_query(
     body: LogQueryRequest,
     use_case: RunLogQuery = Depends(get_run_log_query),
     _user: UserRead = Depends(
-        require_project_permission_for_environment(RbacResources.LOKI_CONFIG, RbacActions.READ)
+        require_project_permission_for_environment(RbacResources.PROJECT_LOKI_CONFIG, RbacActions.READ)
     ),
 ) -> ApiResponse[LogQueryResponse]:
     """POST, not GET — a LogQL query string can be long/awkward in a query
@@ -154,7 +154,7 @@ async def stream_log_tail(
     config_check: GetLokiConfig = Depends(get_get_loki_config),
     use_case: StreamLogTail = Depends(get_stream_log_tail),
     _user: UserRead = Depends(
-        require_project_permission_for_environment(RbacResources.LOKI_CONFIG, RbacActions.READ)
+        require_project_permission_for_environment(RbacResources.PROJECT_LOKI_CONFIG, RbacActions.READ)
     ),
 ) -> EventSourceResponse:
     """SSE bridge to Loki's WebSocket /tail. `config_check` runs a
@@ -208,7 +208,7 @@ async def create_alert_rule(
     body: AlertRuleCreate,
     use_case: CreateAlertRule = Depends(get_create_alert_rule),
     user: UserRead = Depends(
-        require_project_permission_for_environment(RbacResources.ALERT_RULE, RbacActions.CREATE)
+        require_project_permission_for_environment(RbacResources.PROJECT_ALERT_RULE, RbacActions.CREATE)
     ),
 ) -> ApiResponse[AlertRuleRead]:
     result = await use_case.execute(environment_id=environment_id, **body.model_dump(), actor=user)
@@ -220,7 +220,7 @@ async def list_alert_rules(
     environment_id: UUID,
     use_case: ListAlertRules = Depends(get_list_alert_rules),
     _user: UserRead = Depends(
-        require_project_permission_for_environment(RbacResources.ALERT_RULE, RbacActions.READ)
+        require_project_permission_for_environment(RbacResources.PROJECT_ALERT_RULE, RbacActions.READ)
     ),
 ) -> ApiResponse[list[AlertRuleRead]]:
     return ApiResponse[list[AlertRuleRead]](success=True, data=await use_case.execute(environment_id))
@@ -232,7 +232,7 @@ async def update_alert_rule(
     body: AlertRuleUpdate,
     use_case: UpdateAlertRule = Depends(get_update_alert_rule),
     user: UserRead = Depends(
-        require_project_permission_for_alert_rule(RbacResources.ALERT_RULE, RbacActions.UPDATE)
+        require_project_permission_for_alert_rule(RbacResources.PROJECT_ALERT_RULE, RbacActions.UPDATE)
     ),
 ) -> ApiResponse[AlertRuleRead]:
     result = await use_case.execute(alert_rule_id, **body.model_dump(exclude_unset=True), actor=user)
@@ -244,7 +244,7 @@ async def delete_alert_rule(
     alert_rule_id: UUID,
     use_case: DeleteAlertRule = Depends(get_delete_alert_rule),
     user: UserRead = Depends(
-        require_project_permission_for_alert_rule(RbacResources.ALERT_RULE, RbacActions.DELETE)
+        require_project_permission_for_alert_rule(RbacResources.PROJECT_ALERT_RULE, RbacActions.DELETE)
     ),
 ) -> ApiResponse[None]:
     await use_case.execute(alert_rule_id, actor=user)
@@ -270,7 +270,7 @@ async def get_incident(
     incident_id: UUID,
     use_case: GetIncident = Depends(get_get_incident),
     _user: UserRead = Depends(
-        require_project_permission_for_incident(RbacResources.INCIDENT, RbacActions.READ)
+        require_project_permission_for_incident(RbacResources.PROJECT_INCIDENT, RbacActions.READ)
     ),
 ) -> ApiResponse[IncidentRead]:
     return ApiResponse[IncidentRead](success=True, data=await use_case.execute(incident_id))
@@ -297,7 +297,7 @@ async def acknowledge_incident(
     incident_id: UUID,
     use_case: AcknowledgeIncident = Depends(get_acknowledge_incident),
     user: UserRead = Depends(
-        require_project_permission_for_incident(RbacResources.INCIDENT, RbacActions.ACKNOWLEDGE)
+        require_project_permission_for_incident(RbacResources.PROJECT_INCIDENT, RbacActions.ACKNOWLEDGE)
     ),
 ) -> ApiResponse[IncidentRead]:
     return ApiResponse[IncidentRead](success=True, data=await use_case.execute(incident_id, actor=user))
@@ -308,7 +308,7 @@ async def resolve_incident(
     incident_id: UUID,
     use_case: ResolveIncident = Depends(get_resolve_incident),
     user: UserRead = Depends(
-        require_project_permission_for_incident(RbacResources.INCIDENT, RbacActions.RESOLVE)
+        require_project_permission_for_incident(RbacResources.PROJECT_INCIDENT, RbacActions.RESOLVE)
     ),
 ) -> ApiResponse[IncidentRead]:
     return ApiResponse[IncidentRead](success=True, data=await use_case.execute(incident_id, actor=user))

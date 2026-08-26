@@ -1435,7 +1435,7 @@ class TestCreateManualIncident:
             FakeObservabilityUnitOfWork(),
             projects_api=FakeProjectsApi(
                 {env_id: SimpleNamespace(project_id=project_id)},
-                permissions=frozenset({"incident.create"}),
+                permissions=frozenset({"project_incident.create"}),
             ),
             rbac_api=object(),
             audit_api=FakeAuditApi(),
@@ -1496,7 +1496,7 @@ class TestCreateManualIncident:
             FakeObservabilityUnitOfWork(),
             projects_api=FakeProjectsApi(
                 {env_id: SimpleNamespace(project_id=project_id)},
-                permissions=frozenset({"incident.create"}),
+                permissions=frozenset({"project_incident.create"}),
             ),
             rbac_api=object(),
             audit_api=FakeAuditApi(),

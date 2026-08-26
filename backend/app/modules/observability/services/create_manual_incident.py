@@ -67,7 +67,7 @@ class CreateManualIncident(AbstractUseCase):
         permissions = await self._projects_api.resolve_effective_permissions(
             environment.project_id, actor, self._rbac_api
         )
-        if f"{RbacResources.INCIDENT}.{RbacActions.CREATE}" not in permissions:
+        if f"{RbacResources.PROJECT_INCIDENT}.{RbacActions.CREATE}" not in permissions:
             raise ObservabilityPermissionDenied()
 
         incident = await self._uow.incidents.create(
