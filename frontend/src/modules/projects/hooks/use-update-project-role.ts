@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateProjectRole } from "../api/fetchers";
 import { projectRolesKeys } from "../api/query-keys";
+import { projectPermissionsKeys } from "@/entities/permission";
 import { useToastMessage } from "@/shared/hooks/use-toast-message";
 
 export function useUpdateProjectRole(projectId: string) {
@@ -14,6 +15,7 @@ export function useUpdateProjectRole(projectId: string) {
       updateProjectRole(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectRolesKeys.forProject(projectId) });
+      queryClient.invalidateQueries({ queryKey: projectPermissionsKeys.forProject(projectId) });
       success("projectRoleUpdated");
     },
     onError: error,

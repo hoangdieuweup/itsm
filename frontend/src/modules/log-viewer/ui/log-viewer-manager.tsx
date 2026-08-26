@@ -8,7 +8,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
-import { Can } from "@/entities/permission";
+import { CanInProject } from "@/entities/permission";
 import { ACTIONS, RESOURCES } from "@/shared/constants/permissions";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useLokiConfigQuery, useDeleteLokiConfig } from "../hooks/use-loki-config";
@@ -342,7 +342,7 @@ export function LogViewerManager({ environmentId }: { environmentId: string }) {
                 </div>
               </div>
             </div>
-            <Can I={ACTIONS.UPDATE} a={RESOURCES.ENVIRONMENT}>
+            <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_LOKI_CONFIG}>
               <Button
                 size="sm"
                 onClick={() => setFormOpen(true)}
@@ -350,7 +350,7 @@ export function LogViewerManager({ environmentId }: { environmentId: string }) {
               >
                 {t("config.configure")}
               </Button>
-            </Can>
+            </CanInProject>
           </div>
         </section>
       )}
@@ -368,7 +368,7 @@ export function LogViewerManager({ environmentId }: { environmentId: string }) {
                   </h2>
                 </div>
               </div>
-              <Can I={ACTIONS.UPDATE} a={RESOURCES.ENVIRONMENT}>
+              <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_LOKI_CONFIG}>
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
@@ -387,7 +387,7 @@ export function LogViewerManager({ environmentId }: { environmentId: string }) {
                     <Trash2 className="size-4" aria-hidden="true" />
                   </button>
                 </div>
-              </Can>
+              </CanInProject>
             </div>
           </section>
 

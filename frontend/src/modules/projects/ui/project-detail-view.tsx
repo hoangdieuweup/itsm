@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Link2, Users } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
-import { Can, CanInProject, ProjectPermissionProvider } from "@/entities/permission";
+import { CanInProject, ProjectPermissionProvider } from "@/entities/permission";
 import { ACTIONS, RESOURCES } from "@/shared/constants/permissions";
 import { useProjectQuery } from "@/entities/project";
 import { useProjectEnvironmentsQuery, type Environment } from "@/entities/environment";
@@ -59,8 +59,8 @@ const itemVariants: Variants = {
 /**
  * useProjectEnvironmentsQuery is a Suspense query with no built-in "disabled"
  * mode, so this must stay unmounted (not just visually hidden) for a caller
- * without environment:read — gated via <Can>'s children-as-ReactNode prop in
- * ProjectDetailView, never rendered directly.
+ * without environment:read — gated via <CanInProject>'s children-as-ReactNode
+ * prop in ProjectDetailView, never rendered directly.
  */
 function EnvironmentsSection({
   projectId,
@@ -106,7 +106,7 @@ function EnvironmentsSection({
             <p className="text-sm text-muted-foreground">{t("empty.environments")}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {environments.map((env) => (
               <m.div
                 key={env.id}
@@ -154,7 +154,7 @@ function EnvironmentsSection({
 
                   {/* High-Tech Operations Launch Buttons */}
                   <div className="mt-5 grid grid-cols-3 gap-2">
-                    <Can I={ACTIONS.READ} a={RESOURCES.CLOUDFLARE_TUNNEL}>
+                    <CanInProject I={ACTIONS.READ} a={RESOURCES.PROJECT_CLOUDFLARE_TUNNEL}>
                       <button
                         type="button"
                         onClick={() => onManageTunnels(env)}
@@ -166,9 +166,9 @@ function EnvironmentsSection({
                           {t("edgeDns")}
                         </span>
                       </button>
-                    </Can>
+                    </CanInProject>
 
-                    <Can I={ACTIONS.READ} a={RESOURCES.LOKI_CONFIG}>
+                    <CanInProject I={ACTIONS.READ} a={RESOURCES.PROJECT_LOKI_CONFIG}>
                       <button
                         type="button"
                         onClick={() => onManageLogs(env)}
@@ -180,9 +180,9 @@ function EnvironmentsSection({
                           {t("lokiLogs")}
                         </span>
                       </button>
-                    </Can>
+                    </CanInProject>
 
-                    <Can I={ACTIONS.READ} a={RESOURCES.ALERT_RULE}>
+                    <CanInProject I={ACTIONS.READ} a={RESOURCES.PROJECT_ALERT_RULE}>
                       <button
                         type="button"
                         onClick={() => onManageAlerting(env)}
@@ -194,7 +194,7 @@ function EnvironmentsSection({
                           {t("alerts")}
                         </span>
                       </button>
-                    </Can>
+                    </CanInProject>
                   </div>
                 </div>
               </m.div>
@@ -281,11 +281,13 @@ export function ProjectDetailView({
   onManageTunnels,
   onManageLogs,
   onManageAlerting,
+  children,
 }: {
   projectId: string;
   onManageTunnels: (environment: Environment) => void;
   onManageLogs: (environment: Environment) => void;
   onManageAlerting: (environment: Environment) => void;
+  children?: React.ReactNode;
 }) {
   const t = useTranslations("projects");
   const { data: project } = useProjectQuery(projectId);
@@ -312,193 +314,228 @@ export function ProjectDetailView({
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="flex flex-1 flex-col gap-8 pb-10"
+      className="flex flex-1 flex-col gap-0 pb-10"
     >
-      {/* 1. Hero Project Banner */}
-      <m.div
-        variants={itemVariants}
-        className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-card/95 p-6 sm:p-8 backdrop-blur-2xl shadow-xl shadow-black/5 dark:shadow-black/20"
-      >
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="flex items-start gap-4">
-            <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-black text-2xl shadow-lg shadow-emerald-500/25 ring-4 ring-emerald-500/10">
-              {project.name.slice(0, 2).toUpperCase()}
-            </div>
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-0.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                  <span className="relative flex size-2">
-                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-                  </span>
-                  {t("activeWorkspace")}
-                </span>
-              </div>
-              <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
-                {project.name}
-              </h1>
-              <p className="max-w-2xl text-sm text-muted-foreground leading-relaxed">
-                {project.description || t("heroDescription")}
-              </p>
-            </div>
-          </div>
-        </div>
-      </m.div>
+      {/* ═══ 2-Column Grid: Main Content + Right Sidebar ═══ */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] items-start gap-6 xl:gap-8">
 
-      {/* 2. Environments Control Matrix */}
-      <CanInProject I={ACTIONS.READ} a={RESOURCES.ENVIRONMENT} fallback={<EnvironmentsSectionNoPermission />}>
-        <EnvironmentsSection
-          projectId={projectId}
-          onManageTunnels={onManageTunnels}
-          onManageLogs={onManageLogs}
-          onManageAlerting={onManageAlerting}
-        />
-      </CanInProject>
-
-      {/* 3. Project Resources & Integrations Hub */}
-      <m.section variants={itemVariants} className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Link2 className="size-4 text-primary" />
-            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              {t("sections.links")} ({links.length})
-            </h2>
-          </div>
-          <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_LINK}>
-            <Button size="sm" variant="outline" onClick={() => setLinkFormTarget("create")} className="gap-1.5 shadow-2xs">
-              <Plus className="size-3.5" /> {t("actions.addLink")}
-            </Button>
-          </CanInProject>
-        </div>
-
-        {links.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-3xl border border-border/50 bg-card/60 py-12 text-center backdrop-blur-md">
-            <p className="text-sm text-muted-foreground">{t("empty.links")}</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {links.map((link) => (
-              <div
-                key={link.id}
-                className="flex items-center justify-between rounded-2xl border border-border/60 bg-card/70 p-4 backdrop-blur-md transition-all hover:border-primary/40 shadow-2xs"
-              >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    {getLinkIcon(link.name, link.url)}
-                  </div>
-                  <div className="flex flex-col overflow-hidden">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-semibold text-sm text-foreground truncate">{link.name}</span>
-                      {link.isDefault && (
-                        <span className="rounded-md bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-bold text-blue-600 uppercase dark:text-blue-400">
-                          {t("badges.default")}
-                        </span>
-                      )}
-                    </div>
-                    <a
-                      href={link.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-mono text-xs text-muted-foreground truncate hover:text-primary hover:underline"
-                    >
-                      {link.url}
-                    </a>
-                  </div>
+        {/* ─── LEFT: Main Content ─── */}
+        <div className="flex flex-col gap-8 min-w-0">
+          {/* 1. Hero Project Banner */}
+          <m.div
+            variants={itemVariants}
+            className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-card/95 p-6 sm:p-8 backdrop-blur-2xl shadow-xl shadow-black/5 dark:shadow-black/20"
+          >
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+              <div className="flex items-start gap-4">
+                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-black text-2xl shadow-lg shadow-emerald-500/25 ring-4 ring-emerald-500/10">
+                  {project.name.slice(0, 2).toUpperCase()}
                 </div>
-
-                <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_LINK}>
-                  <div className="flex items-center gap-1 shrink-0 ml-2">
-                    <button
-                      type="button"
-                      onClick={() => setLinkFormTarget(link)}
-                      className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
-                      title={t("actions.edit")}
-                    >
-                      <Pencil className="size-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLinkDeleteTarget(link)}
-                      className="flex size-7 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 dark:hover:bg-rose-950/50 cursor-pointer"
-                      title={t("actions.delete")}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-                </CanInProject>
-              </div>
-            ))}
-          </div>
-        )}
-      </m.section>
-
-      {/* 4. Members */}
-      <m.section variants={itemVariants} className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Users className="size-4 text-primary" />
-            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              {t("sections.members")} ({members.length})
-            </h2>
-          </div>
-          <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_MEMBER}>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setMemberFormOpen(true)}
-              className="gap-1.5 shadow-2xs"
-            >
-              <Plus className="size-3.5" /> {t("actions.addMember")}
-            </Button>
-          </CanInProject>
-        </div>
-
-        {members.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-3xl border border-border/50 bg-card/60 py-12 text-center backdrop-blur-md">
-            <p className="text-sm text-muted-foreground">{t("empty.members")}</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {members.map((member) => (
-              <div
-                key={member.userId}
-                className="flex items-center justify-between rounded-2xl border border-border/60 bg-card/70 p-4 backdrop-blur-md transition-all hover:border-primary/40 shadow-2xs"
-              >
-                <div className="flex flex-col overflow-hidden">
-                  <span className="font-semibold text-sm text-foreground truncate">{member.name}</span>
-                  <span className="font-mono text-xs text-muted-foreground truncate">{member.email}</span>
-                  <CanInProject
-                    I={ACTIONS.MANAGE}
-                    a={RESOURCES.PROJECT_MEMBER}
-                    fallback={
-                      <span className="mt-1 text-xs text-muted-foreground">
-                        {member.projectRoleName ?? t("members.noRole")}
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-0.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      <span className="relative flex size-2">
+                        <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
                       </span>
-                    }
-                  >
-                    <MemberRoleSelect projectId={projectId} member={member} />
-                  </CanInProject>
+                      {t("activeWorkspace")}
+                    </span>
+                  </div>
+                  <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+                    {project.name}
+                  </h1>
+                  <p className="max-w-2xl text-sm text-muted-foreground leading-relaxed">
+                    {project.description || t("heroDescription")}
+                  </p>
                 </div>
-                <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_MEMBER}>
-                  <button
-                    type="button"
-                    onClick={() => setMemberRemoveTarget(member)}
-                    className="flex size-7 shrink-0 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 dark:hover:bg-rose-950/50 cursor-pointer"
-                    title={t("actions.removeMember")}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </CanInProject>
               </div>
-            ))}
+            </div>
+          </m.div>
+
+          {/* 2. Environments Control Matrix */}
+          <CanInProject I={ACTIONS.READ} a={RESOURCES.ENVIRONMENT} fallback={<EnvironmentsSectionNoPermission />}>
+            <EnvironmentsSection
+              projectId={projectId}
+              onManageTunnels={onManageTunnels}
+              onManageLogs={onManageLogs}
+              onManageAlerting={onManageAlerting}
+            />
+          </CanInProject>
+
+          {/* 3. Project Resources & Integrations Hub */}
+          <m.section variants={itemVariants} className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Link2 className="size-4 text-primary" />
+                <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  {t("sections.links")} ({links.length})
+                </h2>
+              </div>
+              <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_LINK}>
+                <Button size="sm" variant="outline" onClick={() => setLinkFormTarget("create")} className="gap-1.5 shadow-2xs">
+                  <Plus className="size-3.5" /> {t("actions.addLink")}
+                </Button>
+              </CanInProject>
+            </div>
+
+            {links.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-3xl border border-border/50 bg-card/60 py-12 text-center backdrop-blur-md">
+                <p className="text-sm text-muted-foreground">{t("empty.links")}</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {links.map((link) => (
+                  <div
+                    key={link.id}
+                    className="flex items-center justify-between rounded-2xl border border-border/60 bg-card/70 p-4 backdrop-blur-md transition-all hover:border-primary/40 shadow-2xs"
+                  >
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        {getLinkIcon(link.name, link.url)}
+                      </div>
+                      <div className="flex flex-col overflow-hidden">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-sm text-foreground truncate">{link.name}</span>
+                          {link.isDefault && (
+                            <span className="rounded-md bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-bold text-blue-600 uppercase dark:text-blue-400">
+                              {t("badges.default")}
+                            </span>
+                          )}
+                        </div>
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-mono text-xs text-muted-foreground truncate hover:text-primary hover:underline"
+                        >
+                          {link.url}
+                        </a>
+                      </div>
+                    </div>
+
+                    <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_LINK}>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <button
+                          type="button"
+                          onClick={() => setLinkFormTarget(link)}
+                          className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
+                          title={t("actions.edit")}
+                        >
+                          <Pencil className="size-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLinkDeleteTarget(link)}
+                          className="flex size-7 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 dark:hover:bg-rose-950/50 cursor-pointer"
+                          title={t("actions.delete")}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    </CanInProject>
+                  </div>
+                ))}
+              </div>
+            )}
+          </m.section>
+
+          {/* Injected sections (e.g. NotificationChannelsSection) */}
+          {children}
+        </div>
+
+        {/* ─── RIGHT: Sticky Sidebar (Members + Project Roles) ─── */}
+        <m.aside
+          variants={itemVariants}
+          className="flex flex-col gap-5 lg:sticky lg:top-0 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto"
+        >
+          {/* Members Panel */}
+          <div className="rounded-2xl border border-border/50 bg-card/80 backdrop-blur-xl shadow-sm overflow-hidden">
+            {/* Members Header */}
+            <div className="flex items-center justify-between border-b border-border/30 px-5 py-3.5">
+              <div className="flex items-center gap-2">
+                <Users className="size-4 text-primary" />
+                <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  {t("sections.members")} ({members.length})
+                </h2>
+              </div>
+              <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_MEMBER}>
+                <button
+                  type="button"
+                  onClick={() => setMemberFormOpen(true)}
+                  className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                >
+                  <Plus className="size-3" /> {t("actions.addMember")}
+                </button>
+              </CanInProject>
+            </div>
+
+            {/* Members List */}
+            <div className="divide-y divide-border/20">
+              {members.length === 0 ? (
+                <div className="flex items-center justify-center py-10 px-5">
+                  <p className="text-xs text-muted-foreground">{t("empty.members")}</p>
+                </div>
+              ) : (
+                members.map((member) => (
+                  <div
+                    key={member.userId}
+                    className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/30"
+                  >
+                    {/* Avatar */}
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-[11px] font-bold shadow-sm">
+                      {member.name
+                        .split(" ")
+                        .map((w) => w[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="text-sm font-semibold text-foreground truncate leading-tight">
+                        {member.name}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground truncate leading-tight">
+                        {member.email}
+                      </span>
+                      <CanInProject
+                        I={ACTIONS.MANAGE}
+                        a={RESOURCES.PROJECT_MEMBER}
+                        fallback={
+                          <span className="mt-0.5 text-[11px] font-medium text-muted-foreground/80">
+                            {member.projectRoleName ?? t("members.noRole")}
+                          </span>
+                        }
+                      >
+                        <MemberRoleSelect projectId={projectId} member={member} />
+                      </CanInProject>
+                    </div>
+
+                    {/* Remove button */}
+                    <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_MEMBER}>
+                      <button
+                        type="button"
+                        onClick={() => setMemberRemoveTarget(member)}
+                        className="flex size-6 shrink-0 items-center justify-center rounded-md text-rose-500/70 hover:bg-rose-500/10 hover:text-rose-600 cursor-pointer transition-colors"
+                        title={t("actions.removeMember")}
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </CanInProject>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-        )}
-      </m.section>
 
-      {/* 5. Project Roles */}
-      <ProjectRolesSection projectId={projectId} />
+          <CanInProject I={ACTIONS.READ} a={RESOURCES.PROJECT_ROLE}>
+            <ProjectRolesSection projectId={projectId} />
+          </CanInProject>
+        </m.aside>
+      </div>
 
-      {/* Dialogs */}
+      {/* Dialogs — portaled, position-independent */}
       {linkFormTarget !== null && (
         <ProjectLinkFormDialog
           isOpen

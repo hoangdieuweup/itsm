@@ -152,15 +152,43 @@ def _make_tunnel(cloudflare_account_id) -> CloudflareTunnelRead:
     )
 
 
-class TestVerifyTunnelBelongsToEnvironment:
+class TestVerifyTunnelBelongsToAccount:
     def test_true_when_same_account(self) -> None:
         account_id = uuid4()
         tunnel = _make_tunnel(account_id)
-        assert TunnelOwnershipRules.verify_tunnel_belongs_to_environment(tunnel, account_id) is True
+        assert TunnelOwnershipRules.verify_tunnel_belongs_to_account(tunnel, account_id) is True
 
     def test_false_when_different_account(self) -> None:
         tunnel = _make_tunnel(uuid4())
-        assert TunnelOwnershipRules.verify_tunnel_belongs_to_environment(tunnel, uuid4()) is False
+        assert TunnelOwnershipRules.verify_tunnel_belongs_to_account(tunnel, uuid4()) is False
 
     def test_false_when_tunnel_is_none(self) -> None:
-        assert TunnelOwnershipRules.verify_tunnel_belongs_to_environment(None, uuid4()) is False
+        assert TunnelOwnershipRules.verify_tunnel_belongs_to_account(None, uuid4()) is False
+
+
+class TestClaimsAnotherEnvironment:
+    def test_true_when_hostname_matches_a_different_sibling(self) -> None:
+        this_env, other_env = uuid4(), uuid4()
+        candidates: list[tuple[UUID, str | None]] = [(other_env, "https://itsm.agentsplatform.cloud")]
+        assert (
+            TunnelHostnameRules.claims_another_environment("itsm.agentsplatform.cloud", this_env, candidates)
+            is True
+        )
+
+    def test_false_when_hostname_matches_its_own_environment(self) -> None:
+        this_env = uuid4()
+        candidates: list[tuple[UUID, str | None]] = [(this_env, "https://itsm.agentsplatform.cloud")]
+        assert (
+            TunnelHostnameRules.claims_another_environment("itsm.agentsplatform.cloud", this_env, candidates)
+            is False
+        )
+
+    def test_false_when_hostname_matches_nothing(self) -> None:
+        """The routine, allowed case — a fresh subdomain with no base_url
+        configured for it yet must never be rejected."""
+        this_env, other_env = uuid4(), uuid4()
+        candidates: list[tuple[UUID, str | None]] = [(other_env, "https://itsm.agentsplatform.cloud")]
+        assert (
+            TunnelHostnameRules.claims_another_environment("api.agentsplatform.cloud", this_env, candidates)
+            is False
+        )

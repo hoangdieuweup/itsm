@@ -30,11 +30,13 @@ from app.modules.cloudflare.exceptions import (
     TunnelConfigLocked,
     TunnelHostnameAlreadyExists,
     TunnelHostnameDomainMismatch,
+    TunnelHostnameEnvironmentMismatch,
     TunnelIngressSyncFailed,
 )
 from app.modules.cloudflare.rules import TunnelHostnameRules, TunnelOwnershipRules
 from app.modules.cloudflare.schemas import TunnelPublicHostnameRead
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
+from app.modules.projects.public import ProjectsApi
 from app.modules.users.public import UserRead
 
 logger = logging.getLogger(__name__)
@@ -47,16 +49,32 @@ class AddTunnelHostname(AbstractUseCase):
         client: CloudflareClient,
         cache: CacheClient,
         audit_api: AuditApi,
+        projects_api: ProjectsApi,
     ) -> None:
         self._uow = uow
         self._client = client
         self._cache = cache
         self._audit_api = audit_api
+        self._projects_api = projects_api
 
     @staticmethod
     @helper
     def _is_catch_all(rule: dict) -> bool:
         return "hostname" not in rule or rule.get("hostname") is None
+
+    @helper
+    async def _resolve_sibling_environments(
+        self, cloudflare_account_id: UUID
+    ) -> list[tuple[UUID, str | None]]:
+        """Every environment bound to this account, paired with its
+        base_url — mirrors SyncTunnels' own helper of the same name."""
+        sibling_ids = await self._uow.configs.list_environment_ids_for_account(cloudflare_account_id)
+        candidates: list[tuple[UUID, str | None]] = []
+        for sibling_id in sibling_ids:
+            sibling = await self._projects_api.get_environment_by_id(sibling_id)
+            if sibling is not None:
+                candidates.append((sibling.id, sibling.base_url))
+        return candidates
 
     @use_case
     async def execute(
@@ -68,13 +86,17 @@ class AddTunnelHostname(AbstractUseCase):
         if not TunnelHostnameRules.belongs_to_zone(hostname, config.zone_name):
             raise TunnelHostnameDomainMismatch()
         tunnel = await self._uow.tunnels.get_by_id(tunnel_id)
-        if tunnel is None or not TunnelOwnershipRules.verify_tunnel_belongs_to_environment(
+        if tunnel is None or not TunnelOwnershipRules.verify_tunnel_belongs_to_account(
             tunnel, config.cloudflare_account_id
         ):
             raise CloudflareTunnelNotFound()
         existing_on_tunnel = await self._uow.tunnel_hostnames.list_for_tunnel(tunnel_id)
         if any(h.hostname == hostname for h in existing_on_tunnel):
             raise TunnelHostnameAlreadyExists()
+
+        candidates = await self._resolve_sibling_environments(config.cloudflare_account_id)
+        if TunnelHostnameRules.claims_another_environment(hostname, environment_id, candidates):
+            raise TunnelHostnameEnvironmentMismatch()
 
         lock_key = CacheKeyBuilder.lock_key("tunnel", tunnel_id)
         acquired = await self._cache.try_acquire_lock(

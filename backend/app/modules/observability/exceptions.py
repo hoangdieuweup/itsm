@@ -36,6 +36,19 @@ class IncidentNotFound(NotFoundError):
     message = "Incident not found"
 
 
+class ObservabilityPermissionDenied(ForbiddenError):
+    """Raised when the caller's effective project permission set (global
+    UNION project role) does not include the required resource.action for
+    this environment. Observability-owned rather than importing projects'
+    ProjectPermissionDenied — that class isn't exported through
+    projects/public.py, and cross-module error reuse would break the
+    module-owns-its-errors rule (mirrors ProjectPermissionDenied's own
+    docstring reasoning in the projects module)."""
+
+    code = ErrorCode.PERMISSION_DENIED
+    message = "You do not have this permission on this project"
+
+
 class InvalidIncidentTransition(ValidationFailedError):
     code = ErrorCode.INVALID_INCIDENT_TRANSITION
     message = "This status change is not allowed from the incident's current state"

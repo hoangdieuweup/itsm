@@ -153,7 +153,7 @@ export function IncidentsPageContent() {
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{t("description")}</p>
         </div>
-        <Can I={ACTIONS.CREATE} a={RESOURCES.INCIDENT}>
+        <Can I={ACTIONS.CREATE} a={RESOURCES.PROJECT_INCIDENT}>
           <Button
             size="sm"
             onClick={() => setCreateOpen(true)}

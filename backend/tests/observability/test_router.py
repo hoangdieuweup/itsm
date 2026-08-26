@@ -125,7 +125,11 @@ class TestCreateLokiConfig:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("environment", "update"), ("environment", "read")],
+            permissions=[
+                ("project_loki_config", "manage"),
+                ("project_loki_config", "read"),
+                ("project", "manage_all"),
+            ],
             email="admin@x.com",
         )
 
@@ -152,7 +156,10 @@ class TestCreateLokiConfig:
     async def test_get_404s_when_unconfigured(self, client: AsyncClient, engine: AsyncEngine) -> None:
         environment_id = await _make_environment(client, engine)
         await _login_with_permissions(
-            client, engine, permissions=[("environment", "read")], email="viewer2@x.com"
+            client,
+            engine,
+            permissions=[("project_loki_config", "read"), ("project", "manage_all")],
+            email="viewer2@x.com",
         )
 
         response = await client.get(f"/api/v1/environments/{environment_id}/loki-config")
@@ -164,7 +171,7 @@ class TestCreateLokiConfig:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("environment", "update"), ("environment", "read")],
+            permissions=[("project_loki_config", "manage"), ("project", "manage_all")],
             email="admin2@x.com",
         )
         payload = {
@@ -217,7 +224,11 @@ class TestUpdateAndDeleteLokiConfig:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("environment", "update"), ("environment", "read")],
+            permissions=[
+                ("project_loki_config", "manage"),
+                ("project_loki_config", "read"),
+                ("project", "manage_all"),
+            ],
             email="admin4@x.com",
         )
         await client.post(
@@ -266,7 +277,10 @@ class TestRunLogQuery:
     async def test_404s_when_unconfigured(self, client: AsyncClient, engine: AsyncEngine) -> None:
         environment_id = await _make_environment(client, engine)
         await _login_with_permissions(
-            client, engine, permissions=[("environment", "read")], email="reader@x.com"
+            client,
+            engine,
+            permissions=[("project_loki_config", "read"), ("project", "manage_all")],
+            email="reader@x.com",
         )
 
         response = await client.post(
@@ -294,7 +308,10 @@ class TestStreamLogTail:
     async def test_404s_when_unconfigured(self, client: AsyncClient, engine: AsyncEngine) -> None:
         environment_id = await _make_environment(client, engine)
         await _login_with_permissions(
-            client, engine, permissions=[("environment", "read")], email="tailreader@x.com"
+            client,
+            engine,
+            permissions=[("project_loki_config", "read"), ("project", "manage_all")],
+            email="tailreader@x.com",
         )
 
         response = await client.get(f"/api/v1/environments/{environment_id}/loki-config/tail?query=%7B%7D")
@@ -306,7 +323,11 @@ class TestStreamLogTail:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("environment", "update"), ("environment", "read")],
+            permissions=[
+                ("project_loki_config", "manage"),
+                ("project_loki_config", "read"),
+                ("project", "manage_all"),
+            ],
             email="tailadmin@x.com",
         )
         await client.post(
@@ -392,8 +413,9 @@ async def _bind_environment(client: AsyncClient, engine: AsyncEngine, *, cf_clie
         client,
         engine,
         permissions=[
-            ("cloudflare_account", "manage"),
-            ("cloudflare_account", "view"),
+            ("cloudflare_account", "create"),
+            ("cloudflare_account", "read"),
+            ("cloudflare_config", "manage"),
             ("project", "create"),
             ("environment", "create"),
             ("environment", "read"),
@@ -438,7 +460,7 @@ class TestCloudflareWebhookAuth:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("alert_rule", "create")],
+            permissions=[("project_alert_rule", "create"), ("project", "manage_all")],
             email="alertadmin@x.com",
         )
         create_resp = await client.post(
@@ -536,10 +558,11 @@ class TestAlertRuleRoutes:
             client,
             engine,
             permissions=[
-                ("alert_rule", "create"),
-                ("alert_rule", "read"),
-                ("alert_rule", "update"),
-                ("alert_rule", "delete"),
+                ("project_alert_rule", "create"),
+                ("project_alert_rule", "read"),
+                ("project_alert_rule", "update"),
+                ("project_alert_rule", "delete"),
+                ("project", "manage_all"),
             ],
             email="alertfull@x.com",
         )
@@ -594,10 +617,12 @@ class TestIncidentRoutes:
             client,
             engine,
             permissions=[
-                ("incident", "create"),
+                ("project_incident", "create"),
+                ("project_incident", "read"),
                 ("incident", "read"),
-                ("incident", "acknowledge"),
-                ("incident", "resolve"),
+                ("project_incident", "acknowledge"),
+                ("project_incident", "resolve"),
+                ("project", "manage_all"),
             ],
             email="incidentfull@x.com",
         )
@@ -631,14 +656,76 @@ class TestIncidentRoutes:
         assert resolve_resp.json()["data"]["status"] == "RESOLVED"
 
     async def test_acknowledge_requires_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
-        await _login_with_permissions(client, engine, permissions=[], email="noincidentperm@x.com")
-        response = await client.post(f"/api/v1/incidents/{uuid4()}/acknowledge")
+        """A nonexistent incident 404s regardless of permission —
+        require_project_permission_for_incident resolves the incident (and
+        its project membership) before checking the acknowledge atom, same
+        precedent as require_project_permission_for_environment. So this
+        test proves the permission boundary against a REAL incident the
+        caller is a project member of but lacks incident:acknowledge for."""
+        environment_id = await _make_environment(client, engine)
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[("project_incident", "create"), ("project", "manage_all")],
+            email="incidentcreator@x.com",
+        )
+        create_resp = await client.post(
+            "/api/v1/incidents",
+            json={
+                "environmentId": environment_id,
+                "category": "TRAFFIC",
+                "severity": "MEDIUM",
+                "title": "X",
+            },
+        )
+        incident_id = create_resp.json()["data"]["id"]
+
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[("project", "manage_all")],
+            email="noincidentperm@x.com",
+        )
+        response = await client.post(f"/api/v1/incidents/{incident_id}/acknowledge")
         assert response.status_code == 403
 
     async def test_resolve_requires_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
-        await _login_with_permissions(client, engine, permissions=[], email="noresolveperm@x.com")
-        response = await client.post(f"/api/v1/incidents/{uuid4()}/resolve")
+        environment_id = await _make_environment(client, engine)
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[("project_incident", "create"), ("project", "manage_all")],
+            email="incidentcreator2@x.com",
+        )
+        create_resp = await client.post(
+            "/api/v1/incidents",
+            json={
+                "environmentId": environment_id,
+                "category": "TRAFFIC",
+                "severity": "MEDIUM",
+                "title": "X",
+            },
+        )
+        incident_id = create_resp.json()["data"]["id"]
+
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[("project", "manage_all")],
+            email="noresolveperm@x.com",
+        )
+        response = await client.post(f"/api/v1/incidents/{incident_id}/resolve")
         assert response.status_code == 403
+
+    async def test_returns_404_for_unknown_incident_even_without_permission(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        """Explicit proof of the new, intentional behavior: resource
+        existence is resolved before the permission check, so an unknown
+        incident_id 404s regardless of the caller's permissions."""
+        await _login_with_permissions(client, engine, permissions=[], email="nopermatall@x.com")
+        response = await client.post(f"/api/v1/incidents/{uuid4()}/acknowledge")
+        assert response.status_code == 404
 
     async def test_create_requires_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
         environment_id = await _make_environment(client, engine)

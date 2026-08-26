@@ -20,8 +20,6 @@ class ListTunnelHostnames(AbstractUseCase):
         if config is None:
             raise CloudflareConfigNotFound()
         tunnel = await self._uow.tunnels.get_by_id(tunnel_id)
-        if not TunnelOwnershipRules.verify_tunnel_belongs_to_environment(
-            tunnel, config.cloudflare_account_id
-        ):
+        if not TunnelOwnershipRules.verify_tunnel_belongs_to_account(tunnel, config.cloudflare_account_id):
             raise CloudflareTunnelNotFound()
         return await self._uow.tunnel_hostnames.list_for_tunnel(tunnel_id, environment_id=environment_id)

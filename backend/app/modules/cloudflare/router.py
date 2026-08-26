@@ -55,6 +55,7 @@ from app.modules.cloudflare.dependencies import (
     get_update_tunnel_hostname,
     require_account_access,
     require_account_access_for_environment,
+    require_cloudflare_environment_access,
 )
 from app.modules.cloudflare.exceptions import CloudflareAccountNotFound, CloudflareConfigNotFound
 from app.modules.cloudflare.schemas import (
@@ -121,7 +122,7 @@ router = APIRouter(tags=["cloudflare"])
 async def create_cloudflare_account(
     body: CloudflareAccountCreate,
     use_case: CreateCloudflareAccount = Depends(get_create_account),
-    user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.CREATE)),
 ) -> ApiResponse[CloudflareAccountRead]:
     """Create an account — Cloudflare must confirm the token first; the
     creator is auto-assigned OWNER. No Layer-2 check: the account doesn't
@@ -135,7 +136,7 @@ async def create_cloudflare_account(
 @router.get("/cloudflare-accounts")
 async def list_cloudflare_accounts(
     use_case: ListVisibleCloudflareAccounts = Depends(get_list_visible_accounts),
-    _user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
+    _user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.READ)),
 ) -> ApiResponse[list[CloudflareAccountRead]]:
     """List accounts visible to the current user — filtered server-side, not
     just permission-gated (see ListVisibleCloudflareAccounts)."""
@@ -147,7 +148,7 @@ async def list_cloudflare_accounts(
 async def get_cloudflare_account(
     account_id: UUID,
     uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.READ)),
     _grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.VIEWER)),
 ) -> ApiResponse[CloudflareAccountRead]:
     """Return one account, 404 if it doesn't exist."""
@@ -162,7 +163,7 @@ async def update_cloudflare_account(
     account_id: UUID,
     body: CloudflareAccountUpdate,
     use_case: UpdateCloudflareAccount = Depends(get_update_account),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.UPDATE)),
     grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.EDITOR)),
 ) -> ApiResponse[CloudflareAccountRead]:
     """Rename and/or rotate an account's token. require_account_access(EDITOR)
@@ -178,7 +179,7 @@ async def update_cloudflare_account(
 async def delete_cloudflare_account(
     account_id: UUID,
     use_case: DeleteCloudflareAccount = Depends(get_delete_account),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.DELETE)),
     grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.OWNER)),
 ) -> ApiResponse[None]:
     """Delete an account. Its manager rows cascade at the DB level."""
@@ -190,7 +191,9 @@ async def delete_cloudflare_account(
 async def test_cloudflare_account_connection(
     account_id: UUID,
     use_case: TestCloudflareAccountConnection = Depends(get_test_connection),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
+    _l1: UserRead = Depends(
+        require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.TEST_CONNECTION)
+    ),
     _grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.EDITOR)),
 ) -> ApiResponse[None]:
     """Re-verify Cloudflare still accepts the account's stored token."""
@@ -202,7 +205,7 @@ async def test_cloudflare_account_connection(
 async def reveal_cloudflare_account_token(
     account_id: UUID,
     use_case: RevealCloudflareAccountToken = Depends(get_reveal_token),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.REVEAL_TOKEN)),
     grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.OWNER)),
 ) -> ApiResponse[TokenRevealResponse]:
     """Decrypt and return the account's plaintext token. OWNER only."""
@@ -214,7 +217,7 @@ async def reveal_cloudflare_account_token(
 async def list_cloudflare_account_managers(
     account_id: UUID,
     use_case: ListCloudflareAccountManagers = Depends(get_list_account_managers),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_MANAGER, RbacActions.READ)),
     _grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.VIEWER)),
 ) -> ApiResponse[list[CloudflareAccountManagerRead]]:
     """List everyone with access to this account."""
@@ -227,7 +230,7 @@ async def assign_cloudflare_account_manager(
     account_id: UUID,
     body: CloudflareAccountManagerAssign,
     use_case: AssignCloudflareAccountManager = Depends(get_assign_manager),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_MANAGER, RbacActions.MANAGE)),
     grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.OWNER)),
 ) -> ApiResponse[None]:
     """Grant a user access to this account. OWNER only — only an existing
@@ -244,7 +247,7 @@ async def update_cloudflare_account_manager(
     user_id: UUID,
     body: CloudflareAccountManagerUpdate,
     use_case: UpdateCloudflareAccountManager = Depends(get_update_manager),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_MANAGER, RbacActions.MANAGE)),
     grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.OWNER)),
 ) -> ApiResponse[None]:
     """Change a manager's access_level. Blocked if this would downgrade the
@@ -260,7 +263,7 @@ async def remove_cloudflare_account_manager(
     account_id: UUID,
     user_id: UUID,
     use_case: RemoveCloudflareAccountManager = Depends(get_remove_manager),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_MANAGER, RbacActions.MANAGE)),
     grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.OWNER)),
 ) -> ApiResponse[None]:
     """Remove a user's access to this account. Blocked if they are the last OWNER."""
@@ -272,7 +275,7 @@ async def remove_cloudflare_account_manager(
 async def list_zones(
     account_id: UUID,
     use_case: ListZones = Depends(get_list_zones),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_CONFIG, RbacActions.READ)),
     _grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.VIEWER)),
 ) -> ApiResponse[list[ZoneOption]]:
     """List zones available on an account, for the bind-time zone picker."""
@@ -284,7 +287,7 @@ async def list_zones(
 async def create_cloudflare_config(
     body: CloudflareConfigCreate,
     use_case: CreateCloudflareConfig = Depends(get_create_config),
-    user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_CONFIG, RbacActions.MANAGE)),
 ) -> ApiResponse[CloudflareConfigRead]:
     """Bind an environment to an account + zone. No Depends(require_account_access(...))
     here — cloudflare_account_id is body-only (Decision #1); CreateCloudflareConfig
@@ -297,8 +300,14 @@ async def create_cloudflare_config(
 async def get_cloudflare_config(
     environment_id: UUID,
     uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
+    _grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_CONFIG,
+            RbacResources.PROJECT_CLOUDFLARE_CONFIG,
+            RbacActions.READ,
+            AccessLevel.VIEWER,
+        )
+    ),
 ) -> ApiResponse[CloudflareConfigRead]:
     """Return one environment's binding, 404 if unbound."""
     config = await uow.configs.get_by_environment_id(environment_id)
@@ -312,7 +321,7 @@ async def update_cloudflare_config(
     environment_id: UUID,
     body: CloudflareConfigUpdate,
     use_case: UpdateCloudflareConfig = Depends(get_update_config),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_CONFIG, RbacActions.MANAGE)),
     grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
 ) -> ApiResponse[CloudflareConfigRead]:
     """Rebind an environment to a different zone on the same account."""
@@ -326,7 +335,7 @@ async def update_cloudflare_config(
 async def delete_cloudflare_config(
     environment_id: UUID,
     use_case: DeleteCloudflareConfig = Depends(get_delete_config),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_CONFIG, RbacActions.MANAGE)),
     grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
 ) -> ApiResponse[None]:
     """Remove an environment's binding. Blocked while DNS records still exist."""
@@ -338,8 +347,14 @@ async def delete_cloudflare_config(
 async def list_environment_dns_records(
     environment_id: UUID,
     use_case: ListDnsRecords = Depends(get_list_dns_records),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
+    _grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_DNS,
+            RbacResources.PROJECT_CLOUDFLARE_DNS,
+            RbacActions.READ,
+            AccessLevel.VIEWER,
+        )
+    ),
 ) -> ApiResponse[list[DnsRecordRead]]:
     """List an environment's DNS records."""
     records = await use_case.execute(environment_id)
@@ -350,8 +365,14 @@ async def list_environment_dns_records(
 async def sync_environment_dns_records(
     environment_id: UUID,
     use_case: SyncDnsRecords = Depends(get_sync_dns_records),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
+    _grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_DNS,
+            RbacResources.PROJECT_CLOUDFLARE_DNS,
+            RbacActions.READ,
+            AccessLevel.VIEWER,
+        )
+    ),
 ) -> ApiResponse[list[DnsRecordRead]]:
     """Sync DNS records from Cloudflare API into local DB, then return the fresh list."""
     records = await use_case.execute(environment_id)
@@ -364,8 +385,14 @@ async def list_cloudflare_audit_logs(
     since: datetime | None = None,
     before: datetime | None = None,
     use_case: ListCloudflareAuditLogs = Depends(get_list_cloudflare_audit_logs),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
+    _grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_AUDIT,
+            RbacResources.PROJECT_CLOUDFLARE_AUDIT,
+            RbacActions.READ,
+            AccessLevel.VIEWER,
+        )
+    ),
 ) -> ApiResponse[list[CloudflareAuditLogEntry]]:
     """List this environment's Cloudflare Audit Log entries, filtered to its
     bound zone. Logpull (raw traffic) was dropped from Phase 6 — Enterprise
@@ -379,8 +406,14 @@ async def create_environment_dns_record(
     environment_id: UUID,
     body: DnsRecordCreate,
     use_case: CreateDnsRecord = Depends(get_create_dns_record),
-    user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+    grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_DNS,
+            RbacResources.PROJECT_CLOUDFLARE_DNS,
+            RbacActions.CREATE,
+            AccessLevel.EDITOR,
+        )
+    ),
 ) -> ApiResponse[DnsRecordRead]:
     """Create a DNS record — Cloudflare must confirm first (Decision #3)."""
     record = await use_case.execute(
@@ -391,7 +424,7 @@ async def create_environment_dns_record(
         body.priority,
         body.proxied,
         body.ttl,
-        actor=user,
+        actor=grant.user,
     )
     return ApiResponse[DnsRecordRead](success=True, data=record)
 
@@ -402,12 +435,18 @@ async def update_environment_dns_record(
     record_id: UUID,
     body: DnsRecordUpdate,
     use_case: UpdateDnsRecord = Depends(get_update_dns_record),
-    user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+    grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_DNS,
+            RbacResources.PROJECT_CLOUDFLARE_DNS,
+            RbacActions.UPDATE,
+            AccessLevel.EDITOR,
+        )
+    ),
 ) -> ApiResponse[DnsRecordRead]:
     """Update a DNS record — Cloudflare must confirm first (Decision #3)."""
     record = await use_case.execute(
-        environment_id, record_id, body.content, body.priority, body.proxied, body.ttl, actor=user
+        environment_id, record_id, body.content, body.priority, body.proxied, body.ttl, actor=grant.user
     )
     return ApiResponse[DnsRecordRead](success=True, data=record)
 
@@ -417,11 +456,17 @@ async def delete_environment_dns_record(
     environment_id: UUID,
     record_id: UUID,
     use_case: DeleteDnsRecord = Depends(get_delete_dns_record),
-    user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+    grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_DNS,
+            RbacResources.PROJECT_CLOUDFLARE_DNS,
+            RbacActions.DELETE,
+            AccessLevel.EDITOR,
+        )
+    ),
 ) -> ApiResponse[None]:
     """Delete a DNS record — Cloudflare must confirm first (Decision #3)."""
-    await use_case.execute(environment_id, record_id, actor=user)
+    await use_case.execute(environment_id, record_id, actor=grant.user)
     return ApiResponse[None](success=True)
 
 
@@ -429,8 +474,14 @@ async def delete_environment_dns_record(
 async def list_environment_tunnels(
     environment_id: UUID,
     use_case: ListTunnels = Depends(get_list_tunnels),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
+    _grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_TUNNEL,
+            RbacResources.PROJECT_CLOUDFLARE_TUNNEL,
+            RbacActions.READ,
+            AccessLevel.VIEWER,
+        )
+    ),
 ) -> ApiResponse[list[CloudflareTunnelRead]]:
     """List every tunnel bound to an environment (1:N)."""
     tunnels = await use_case.execute(environment_id)
@@ -441,8 +492,14 @@ async def list_environment_tunnels(
 async def sync_environment_tunnels(
     environment_id: UUID,
     use_case: SyncTunnels = Depends(get_sync_tunnels),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+    _grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_TUNNEL,
+            RbacResources.PROJECT_CLOUDFLARE_TUNNEL,
+            RbacActions.SYNC,
+            AccessLevel.EDITOR,
+        )
+    ),
 ) -> ApiResponse[list[CloudflareTunnelRead]]:
     """Sync tunnels from Cloudflare API into local DB for the account this
     environment is bound to (account-wide, not environment-scoped — see
@@ -457,11 +514,17 @@ async def create_environment_tunnel(
     environment_id: UUID,
     body: CloudflareTunnelCreate,
     use_case: CreateCloudflareTunnel = Depends(get_create_tunnel),
-    user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+    grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_TUNNEL,
+            RbacResources.PROJECT_CLOUDFLARE_TUNNEL,
+            RbacActions.CREATE,
+            AccessLevel.EDITOR,
+        )
+    ),
 ) -> ApiResponse[CloudflareTunnelCreateResponse]:
     """Create a tunnel and return its one-time connector token (Decision #8)."""
-    tunnel, token = await use_case.execute(environment_id, body.name, actor=user)
+    tunnel, token = await use_case.execute(environment_id, body.name, actor=grant.user)
     return ApiResponse[CloudflareTunnelCreateResponse](
         success=True, data=CloudflareTunnelCreateResponse(tunnel=tunnel, token=token)
     )
@@ -472,11 +535,20 @@ async def delete_environment_tunnel(
     environment_id: UUID,
     tunnel_id: UUID,
     use_case: DeleteCloudflareTunnel = Depends(get_delete_tunnel),
-    user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+    grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_TUNNEL, None, RbacActions.DELETE, AccessLevel.EDITOR
+        )
+    ),
 ) -> ApiResponse[None]:
-    """Delete a tunnel. Its public hostnames cascade at the DB level (Decision #7)."""
-    await use_case.execute(environment_id, tunnel_id, actor=user)
+    """Delete a tunnel. Its public hostnames cascade at the DB level (Decision #7).
+
+    project_resource=None: a Cloudflare Tunnel is an ACCOUNT-wide object that
+    commonly serves several unrelated projects at once (no environment_id
+    column at all), so deleting one from inside a single project would
+    silently take down every other project it serves. Only genuine
+    Cloudflare account access can do this."""
+    await use_case.execute(environment_id, tunnel_id, actor=grant.user)
     return ApiResponse[None](success=True)
 
 
@@ -485,12 +557,18 @@ async def reveal_environment_tunnel_token(
     environment_id: UUID,
     tunnel_id: UUID,
     use_case: RevealCloudflareTunnelToken = Depends(get_reveal_tunnel_token),
-    user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+    grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_TUNNEL, None, RbacActions.REVEAL_TOKEN, AccessLevel.EDITOR
+        )
+    ),
 ) -> ApiResponse[TunnelTokenResponse]:
     """Re-fetch the connector token live. EDITOR only (Decision #6 — a
-    narrower blast radius than an account's own OWNER-gated reveal-token)."""
-    token = await use_case.execute(environment_id, tunnel_id, actor=user)
+    narrower blast radius than an account's own OWNER-gated reveal-token).
+
+    project_resource=None: reveals a live connector token for a tunnel that
+    may serve several other projects — account access only, no project role."""
+    token = await use_case.execute(environment_id, tunnel_id, actor=grant.user)
     return ApiResponse[TunnelTokenResponse](success=True, data=TunnelTokenResponse(token=token))
 
 
@@ -499,8 +577,14 @@ async def refresh_environment_tunnel_status(
     environment_id: UUID,
     tunnel_id: UUID,
     use_case: RefreshTunnelStatus = Depends(get_refresh_tunnel_status),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+    _grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_TUNNEL,
+            RbacResources.PROJECT_CLOUDFLARE_TUNNEL,
+            RbacActions.REFRESH_STATUS,
+            AccessLevel.EDITOR,
+        )
+    ),
 ) -> ApiResponse[CloudflareTunnelRead]:
     """On-demand status sync (Decision #10 — never automatic)."""
     tunnel = await use_case.execute(environment_id, tunnel_id)
@@ -512,8 +596,14 @@ async def list_environment_tunnel_hostnames(
     environment_id: UUID,
     tunnel_id: UUID,
     use_case: ListTunnelHostnames = Depends(get_list_tunnel_hostnames),
-    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.VIEW)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.VIEWER)),
+    _grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_HOSTNAME,
+            RbacResources.PROJECT_CLOUDFLARE_HOSTNAME,
+            RbacActions.READ,
+            AccessLevel.VIEWER,
+        )
+    ),
 ) -> ApiResponse[list[TunnelPublicHostnameRead]]:
     """List every public hostname published through a tunnel."""
     hostnames = await use_case.execute(environment_id, tunnel_id)
@@ -526,12 +616,20 @@ async def add_environment_tunnel_hostname(
     tunnel_id: UUID,
     body: TunnelPublicHostnameCreate,
     use_case: AddTunnelHostname = Depends(get_add_tunnel_hostname),
-    user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+    grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_HOSTNAME,
+            RbacResources.PROJECT_CLOUDFLARE_HOSTNAME,
+            RbacActions.CREATE,
+            AccessLevel.EDITOR,
+        )
+    ),
 ) -> ApiResponse[TunnelPublicHostnameRead]:
     """Add a hostname — Redis-locked GET-modify-PUT (Decisions #1-#5). 409 if
     another edit is already in flight for this tunnel."""
-    hostname = await use_case.execute(environment_id, tunnel_id, body.hostname, body.service, actor=user)
+    hostname = await use_case.execute(
+        environment_id, tunnel_id, body.hostname, body.service, actor=grant.user
+    )
     return ApiResponse[TunnelPublicHostnameRead](success=True, data=hostname)
 
 
@@ -542,11 +640,17 @@ async def update_environment_tunnel_hostname(
     hostname_id: UUID,
     body: TunnelPublicHostnameUpdate,
     use_case: UpdateTunnelHostname = Depends(get_update_tunnel_hostname),
-    user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+    grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_HOSTNAME,
+            RbacResources.PROJECT_CLOUDFLARE_HOSTNAME,
+            RbacActions.UPDATE,
+            AccessLevel.EDITOR,
+        )
+    ),
 ) -> ApiResponse[TunnelPublicHostnameRead]:
     """Update a hostname's service target — same Redis-locked shape."""
-    hostname = await use_case.execute(environment_id, tunnel_id, hostname_id, body.service, actor=user)
+    hostname = await use_case.execute(environment_id, tunnel_id, hostname_id, body.service, actor=grant.user)
     return ApiResponse[TunnelPublicHostnameRead](success=True, data=hostname)
 
 
@@ -556,9 +660,15 @@ async def remove_environment_tunnel_hostname(
     tunnel_id: UUID,
     hostname_id: UUID,
     use_case: RemoveTunnelHostname = Depends(get_remove_tunnel_hostname),
-    user: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
-    _grant: AccountAccessGrant = Depends(require_account_access_for_environment(AccessLevel.EDITOR)),
+    grant: AccountAccessGrant = Depends(
+        require_cloudflare_environment_access(
+            RbacResources.CLOUDFLARE_HOSTNAME,
+            RbacResources.PROJECT_CLOUDFLARE_HOSTNAME,
+            RbacActions.DELETE,
+            AccessLevel.EDITOR,
+        )
+    ),
 ) -> ApiResponse[None]:
     """Remove a hostname — same Redis-locked shape."""
-    await use_case.execute(environment_id, tunnel_id, hostname_id, actor=user)
+    await use_case.execute(environment_id, tunnel_id, hostname_id, actor=grant.user)
     return ApiResponse[None](success=True)

@@ -34,15 +34,22 @@
     "audit_log": "Audit Logs",
     "cloudflare_account": "Cloudflare Accounts",
     "cloudflare_manager": "CF Account Managers",
-    "cloudflare_config": "CF Zone Binding",
-    "cloudflare_tunnel": "CF Tunnels",
-    "cloudflare_hostname": "CF Public Hostnames",
-    "cloudflare_dns": "CF DNS Records",
-    "cloudflare_audit": "CF Audit Logs",
-    "loki_config": "Loki / Log Viewer",
+    "cloudflare_config": "CF Zone Binding (account-level)",
+    "cloudflare_tunnel": "CF Tunnels (account-level)",
+    "cloudflare_hostname": "CF Public Hostnames (account-level)",
+    "cloudflare_dns": "CF DNS Records (account-level)",
+    "cloudflare_audit": "CF Audit Logs (account-level)",
     "notification_channel": "Notification Channels",
-    "alert_rule": "Alert Rules",
-    "incident": "Incident Management"
+    "alert_rule": "Alert Rules (account-level)",
+    "incident": "Incident Management (account-level)",
+    "project_cloudflare_config": "CF Zone Binding (project)",
+    "project_cloudflare_dns": "CF DNS Records (project)",
+    "project_cloudflare_tunnel": "CF Tunnels (project)",
+    "project_cloudflare_hostname": "CF Public Hostnames (project)",
+    "project_cloudflare_audit": "CF Audit Logs (project)",
+    "project_loki_config": "Loki / Log Viewer (project)",
+    "project_alert_rule": "Alert Rules (project)",
+    "project_incident": "Incident Management (project)"
   },
   "catalog": {
     "permissions": {
@@ -102,35 +109,31 @@
         "manage": "Add / Edit / Remove account managers"
       },
       "cloudflare_config": {
-        "read": "View zone binding configuration",
-        "manage": "Bind / Unbind zone to environment"
+        "read": "View zone binding configuration (any account you manage)",
+        "manage": "Bind / Unbind zone to environment (any account you manage)"
       },
       "cloudflare_tunnel": {
-        "read": "View tunnels",
-        "create": "Create new tunnels",
-        "delete": "Delete tunnels",
-        "sync": "Sync tunnels from Cloudflare",
-        "reveal_token": "Reveal tunnel connector token",
-        "refresh_status": "Refresh tunnel connection status"
+        "read": "View tunnels (any account you manage)",
+        "create": "Create new tunnels (any account you manage)",
+        "delete": "Delete tunnels — account-wide action, never assignable within a project",
+        "sync": "Sync tunnels from Cloudflare (any account you manage)",
+        "reveal_token": "Reveal tunnel connector token — account-wide action, never assignable within a project",
+        "refresh_status": "Refresh tunnel connection status (any account you manage)"
       },
       "cloudflare_hostname": {
-        "read": "View public hostnames",
-        "create": "Add public hostnames",
-        "update": "Edit hostname service target",
-        "delete": "Remove public hostnames"
+        "read": "View public hostnames (any account you manage)",
+        "create": "Add public hostnames (any account you manage)",
+        "update": "Edit hostname service target (any account you manage)",
+        "delete": "Remove public hostnames (any account you manage)"
       },
       "cloudflare_dns": {
-        "read": "View DNS records",
-        "create": "Create DNS records",
-        "update": "Edit DNS records",
-        "delete": "Delete DNS records"
+        "read": "View DNS records (any account you manage)",
+        "create": "Create DNS records (any account you manage)",
+        "update": "Edit DNS records (any account you manage)",
+        "delete": "Delete DNS records (any account you manage)"
       },
       "cloudflare_audit": {
-        "read": "View Cloudflare audit logs"
-      },
-      "loki_config": {
-        "read": "View Loki config & query logs",
-        "manage": "Create / Edit / Delete Loki config"
+        "read": "View Cloudflare audit logs (any account you manage)"
       },
       "notification_channel": {
         "create": "Create notification channels",
@@ -140,16 +143,50 @@
         "test_send": "Send test notification"
       },
       "alert_rule": {
-        "create": "Create alert rules",
-        "read": "View alert rules",
-        "update": "Edit alert rules",
-        "delete": "Delete alert rules"
+        "read": "View available Cloudflare alert types (any account you manage)"
       },
       "incident": {
-        "create": "Create manual incidents",
-        "read": "View incidents and details",
-        "acknowledge": "Acknowledge active incidents",
-        "resolve": "Resolve incidents"
+        "read": "View incidents across every project"
+      },
+      "project_cloudflare_config": {
+        "read": "View this project's zone binding"
+      },
+      "project_cloudflare_dns": {
+        "read": "View this project's DNS records",
+        "create": "Create DNS records for this project",
+        "update": "Edit this project's DNS records",
+        "delete": "Delete this project's DNS records"
+      },
+      "project_cloudflare_tunnel": {
+        "read": "View tunnels serving this project",
+        "create": "Create tunnels for this project",
+        "sync": "Sync this project's tunnels from Cloudflare",
+        "refresh_status": "Refresh this project's tunnel connection status"
+      },
+      "project_cloudflare_hostname": {
+        "read": "View this project's public hostnames",
+        "create": "Add public hostnames to this project",
+        "update": "Edit this project's hostname service targets",
+        "delete": "Remove this project's public hostnames"
+      },
+      "project_cloudflare_audit": {
+        "read": "View this project's Cloudflare audit logs"
+      },
+      "project_loki_config": {
+        "read": "View this project's Loki config & query logs",
+        "manage": "Create / Edit / Delete this project's Loki config"
+      },
+      "project_alert_rule": {
+        "create": "Create alert rules for this project",
+        "read": "View this project's alert rules",
+        "update": "Edit this project's alert rules",
+        "delete": "Delete this project's alert rules"
+      },
+      "project_incident": {
+        "create": "Create manual incidents for this project",
+        "read": "View this project's incidents and details",
+        "acknowledge": "Acknowledge this project's active incidents",
+        "resolve": "Resolve this project's incidents"
       }
     }
   },

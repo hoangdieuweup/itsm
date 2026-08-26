@@ -80,12 +80,32 @@ class ProjectAuditActions(StrEnum):
 
 class ProjectScopedPermissionCatalog:
     """The subset of the global rbac.Permission catalog a ProjectRole may
-    ever grant. Bounded deliberately: project.delete (cascades every
+    ever grant.
+
+    Every Cloudflare/Loki/Alerting/Incident entry below is a `project_`-
+    prefixed resource whose ONLY check site is a project-scoped dependency.
+    The account-level namesakes (cloudflare_tunnel.*, cloudflare_dns.*,
+    loki_config.*, alert_rule.*, incident.*) are deliberately absent: they
+    are what the account-manager path of require_cloudflare_environment_access
+    checks, and letting a project role grant one of those strings is exactly
+    the cross-tenant escalation this split closes. Before the split, a
+    Project-A-only member with a role granting cloudflare_tunnel.delete could
+    delete a tunnel actively serving Projects B/C/D, because a Cloudflare
+    Tunnel is an ACCOUNT-wide object (CloudflareTunnel has no environment_id
+    column at all — see cloudflare/models.py).
+
+    Permanently excluded, in every namespace: project.delete (cascades every
     downstream Cloudflare/Loki/alerting row), project.manage_all,
-    project_member.manage, and both project_role.* atoms are permanently
-    excluded — managing roles/members and deleting a project always
-    require a GLOBAL atom, never a project-scoped one, closing the
-    mint-yourself-more-power loop a naive union would open."""
+    project_member.manage, both project_role.* atoms, all Cloudflare ACCOUNT
+    administration (cloudflare_account.*, cloudflare_manager.*),
+    cloudflare_config.manage (binding an environment to an account is a
+    trust-establishing action — a project role may only OPERATE inside a
+    binding someone with real account access already established), and —
+    added by this split — cloudflare_tunnel.delete and
+    cloudflare_tunnel.reveal_token, which have no project_ twin at all.
+
+    See docs/superpowers/plans/2026-08-26-project-scoped-resource-split-and-
+    tunnel-hostname-ownership-fix.md."""
 
     ASSIGNABLE: frozenset[tuple[str, str]] = frozenset(
         {
@@ -98,5 +118,29 @@ class ProjectScopedPermissionCatalog:
             ("project_link", "read"),
             ("project_link", "manage"),
             ("project_member", "read"),
+            ("project_cloudflare_config", "read"),
+            ("project_cloudflare_dns", "read"),
+            ("project_cloudflare_dns", "create"),
+            ("project_cloudflare_dns", "update"),
+            ("project_cloudflare_dns", "delete"),
+            ("project_cloudflare_tunnel", "read"),
+            ("project_cloudflare_tunnel", "create"),
+            ("project_cloudflare_tunnel", "sync"),
+            ("project_cloudflare_tunnel", "refresh_status"),
+            ("project_cloudflare_hostname", "read"),
+            ("project_cloudflare_hostname", "create"),
+            ("project_cloudflare_hostname", "update"),
+            ("project_cloudflare_hostname", "delete"),
+            ("project_cloudflare_audit", "read"),
+            ("project_loki_config", "read"),
+            ("project_loki_config", "manage"),
+            ("project_alert_rule", "create"),
+            ("project_alert_rule", "read"),
+            ("project_alert_rule", "update"),
+            ("project_alert_rule", "delete"),
+            ("project_incident", "create"),
+            ("project_incident", "read"),
+            ("project_incident", "acknowledge"),
+            ("project_incident", "resolve"),
         }
     )

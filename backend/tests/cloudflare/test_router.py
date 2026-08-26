@@ -157,6 +157,17 @@ async def _login_with_permissions(
     return user_id
 
 
+async def _switch_to(client: AsyncClient, user_id: UUID, *, email: str) -> None:
+    """Re-authenticate `client` as an already-created user, without re-inserting
+    them — for tests that alternate between two previously logged-in identities."""
+    token = JwtCodec.encode(
+        {"sub": str(user_id), "type": "access", "jti": f"test-jti-{email}"},
+        secret=auth_settings.JWT_SECRET,
+        ttl_seconds=3600,
+    )
+    client.cookies.set(AuthCookies.ACCESS_TOKEN, token)
+
+
 MANAGE_AND_VIEW = [("cloudflare_account", "manage"), ("cloudflare_account", "view")]
 
 
@@ -333,8 +344,9 @@ async def _bind_environment(
         client,
         engine,
         permissions=[
-            ("cloudflare_account", "manage"),
-            ("cloudflare_account", "view"),
+            ("cloudflare_account", "create"),
+            ("cloudflare_account", "read"),
+            ("cloudflare_config", "manage"),
             ("project", "create"),
             ("environment", "create"),
             ("environment", "read"),
@@ -711,5 +723,355 @@ class TestSyncTunnelsRouter:
 
         response = await client.post(f"/api/v1/environments/{environment_id}/cloudflare-tunnels/sync")
         assert response.status_code == 200, response.text
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+
+class TestProjectRoleGrantsEnvironmentScopedCloudflareAccess:
+    async def test_project_role_grants_tunnel_create_but_never_account_administration(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        """The decisive proof for D1/D2/D3: admin creates a Cloudflare account,
+        binds an environment to it, creates a project role granting
+        cloudflare_tunnel.create (from the ASSIGNABLE set), adds a collaborator
+        to the project (who holds NO cloudflare_account_managers row and NO
+        global cloudflare_tunnel permission), assigns the role. The
+        collaborator succeeds on the in-scope Tunnel-create route, and is
+        STILL rejected on (a) the excluded binding route and (b) account
+        administration — proving the boundary genuinely holds."""
+        cf_client = FakeCloudflareClient(
+            zones=[ZoneOption(id="z1", name="example.com")], create_tunnel_id="tun-proj-role"
+        )
+        app.dependency_overrides[get_cloudflare_client] = lambda: cf_client
+
+        admin_id = await _login_with_permissions(
+            client,
+            engine,
+            permissions=[
+                ("cloudflare_account", "create"),
+                ("cloudflare_account", "read"),
+                ("cloudflare_config", "manage"),
+                ("project", "create"),
+                ("project", "read"),
+                ("environment", "create"),
+                ("environment", "read"),
+                ("project_member", "manage"),
+                ("project_role", "manage"),
+                ("project_role", "read"),
+                ("permission", "read"),
+                ("cloudflare_tunnel", "create"),
+                ("project_cloudflare_tunnel", "create"),
+            ],
+            email="cf-admin@example.com",
+        )
+        account_resp = await client.post(
+            "/api/v1/cloudflare-accounts",
+            json={"label": "acct", "cfAccountId": "cf1", "apiToken": "tok"},
+        )
+        assert account_resp.status_code == 200, account_resp.text
+        account_id = account_resp.json()["data"]["id"]
+
+        project_resp = await client.post("/api/v1/projects", json={"name": "P"})
+        project_id = project_resp.json()["data"]["id"]
+        env_resp = await client.post(
+            f"/api/v1/projects/{project_id}/environments", json={"type": "dev", "name": "dev"}
+        )
+        environment_id = env_resp.json()["data"]["id"]
+
+        bind_resp = await client.post(
+            "/api/v1/cloudflare-configs",
+            json={"environmentId": environment_id, "cloudflareAccountId": account_id, "zoneId": "z1"},
+        )
+        assert bind_resp.status_code == 200, bind_resp.text
+
+        perms_resp = await client.get("/api/v1/rbac/permissions")
+        project_tunnel_create_id = next(
+            p["id"]
+            for p in perms_resp.json()["data"]
+            if p["resource"] == "project_cloudflare_tunnel" and p["action"] == "create"
+        )
+        account_tunnel_create_id = next(
+            p["id"]
+            for p in perms_resp.json()["data"]
+            if p["resource"] == "cloudflare_tunnel" and p["action"] == "create"
+        )
+
+        escalation_attempt = await client.post(
+            f"/api/v1/projects/{project_id}/roles",
+            json={"name": "escalation", "permissionIds": [account_tunnel_create_id]},
+        )
+        assert escalation_attempt.status_code == 409, escalation_attempt.text
+
+        role_resp = await client.post(
+            f"/api/v1/projects/{project_id}/roles",
+            json={"name": "tunnel-manager", "permissionIds": [project_tunnel_create_id]},
+        )
+        assert role_resp.status_code == 200, role_resp.text
+        role_id = role_resp.json()["data"]["id"]
+
+        collaborator_id = await _login_with_permissions(
+            client, engine, permissions=[("project", "read")], email="collaborator@example.com"
+        )
+        await _switch_to(client, admin_id, email="cf-admin@example.com")
+        await client.post(f"/api/v1/projects/{project_id}/members", json={"userId": str(collaborator_id)})
+        assign_resp = await client.put(
+            f"/api/v1/projects/{project_id}/members/{collaborator_id}/role",
+            json={"projectRoleId": role_id},
+        )
+        assert assign_resp.status_code == 200, assign_resp.text
+
+        await _switch_to(client, collaborator_id, email="collaborator@example.com")
+
+        create_tunnel_resp = await client.post(
+            f"/api/v1/environments/{environment_id}/cloudflare-tunnels", json={"name": "t1"}
+        )
+        assert create_tunnel_resp.status_code == 200, create_tunnel_resp.text
+
+        rebind_attempt = await client.patch(
+            f"/api/v1/environments/{environment_id}/cloudflare-config", json={"zoneId": "z2"}
+        )
+        assert rebind_attempt.status_code == 403
+
+        create_account_attempt = await client.post(
+            "/api/v1/cloudflare-accounts", json={"label": "x", "cfAccountId": "cf2", "apiToken": "t"}
+        )
+        assert create_account_attempt.status_code == 403
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+
+class TestProjectRoleCannotReachAnotherEnvironmentsTunnelObjects:
+    """The decisive end-to-end proof for the whole project-scoped-resource-
+    split + tunnel/hostname-ownership fix: two projects sharing one
+    Cloudflare account+zone+tunnel. A project-role holder confined to
+    Project A, fully trusted within it (full Tunnel + Hostname CRUD atoms),
+    can create/read/sync/refresh-status the shared tunnel and manage its
+    OWN hostname — but can never delete the tunnel, reveal its token, or
+    touch a hostname that genuinely belongs to Project B. A companion test
+    proves a real cloudflare_account_managers EDITOR is unaffected by any
+    of this — the account-manager path stays exactly as it always was."""
+
+    @staticmethod
+    def _perm_id(catalog: list[dict], resource: str, action: str) -> str:
+        return next(p["id"] for p in catalog if p["resource"] == resource and p["action"] == action)
+
+    async def test_confined_project_role_holder_is_blocked_at_the_account_boundary(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        cf_client = FakeCloudflareClient(
+            zones=[ZoneOption(id="z1", name="example.com")], create_tunnel_id="tun-shared"
+        )
+        app.dependency_overrides[get_cloudflare_client] = lambda: cf_client
+
+        admin_id = await _login_with_permissions(
+            client,
+            engine,
+            permissions=[
+                ("cloudflare_account", "create"),
+                ("cloudflare_account", "read"),
+                ("cloudflare_config", "manage"),
+                ("cloudflare_hostname", "create"),
+                ("project", "create"),
+                ("project", "read"),
+                ("environment", "create"),
+                ("environment", "read"),
+                ("project_member", "manage"),
+                ("project_role", "manage"),
+                ("project_role", "read"),
+                ("permission", "read"),
+                ("project_cloudflare_tunnel", "create"),
+                ("project_cloudflare_tunnel", "read"),
+                ("project_cloudflare_tunnel", "sync"),
+                ("project_cloudflare_tunnel", "refresh_status"),
+                ("project_cloudflare_hostname", "create"),
+                ("project_cloudflare_hostname", "read"),
+                ("project_cloudflare_hostname", "update"),
+                ("project_cloudflare_hostname", "delete"),
+            ],
+            email="shared-admin@example.com",
+        )
+        account_resp = await client.post(
+            "/api/v1/cloudflare-accounts",
+            json={"label": "shared", "cfAccountId": "cf-shared", "apiToken": "tok"},
+        )
+        assert account_resp.status_code == 200, account_resp.text
+        account_id = account_resp.json()["data"]["id"]
+
+        project_a_resp = await client.post("/api/v1/projects", json={"name": "A"})
+        project_a_id = project_a_resp.json()["data"]["id"]
+        env_a_resp = await client.post(
+            f"/api/v1/projects/{project_a_id}/environments",
+            json={"type": "dev", "name": "dev", "baseUrl": "https://a.example.com"},
+        )
+        environment_a_id = env_a_resp.json()["data"]["id"]
+        bind_a = await client.post(
+            "/api/v1/cloudflare-configs",
+            json={"environmentId": environment_a_id, "cloudflareAccountId": account_id, "zoneId": "z1"},
+        )
+        assert bind_a.status_code == 200, bind_a.text
+
+        project_b_resp = await client.post("/api/v1/projects", json={"name": "B"})
+        project_b_id = project_b_resp.json()["data"]["id"]
+        env_b_resp = await client.post(
+            f"/api/v1/projects/{project_b_id}/environments",
+            json={"type": "dev", "name": "dev", "baseUrl": "https://b.example.com"},
+        )
+        environment_b_id = env_b_resp.json()["data"]["id"]
+        bind_b = await client.post(
+            "/api/v1/cloudflare-configs",
+            json={"environmentId": environment_b_id, "cloudflareAccountId": account_id, "zoneId": "z1"},
+        )
+        assert bind_b.status_code == 200, bind_b.text
+
+        perms_resp = await client.get("/api/v1/rbac/permissions")
+        catalog = perms_resp.json()["data"]
+        role_resp = await client.post(
+            f"/api/v1/projects/{project_a_id}/roles",
+            json={
+                "name": "tunnel-manager",
+                "permissionIds": [
+                    self._perm_id(catalog, "project_cloudflare_tunnel", "create"),
+                    self._perm_id(catalog, "project_cloudflare_tunnel", "read"),
+                    self._perm_id(catalog, "project_cloudflare_tunnel", "sync"),
+                    self._perm_id(catalog, "project_cloudflare_tunnel", "refresh_status"),
+                    self._perm_id(catalog, "project_cloudflare_hostname", "create"),
+                    self._perm_id(catalog, "project_cloudflare_hostname", "read"),
+                    self._perm_id(catalog, "project_cloudflare_hostname", "update"),
+                    self._perm_id(catalog, "project_cloudflare_hostname", "delete"),
+                ],
+            },
+        )
+        assert role_resp.status_code == 200, role_resp.text
+        role_id = role_resp.json()["data"]["id"]
+
+        collaborator_id = await _login_with_permissions(
+            client, engine, permissions=[("project", "read")], email="confined@example.com"
+        )
+        await _switch_to(client, admin_id, email="shared-admin@example.com")
+        await client.post(f"/api/v1/projects/{project_a_id}/members", json={"userId": str(collaborator_id)})
+        assign_resp = await client.put(
+            f"/api/v1/projects/{project_a_id}/members/{collaborator_id}/role",
+            json={"projectRoleId": role_id},
+        )
+        assert assign_resp.status_code == 200, assign_resp.text
+
+        await _switch_to(client, collaborator_id, email="confined@example.com")
+
+        create_tunnel_resp = await client.post(
+            f"/api/v1/environments/{environment_a_id}/cloudflare-tunnels", json={"name": "shared"}
+        )
+        assert create_tunnel_resp.status_code == 200, create_tunnel_resp.text
+        tunnel_id = create_tunnel_resp.json()["data"]["tunnel"]["id"]
+
+        own_hostname_resp = await client.post(
+            f"/api/v1/environments/{environment_a_id}/cloudflare-tunnels/{tunnel_id}/hostnames",
+            json={"hostname": "a.example.com", "service": "http://a-service"},
+        )
+        assert own_hostname_resp.status_code == 200, own_hostname_resp.text
+
+        escalation_create_resp = await client.post(
+            f"/api/v1/environments/{environment_a_id}/cloudflare-tunnels/{tunnel_id}/hostnames",
+            json={"hostname": "b.example.com", "service": "http://steal-it"},
+        )
+        assert escalation_create_resp.status_code == 422, escalation_create_resp.text
+        assert (
+            escalation_create_resp.json()["error"]["code"]
+            == "cloudflare_tunnel_hostname_environment_mismatch"
+        )
+
+        delete_attempt = await client.delete(
+            f"/api/v1/environments/{environment_a_id}/cloudflare-tunnels/{tunnel_id}"
+        )
+        assert delete_attempt.status_code == 403
+
+        reveal_attempt = await client.post(
+            f"/api/v1/environments/{environment_a_id}/cloudflare-tunnels/{tunnel_id}/reveal-token"
+        )
+        assert reveal_attempt.status_code == 403
+
+        await _switch_to(client, admin_id, email="shared-admin@example.com")
+        b_hostname_resp = await client.post(
+            f"/api/v1/environments/{environment_b_id}/cloudflare-tunnels/{tunnel_id}/hostnames",
+            json={"hostname": "b.example.com", "service": "http://b-service"},
+        )
+        assert b_hostname_resp.status_code == 200, b_hostname_resp.text
+        b_hostname_id = b_hostname_resp.json()["data"]["id"]
+
+        await _switch_to(client, collaborator_id, email="confined@example.com")
+        update_b_attempt = await client.patch(
+            f"/api/v1/environments/{environment_a_id}/cloudflare-tunnels/{tunnel_id}/hostnames/{b_hostname_id}",
+            json={"service": "http://hijacked"},
+        )
+        assert update_b_attempt.status_code == 404
+        assert update_b_attempt.json()["error"]["code"] == "cloudflare_tunnel_hostname_not_found"
+
+        delete_b_attempt = await client.delete(
+            f"/api/v1/environments/{environment_a_id}/cloudflare-tunnels/{tunnel_id}/hostnames/{b_hostname_id}"
+        )
+        assert delete_b_attempt.status_code == 404
+        assert delete_b_attempt.json()["error"]["code"] == "cloudflare_tunnel_hostname_not_found"
+
+        del app.dependency_overrides[get_cloudflare_client]
+
+    async def test_a_genuine_account_manager_is_unaffected(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        """Companion proof: an actual cloudflare_account_managers EDITOR —
+        never a project role — still passes every route this test class's
+        first test proves a project role can never satisfy."""
+        cf_client = FakeCloudflareClient(
+            zones=[ZoneOption(id="z1", name="example.com")], create_tunnel_id="tun-owner"
+        )
+        app.dependency_overrides[get_cloudflare_client] = lambda: cf_client
+
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[
+                ("cloudflare_account", "create"),
+                ("cloudflare_account", "read"),
+                ("cloudflare_config", "manage"),
+                ("cloudflare_tunnel", "create"),
+                ("cloudflare_tunnel", "delete"),
+                ("cloudflare_tunnel", "reveal_token"),
+                ("project", "create"),
+                ("environment", "create"),
+            ],
+            email="owner-admin@example.com",
+        )
+        account_resp = await client.post(
+            "/api/v1/cloudflare-accounts",
+            json={"label": "owner-acct", "cfAccountId": "cf-owner", "apiToken": "tok"},
+        )
+        assert account_resp.status_code == 200, account_resp.text
+        account_id = account_resp.json()["data"]["id"]
+
+        project_resp = await client.post("/api/v1/projects", json={"name": "Solo"})
+        project_id = project_resp.json()["data"]["id"]
+        env_resp = await client.post(
+            f"/api/v1/projects/{project_id}/environments", json={"type": "dev", "name": "dev"}
+        )
+        environment_id = env_resp.json()["data"]["id"]
+        bind_resp = await client.post(
+            "/api/v1/cloudflare-configs",
+            json={"environmentId": environment_id, "cloudflareAccountId": account_id, "zoneId": "z1"},
+        )
+        assert bind_resp.status_code == 200, bind_resp.text
+
+        create_tunnel_resp = await client.post(
+            f"/api/v1/environments/{environment_id}/cloudflare-tunnels", json={"name": "owned"}
+        )
+        assert create_tunnel_resp.status_code == 200, create_tunnel_resp.text
+        tunnel_id = create_tunnel_resp.json()["data"]["tunnel"]["id"]
+
+        reveal_resp = await client.post(
+            f"/api/v1/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}/reveal-token"
+        )
+        assert reveal_resp.status_code == 200, reveal_resp.text
+
+        delete_resp = await client.delete(
+            f"/api/v1/environments/{environment_id}/cloudflare-tunnels/{tunnel_id}"
+        )
+        assert delete_resp.status_code == 200, delete_resp.text
 
         del app.dependency_overrides[get_cloudflare_client]

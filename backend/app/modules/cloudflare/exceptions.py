@@ -148,6 +148,18 @@ class TunnelHostnameDomainMismatch(ValidationFailedError):
     message = "This hostname's domain does not match the environment's bound Cloudflare zone"
 
 
+class TunnelHostnameEnvironmentMismatch(ValidationFailedError):
+    """Raised when the submitted hostname exactly matches a DIFFERENT
+    sibling environment's own base_url — a project-role holder attempting
+    to claim a hostname that genuinely belongs to another project sharing
+    the same Cloudflare account/tunnel. Distinct from
+    TunnelHostnameDomainMismatch, which checks the zone, not ownership of
+    a specific hostname within it."""
+
+    code = ErrorCode.TUNNEL_HOSTNAME_ENVIRONMENT_MISMATCH
+    message = "This hostname belongs to a different environment"
+
+
 class TunnelIngressSyncFailed(IntegrationError):
     """Raised when Cloudflare's side of an ingress PUT succeeded but the
     local Postgres write then failed. Decision #5: a compensating PUT-back

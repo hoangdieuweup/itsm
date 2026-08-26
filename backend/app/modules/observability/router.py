@@ -14,6 +14,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.core.models import ApiResponse, ErrorPayload
 from app.integrations.loki.schemas import LokiLogEntry
+from app.modules.auth.public import AuthApi, get_auth_api
 from app.modules.cloudflare.constants import AccessLevel
 from app.modules.cloudflare.public import require_account_access
 from app.modules.observability.constants import IncidentStatus, ObservabilityDefaults
@@ -36,6 +37,9 @@ from app.modules.observability.dependencies import (
     get_stream_log_tail,
     get_update_alert_rule,
     get_update_loki_config,
+    require_project_permission_for_alert_rule,
+    require_project_permission_for_environment,
+    require_project_permission_for_incident,
     verify_cloudflare_webhook_secret,
     verify_loki_webhook_secret,
 )
@@ -81,7 +85,9 @@ async def create_loki_config(
     environment_id: UUID,
     body: LokiConfigCreate,
     use_case: CreateLokiConfig = Depends(get_create_loki_config),
-    user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.UPDATE)),
+    user: UserRead = Depends(
+        require_project_permission_for_environment(RbacResources.PROJECT_LOKI_CONFIG, RbacActions.MANAGE)
+    ),
 ) -> ApiResponse[LokiConfigRead]:
     config = await use_case.execute(environment_id, **body.model_dump(), actor=user)
     return ApiResponse[LokiConfigRead](success=True, data=config)
@@ -91,7 +97,9 @@ async def create_loki_config(
 async def get_loki_config(
     environment_id: UUID,
     use_case: GetLokiConfig = Depends(get_get_loki_config),
-    _user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.READ)),
+    _user: UserRead = Depends(
+        require_project_permission_for_environment(RbacResources.PROJECT_LOKI_CONFIG, RbacActions.READ)
+    ),
 ) -> ApiResponse[LokiConfigRead]:
     config = await use_case.execute(environment_id)
     return ApiResponse[LokiConfigRead](success=True, data=config)
@@ -102,7 +110,9 @@ async def update_loki_config(
     environment_id: UUID,
     body: LokiConfigUpdate,
     use_case: UpdateLokiConfig = Depends(get_update_loki_config),
-    user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.UPDATE)),
+    user: UserRead = Depends(
+        require_project_permission_for_environment(RbacResources.PROJECT_LOKI_CONFIG, RbacActions.MANAGE)
+    ),
 ) -> ApiResponse[LokiConfigRead]:
     config = await use_case.execute(environment_id, **body.model_dump(exclude_unset=True), actor=user)
     return ApiResponse[LokiConfigRead](success=True, data=config)
@@ -112,7 +122,9 @@ async def update_loki_config(
 async def delete_loki_config(
     environment_id: UUID,
     use_case: DeleteLokiConfig = Depends(get_delete_loki_config),
-    user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.UPDATE)),
+    user: UserRead = Depends(
+        require_project_permission_for_environment(RbacResources.PROJECT_LOKI_CONFIG, RbacActions.MANAGE)
+    ),
 ) -> ApiResponse[None]:
     await use_case.execute(environment_id, actor=user)
     return ApiResponse[None](success=True, data=None)
@@ -123,7 +135,9 @@ async def run_log_query(
     environment_id: UUID,
     body: LogQueryRequest,
     use_case: RunLogQuery = Depends(get_run_log_query),
-    _user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.READ)),
+    _user: UserRead = Depends(
+        require_project_permission_for_environment(RbacResources.PROJECT_LOKI_CONFIG, RbacActions.READ)
+    ),
 ) -> ApiResponse[LogQueryResponse]:
     """POST, not GET — a LogQL query string can be long/awkward in a query
     string, and this is semantically an action ('run this query'), not a
@@ -139,7 +153,9 @@ async def stream_log_tail(
     limit: int = 100,
     config_check: GetLokiConfig = Depends(get_get_loki_config),
     use_case: StreamLogTail = Depends(get_stream_log_tail),
-    _user: UserRead = Depends(require_permission(RbacResources.ENVIRONMENT, RbacActions.READ)),
+    _user: UserRead = Depends(
+        require_project_permission_for_environment(RbacResources.PROJECT_LOKI_CONFIG, RbacActions.READ)
+    ),
 ) -> EventSourceResponse:
     """SSE bridge to Loki's WebSocket /tail. `config_check` runs a
     pre-flight GetLokiConfig call BEFORE the SSE response is constructed —
@@ -191,7 +207,9 @@ async def create_alert_rule(
     environment_id: UUID,
     body: AlertRuleCreate,
     use_case: CreateAlertRule = Depends(get_create_alert_rule),
-    user: UserRead = Depends(require_permission(RbacResources.ALERT_RULE, RbacActions.CREATE)),
+    user: UserRead = Depends(
+        require_project_permission_for_environment(RbacResources.PROJECT_ALERT_RULE, RbacActions.CREATE)
+    ),
 ) -> ApiResponse[AlertRuleRead]:
     result = await use_case.execute(environment_id=environment_id, **body.model_dump(), actor=user)
     return ApiResponse[AlertRuleRead](success=True, data=result)
@@ -201,7 +219,9 @@ async def create_alert_rule(
 async def list_alert_rules(
     environment_id: UUID,
     use_case: ListAlertRules = Depends(get_list_alert_rules),
-    _user: UserRead = Depends(require_permission(RbacResources.ALERT_RULE, RbacActions.READ)),
+    _user: UserRead = Depends(
+        require_project_permission_for_environment(RbacResources.PROJECT_ALERT_RULE, RbacActions.READ)
+    ),
 ) -> ApiResponse[list[AlertRuleRead]]:
     return ApiResponse[list[AlertRuleRead]](success=True, data=await use_case.execute(environment_id))
 
@@ -211,7 +231,9 @@ async def update_alert_rule(
     alert_rule_id: UUID,
     body: AlertRuleUpdate,
     use_case: UpdateAlertRule = Depends(get_update_alert_rule),
-    user: UserRead = Depends(require_permission(RbacResources.ALERT_RULE, RbacActions.UPDATE)),
+    user: UserRead = Depends(
+        require_project_permission_for_alert_rule(RbacResources.PROJECT_ALERT_RULE, RbacActions.UPDATE)
+    ),
 ) -> ApiResponse[AlertRuleRead]:
     result = await use_case.execute(alert_rule_id, **body.model_dump(exclude_unset=True), actor=user)
     return ApiResponse[AlertRuleRead](success=True, data=result)
@@ -221,7 +243,9 @@ async def update_alert_rule(
 async def delete_alert_rule(
     alert_rule_id: UUID,
     use_case: DeleteAlertRule = Depends(get_delete_alert_rule),
-    user: UserRead = Depends(require_permission(RbacResources.ALERT_RULE, RbacActions.DELETE)),
+    user: UserRead = Depends(
+        require_project_permission_for_alert_rule(RbacResources.PROJECT_ALERT_RULE, RbacActions.DELETE)
+    ),
 ) -> ApiResponse[None]:
     await use_case.execute(alert_rule_id, actor=user)
     return ApiResponse[None](success=True, data=None)
@@ -245,7 +269,9 @@ async def list_incidents(
 async def get_incident(
     incident_id: UUID,
     use_case: GetIncident = Depends(get_get_incident),
-    _user: UserRead = Depends(require_permission(RbacResources.INCIDENT, RbacActions.READ)),
+    _user: UserRead = Depends(
+        require_project_permission_for_incident(RbacResources.PROJECT_INCIDENT, RbacActions.READ)
+    ),
 ) -> ApiResponse[IncidentRead]:
     return ApiResponse[IncidentRead](success=True, data=await use_case.execute(incident_id))
 
@@ -254,8 +280,14 @@ async def get_incident(
 async def create_manual_incident(
     body: CreateManualIncidentRequest,
     use_case: CreateManualIncident = Depends(get_create_manual_incident),
-    user: UserRead = Depends(require_permission(RbacResources.INCIDENT, RbacActions.CREATE)),
+    auth_api: AuthApi = Depends(get_auth_api),
 ) -> ApiResponse[IncidentRead]:
+    """No Depends(require_permission(...)) here — environment_id is body-only
+    and incident.create is itself project-role-assignable (Decision, Task 8),
+    so a global-only Layer-1 gate would 403 a project-role holder before
+    their grant is ever consulted. CreateManualIncident resolves the full
+    project-permission check itself via ProjectsApi.resolve_effective_permissions."""
+    user = auth_api.current_user()
     result = await use_case.execute(**body.model_dump(), actor=user)
     return ApiResponse[IncidentRead](success=True, data=result)
 
@@ -264,7 +296,9 @@ async def create_manual_incident(
 async def acknowledge_incident(
     incident_id: UUID,
     use_case: AcknowledgeIncident = Depends(get_acknowledge_incident),
-    user: UserRead = Depends(require_permission(RbacResources.INCIDENT, RbacActions.ACKNOWLEDGE)),
+    user: UserRead = Depends(
+        require_project_permission_for_incident(RbacResources.PROJECT_INCIDENT, RbacActions.ACKNOWLEDGE)
+    ),
 ) -> ApiResponse[IncidentRead]:
     return ApiResponse[IncidentRead](success=True, data=await use_case.execute(incident_id, actor=user))
 
@@ -273,7 +307,9 @@ async def acknowledge_incident(
 async def resolve_incident(
     incident_id: UUID,
     use_case: ResolveIncident = Depends(get_resolve_incident),
-    user: UserRead = Depends(require_permission(RbacResources.INCIDENT, RbacActions.RESOLVE)),
+    user: UserRead = Depends(
+        require_project_permission_for_incident(RbacResources.PROJECT_INCIDENT, RbacActions.RESOLVE)
+    ),
 ) -> ApiResponse[IncidentRead]:
     return ApiResponse[IncidentRead](success=True, data=await use_case.execute(incident_id, actor=user))
 

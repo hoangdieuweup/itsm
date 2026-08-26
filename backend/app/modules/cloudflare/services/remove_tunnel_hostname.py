@@ -60,12 +60,12 @@ class RemoveTunnelHostname(AbstractUseCase):
         if config is None:
             raise CloudflareConfigNotFound()
         tunnel = await self._uow.tunnels.get_by_id(tunnel_id)
-        if tunnel is None or not TunnelOwnershipRules.verify_tunnel_belongs_to_environment(
+        if tunnel is None or not TunnelOwnershipRules.verify_tunnel_belongs_to_account(
             tunnel, config.cloudflare_account_id
         ):
             raise CloudflareTunnelNotFound()
         existing = await self._uow.tunnel_hostnames.get_by_id(hostname_id)
-        if existing is None or existing.tunnel_id != tunnel_id:
+        if existing is None or existing.tunnel_id != tunnel_id or existing.environment_id != environment_id:
             raise TunnelPublicHostnameNotFound()
 
         lock_key = CacheKeyBuilder.lock_key("tunnel", tunnel_id)

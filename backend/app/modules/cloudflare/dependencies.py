@@ -15,7 +15,7 @@ from app.modules.audit.public import AuditApi, get_audit_api
 from app.modules.auth.public import AuthApi, get_auth_api
 from app.modules.cloudflare.access import resolve_account_access_grant
 from app.modules.cloudflare.constants import AccessLevel
-from app.modules.cloudflare.exceptions import CloudflareConfigNotFound
+from app.modules.cloudflare.exceptions import CloudflareConfigNotFound, InsufficientAccountAccess
 from app.modules.cloudflare.schemas import AccountAccessGrant
 from app.modules.cloudflare.services.add_tunnel_hostname import AddTunnelHostname
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
@@ -107,6 +107,50 @@ def require_account_access_for_environment(min_level: AccessLevel):
         return await resolve_account_access_grant(
             config.cloudflare_account_id, user, rbac_api, uow, min_level
         )
+
+    return check
+
+
+def require_cloudflare_environment_access(
+    account_resource: str, project_resource: str | None, action: str, min_level: AccessLevel
+):
+    """Composed check for environment-scoped Cloudflare routes. Two
+    resource names, not one: the account-manager path (tried first) checks
+    `account_resource` unchanged from before; the project-role fallback
+    checks `project_resource`, and is skipped entirely when None (tunnel
+    delete/reveal-token have no project-scoped equivalent — a Cloudflare
+    Tunnel is account-wide, so those stay account-only)."""
+
+    async def check(
+        environment_id: UUID,
+        auth_api: AuthApi = Depends(get_auth_api),
+        rbac_api: RbacApi = Depends(get_rbac_api),
+        uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+        projects_api: ProjectsApi = Depends(get_projects_api),
+    ) -> AccountAccessGrant:
+        user = auth_api.current_user()
+        config = await uow.configs.get_by_environment_id(environment_id)
+        if config is None:
+            raise CloudflareConfigNotFound()
+
+        if await rbac_api.has_permission(user.id, account_resource, action):
+            try:
+                return await resolve_account_access_grant(
+                    config.cloudflare_account_id, user, rbac_api, uow, min_level
+                )
+            except InsufficientAccountAccess:
+                pass
+
+        if project_resource is not None:
+            environment = await projects_api.get_environment_by_id(environment_id)
+            if environment is not None:
+                permissions = await projects_api.resolve_effective_permissions(
+                    environment.project_id, user, rbac_api
+                )
+                if f"{project_resource}.{action}" in permissions:
+                    return AccountAccessGrant(user=user, held_level=None)
+
+        raise InsufficientAccountAccess()
 
     return check
 
@@ -331,9 +375,10 @@ async def get_add_tunnel_hostname(
     client: CloudflareClient = Depends(get_cloudflare_client),
     cache: CacheClient = Depends(get_cache),
     audit_api: AuditApi = Depends(get_audit_api),
+    projects_api: ProjectsApi = Depends(get_projects_api),
 ) -> AddTunnelHostname:
     """Provide the add-tunnel-hostname use case."""
-    return AddTunnelHostname(uow, client, cache, audit_api)
+    return AddTunnelHostname(uow, client, cache, audit_api, projects_api)
 
 
 async def get_update_tunnel_hostname(

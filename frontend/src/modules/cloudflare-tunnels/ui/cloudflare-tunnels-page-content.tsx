@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useEnvironmentQuery } from "@/entities/environment";
+import { ProjectPermissionProvider } from "@/entities/permission";
 import { TunnelsManager } from "./tunnels-manager";
 
 export function CloudflareTunnelsPageContent({ environmentId }: { environmentId: string }) {
@@ -15,7 +16,9 @@ export function CloudflareTunnelsPageContent({ environmentId }: { environmentId:
         <p className="text-sm text-muted-foreground">{t(`environmentTypes.${environment.type}`)}</p>
       </div>
 
-      <TunnelsManager environmentId={environmentId} />
+      <ProjectPermissionProvider projectId={environment.projectId}>
+        <TunnelsManager environmentId={environmentId} />
+      </ProjectPermissionProvider>
     </div>
   );
 }
