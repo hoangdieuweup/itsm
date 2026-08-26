@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createRole } from "../api/fetchers";
 import { rolesKeys } from "@/entities/role";
+import { authKeys } from "@/entities/auth";
 import { useToastMessage } from "@/shared/hooks/use-toast-message";
 
 
@@ -20,6 +21,8 @@ export function useCreateRole() {
     }) => createRole(name, permissionIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: rolesKeys.all });
+      queryClient.invalidateQueries({ queryKey: rolesKeys.permissions() });
+      queryClient.invalidateQueries({ queryKey: authKeys.session() });
       success("created");
     },
     onError: error,

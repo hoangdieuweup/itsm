@@ -100,43 +100,41 @@ export function NotificationChannelsSection({ projectId }: { projectId: string }
           <p className="text-sm font-medium text-muted-foreground">{t("section.empty")}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="flex flex-col gap-3">
           {channels.map((channel) => (
             <div
               key={channel.id}
-              className="flex items-center justify-between rounded-2xl border border-border/60 bg-card/80 p-4 backdrop-blur-md transition-all hover:border-amber-500/40 hover:shadow-md shadow-2xs"
+              className="flex items-center justify-between gap-4 rounded-2xl border border-border/60 bg-card/80 px-5 py-3.5 backdrop-blur-md transition-all hover:border-amber-500/40 hover:shadow-md shadow-2xs"
             >
-              <div className="flex items-center gap-3 overflow-hidden">
+              {/* Left: avatar + info */}
+              <div className="flex items-center gap-3 min-w-0">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted/60 text-foreground font-bold font-mono text-xs">
                   {channel.type.slice(0, 2).toUpperCase()}
                 </div>
-                <div className="flex flex-col overflow-hidden">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-sm text-foreground truncate">{channel.name}</span>
-                    <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
-                      {t(`types.${channel.type}`)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                  <span className="font-bold text-sm text-foreground truncate">{channel.name}</span>
+                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground shrink-0">
+                    {t(`types.${channel.type}`)}
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1 text-[11px] font-medium shrink-0 ${
+                      channel.isActive
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-amber-600 dark:text-amber-400"
+                    }`}
+                  >
                     <span
-                      className={`inline-flex items-center gap-1 text-[11px] font-medium ${
-                        channel.isActive
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-amber-600 dark:text-amber-400"
+                      className={`size-1.5 rounded-full ${
+                        channel.isActive ? "bg-emerald-500" : "bg-amber-500"
                       }`}
-                    >
-                      <span
-                        className={`size-1.5 rounded-full ${
-                          channel.isActive ? "bg-emerald-500" : "bg-amber-500"
-                        }`}
-                      />
-                      {channel.isActive ? "Active" : t("section.inactive")}
-                    </span>
-                  </div>
+                    />
+                    {channel.isActive ? "Active" : t("section.inactive")}
+                  </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1 shrink-0 ml-2">
+              {/* Right: actions */}
+              <div className="flex items-center gap-1 shrink-0">
                 <Can I={ACTIONS.UPDATE} a={RESOURCES.NOTIFICATION_CHANNEL}>
                   <TestSendButton channelId={channel.id} />
                 </Can>

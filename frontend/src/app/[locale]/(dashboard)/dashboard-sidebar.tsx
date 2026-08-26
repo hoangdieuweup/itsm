@@ -477,7 +477,7 @@ export function DashboardSidebar({
       active:
         pathname.startsWith(ROUTES.adminCloudflareAccounts) ||
         pathname.startsWith(ROUTES.adminEnvironments),
-      permission: { action: ACTIONS.VIEW, resource: RESOURCES.CLOUDFLARE_ACCOUNT },
+      permission: { action: ACTIONS.READ, resource: RESOURCES.CLOUDFLARE_ACCOUNT },
     },
     {
       href: ROUTES.adminIncidents,

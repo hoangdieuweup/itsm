@@ -307,7 +307,7 @@ export default function DashboardPage() {
           </Can>
 
           {/* Action 4: Cloudflare */}
-          <Can I={ACTIONS.VIEW} a={RESOURCES.CLOUDFLARE_ACCOUNT}>
+          <Can I={ACTIONS.READ} a={RESOURCES.CLOUDFLARE_ACCOUNT}>
             <m.div variants={itemVariants} whileHover={{ y: -2, scale: 1.01 }} whileTap={{ scale: 0.99 }}>
               <Link href={ROUTES.adminCloudflareAccounts} className="group block h-full">
                 <div className="flex items-center gap-4 rounded-2xl border border-border/60 bg-card/60 p-4.5 backdrop-blur-md transition-all duration-300 hover:border-blue-500/50 hover:bg-card hover:shadow-md shadow-2xs">
