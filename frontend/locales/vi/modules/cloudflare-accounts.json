@@ -24,6 +24,8 @@
     "manageAccess": "Quản lý quyền truy cập"
   },
   "form": {
+    "createTitle": "Thêm tài khoản Cloudflare",
+    "editTitle": "Chỉnh sửa tài khoản Cloudflare",
     "label": "Tên gợi nhớ",
     "cfAccountId": "Cloudflare Account ID",
     "apiToken": "API Token",
@@ -54,6 +56,24 @@
       "description": "Họ sẽ mất toàn bộ quyền truy cập tài khoản này."
     }
   },
+  "tabs": {
+    "tunnels": "Tunnels",
+    "dns": "Bản ghi DNS",
+    "managers": "Người quản lý",
+    "tunnelsEmpty": "Không tìm thấy tunnel nào trên tài khoản này.",
+    "tunnelName": "Tên",
+    "tunnelStatus": "Trạng thái",
+    "tunnelType": "Loại",
+    "tunnelConfig": "Cấu hình",
+    "tunnelConns": "Kết nối",
+    "tunnelCreated": "Ngày tạo",
+    "dnsEmpty": "Không có bản ghi DNS nào trong zone này.",
+    "noZones": "Không tìm thấy zone nào trên tài khoản này.",
+    "dnsType": "Loại",
+    "dnsName": "Tên",
+    "dnsContent": "Giá trị",
+    "dnsProxy": "Proxy"
+  },
   "errors": {
     "cloudflare_account_not_found": "Tài khoản Cloudflare này không còn tồn tại.",
     "cloudflare_account_manager_not_found": "Người quản lý này không còn tồn tại.",
@@ -61,6 +81,29 @@
     "cloudflare_api_unavailable": "Không thể kết nối Cloudflare. Vui lòng thử lại sau.",
     "cloudflare_insufficient_account_access": "Bạn không có đủ quyền trên tài khoản này.",
     "cloudflare_last_owner_removal_blocked": "Không thể xóa hoặc hạ quyền chủ sở hữu cuối cùng của tài khoản này."
+  },
+  "tunnelForm": {
+    "createTitle": "Tạo Tunnel",
+    "createDesc": "Kết nối mạng của bạn đến Cloudflare.",
+    "name": "Tên tunnel",
+    "namePlaceholder": "my-tunnel",
+    "create": "Thêm Tunnel",
+    "delete": "Xóa",
+    "tokenTitle": "Cài đặt connector",
+    "tokenDesc": "Chạy lệnh này trên server để cài đặt cloudflared connector:",
+    "done": "Xong",
+    "deleteConfirmTitle": "Xóa tunnel này?",
+    "deleteConfirmDesc": "Tunnel sẽ bị xóa vĩnh viễn khỏi Cloudflare. Mọi dịch vụ đang chạy qua tunnel này sẽ bị gián đoạn."
+  },
+  "dnsForm": {
+    "createTitle": "Thêm bản ghi DNS",
+    "editTitle": "Sửa bản ghi DNS",
+    "desc": "Quản lý bản ghi DNS cho zone này.",
+    "create": "Thêm bản ghi",
+    "proxy": "Proxy",
+    "proxyDesc": "Định tuyến lưu lượng qua mạng Cloudflare.",
+    "deleteConfirmTitle": "Xóa bản ghi DNS này?",
+    "deleteConfirmDesc": "Bản ghi sẽ bị xóa khỏi Cloudflare ngay lập tức."
   },
   "messages": {
     "created": "Thêm tài khoản Cloudflare thành công.",
@@ -70,6 +113,11 @@
     "connectionFailed": "Kiểm tra kết nối thất bại.",
     "managerAssigned": "Gán người quản lý thành công.",
     "managerUpdated": "Cập nhật quyền truy cập thành công.",
-    "managerRemoved": "Gỡ người quản lý thành công."
+    "managerRemoved": "Gỡ người quản lý thành công.",
+    "tunnelCreated": "Tạo tunnel thành công.",
+    "tunnelDeleted": "Xóa tunnel thành công.",
+    "dnsCreated": "Tạo bản ghi DNS thành công.",
+    "dnsUpdated": "Cập nhật bản ghi DNS thành công.",
+    "dnsDeleted": "Xóa bản ghi DNS thành công."
   }
 }

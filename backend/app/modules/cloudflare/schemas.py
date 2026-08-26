@@ -256,3 +256,31 @@ class ReadyCloudflareClient(FrozenModel):
     cf_account_id: str
     api_token: str
     cloudflare_account_id: UUID
+
+
+class AccountTunnelCreate(CustomModel):
+    """Request body for POST /cloudflare-accounts/{id}/tunnels (account-level)."""
+
+    name: str
+
+
+class AccountDnsRecordCreate(CustomModel):
+    """Request body for POST .../zones/{zone_id}/dns-records (account-level)."""
+
+    record_type: str
+    name: str
+    content: str
+    priority: int | None = None
+    proxied: bool = False
+    ttl: int = 1
+
+
+class AccountDnsRecordUpdate(CustomModel):
+    """Request body for PATCH .../zones/{zone_id}/dns-records/{cf_record_id} (account-level)."""
+
+    record_type: str
+    name: str
+    content: str
+    priority: int | None = None
+    proxied: bool = False
+    ttl: int = 1

@@ -16,7 +16,7 @@ export default async function AdminEnvironmentDnsPage({
   setRequestLocale(locale);
 
   const session = await fetchAuthSession();
-  const canView = hasPermission(session, RESOURCES.CLOUDFLARE_ACCOUNT, ACTIONS.VIEW);
+  const canView = hasPermission(session, RESOURCES.CLOUDFLARE_DNS, ACTIONS.READ);
 
   const queryClient = createQueryClient();
   if (canView) {
@@ -29,8 +29,8 @@ export default async function AdminEnvironmentDnsPage({
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <RequirePermission
-        resource={RESOURCES.CLOUDFLARE_ACCOUNT}
-        action={ACTIONS.VIEW}
+        resource={RESOURCES.CLOUDFLARE_DNS}
+        action={ACTIONS.READ}
         fallback={<NoPermission />}
       >
         <CloudflareDnsPageContent environmentId={environmentId} />

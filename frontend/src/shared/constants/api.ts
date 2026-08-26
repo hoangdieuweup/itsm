@@ -47,6 +47,11 @@ export const API_CONFIG = {
       REVEAL_TOKEN: (id: string) => `/cloudflare-accounts/${id}/reveal-token`,
       MANAGERS: (id: string) => `/cloudflare-accounts/${id}/managers`,
       MANAGER_DETAIL: (id: string, userId: string) => `/cloudflare-accounts/${id}/managers/${userId}`,
+      TUNNELS: (id: string) => `/cloudflare-accounts/${id}/tunnels`,
+      TUNNEL_DETAIL: (id: string, cfTunnelId: string) => `/cloudflare-accounts/${id}/tunnels/${cfTunnelId}`,
+      ZONE_DNS_RECORDS: (id: string, zoneId: string) => `/cloudflare-accounts/${id}/zones/${zoneId}/dns-records`,
+      ZONE_DNS_RECORD_DETAIL: (id: string, zoneId: string, cfRecordId: string) =>
+        `/cloudflare-accounts/${id}/zones/${zoneId}/dns-records/${cfRecordId}`,
     },
     CLOUDFLARE_DNS: {
       ZONES: (accountId: string) => `/cloudflare-accounts/${accountId}/zones`,

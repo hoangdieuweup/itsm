@@ -43,7 +43,7 @@ export function CloudflareAccountsPageContent() {
           <p className="mt-1 text-sm text-muted-foreground">{t("description")}</p>
         </div>
 
-        <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
+        <Can I={ACTIONS.CREATE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
           <Button
             onClick={() => setFormTarget("create")}
             className="gap-2 self-start bg-gradient-to-r from-blue-600 to-cyan-600 font-semibold text-white shadow-md shadow-blue-500/25 hover:from-blue-700 hover:to-cyan-700 sm:self-auto"
@@ -93,7 +93,7 @@ export function CloudflareAccountsPageContent() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-1.5">
-                      <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
+                      <Can I={ACTIONS.DELETE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
                         <Button
                           variant="ghost"
                           size="sm"

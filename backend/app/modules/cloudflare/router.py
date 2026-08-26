@@ -25,14 +25,20 @@ from app.modules.cloudflare.dependencies import (
     get_add_tunnel_hostname,
     get_assign_manager,
     get_create_account,
+    get_create_account_dns_record,
+    get_create_account_tunnel,
     get_create_config,
     get_create_dns_record,
     get_create_tunnel,
     get_delete_account,
+    get_delete_account_dns_record,
+    get_delete_account_tunnel,
     get_delete_config,
     get_delete_dns_record,
     get_delete_tunnel,
+    get_list_account_dns_records,
     get_list_account_managers,
+    get_list_account_tunnels,
     get_list_cloudflare_audit_logs,
     get_list_dns_records,
     get_list_tunnel_hostnames,
@@ -49,6 +55,7 @@ from app.modules.cloudflare.dependencies import (
     get_test_connection,
     get_uow,
     get_update_account,
+    get_update_account_dns_record,
     get_update_config,
     get_update_dns_record,
     get_update_manager,
@@ -60,6 +67,9 @@ from app.modules.cloudflare.dependencies import (
 from app.modules.cloudflare.exceptions import CloudflareAccountNotFound, CloudflareConfigNotFound
 from app.modules.cloudflare.schemas import (
     AccountAccessGrant,
+    AccountDnsRecordCreate,
+    AccountDnsRecordUpdate,
+    AccountTunnelCreate,
     CloudflareAccountCreate,
     CloudflareAccountManagerAssign,
     CloudflareAccountManagerRead,
@@ -84,14 +94,20 @@ from app.modules.cloudflare.schemas import (
 from app.modules.cloudflare.services.add_tunnel_hostname import AddTunnelHostname
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
+from app.modules.cloudflare.services.create_account_dns_record import CreateAccountDnsRecord
+from app.modules.cloudflare.services.create_account_tunnel import CreateAccountTunnel
 from app.modules.cloudflare.services.create_config import CreateCloudflareConfig
 from app.modules.cloudflare.services.create_dns_record import CreateDnsRecord
 from app.modules.cloudflare.services.create_tunnel import CreateCloudflareTunnel
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
+from app.modules.cloudflare.services.delete_account_dns_record import DeleteAccountDnsRecord
+from app.modules.cloudflare.services.delete_account_tunnel import DeleteAccountTunnel
 from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
 from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
 from app.modules.cloudflare.services.delete_tunnel import DeleteCloudflareTunnel
+from app.modules.cloudflare.services.list_account_dns_records import ListAccountDnsRecords
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
+from app.modules.cloudflare.services.list_account_tunnels import ListAccountTunnels
 from app.modules.cloudflare.services.list_cloudflare_audit_logs import ListCloudflareAuditLogs
 from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
 from app.modules.cloudflare.services.list_tunnel_hostnames import ListTunnelHostnames
@@ -107,6 +123,7 @@ from app.modules.cloudflare.services.sync_dns_records import SyncDnsRecords
 from app.modules.cloudflare.services.sync_tunnels import SyncTunnels
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
+from app.modules.cloudflare.services.update_account_dns_record import UpdateAccountDnsRecord
 from app.modules.cloudflare.services.update_config import UpdateCloudflareConfig
 from app.modules.cloudflare.services.update_dns_record import UpdateDnsRecord
 from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
@@ -281,6 +298,119 @@ async def list_zones(
     """List zones available on an account, for the bind-time zone picker."""
     zones = await use_case.execute(account_id)
     return ApiResponse[list[ZoneOption]](success=True, data=zones)
+
+
+@router.get("/cloudflare-accounts/{account_id}/tunnels")
+async def list_account_tunnels(
+    account_id: UUID,
+    use_case: ListAccountTunnels = Depends(get_list_account_tunnels),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.READ)),
+    _grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.VIEWER)),
+) -> ApiResponse[list[dict]]:
+    """List all Cloudflare tunnels for an account — live API proxy."""
+    tunnels = await use_case.execute(account_id)
+    return ApiResponse[list[dict]](success=True, data=tunnels)
+
+
+@router.get("/cloudflare-accounts/{account_id}/zones/{zone_id}/dns-records")
+async def list_account_zone_dns_records(
+    account_id: UUID,
+    zone_id: str,
+    use_case: ListAccountDnsRecords = Depends(get_list_account_dns_records),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.READ)),
+    _grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.VIEWER)),
+) -> ApiResponse[list[dict]]:
+    """List all DNS records for a zone on this account — live API proxy."""
+    records = await use_case.execute(account_id, zone_id)
+    return ApiResponse[list[dict]](success=True, data=records)
+
+
+@router.post("/cloudflare-accounts/{account_id}/tunnels")
+async def create_account_tunnel(
+    account_id: UUID,
+    body: AccountTunnelCreate,
+    use_case: CreateAccountTunnel = Depends(get_create_account_tunnel),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    _grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.EDITOR)),
+) -> ApiResponse[dict]:
+    """Create a new tunnel on this account — live API proxy."""
+    result = await use_case.execute(account_id, body.name)
+    return ApiResponse[dict](success=True, data=result)
+
+
+@router.delete("/cloudflare-accounts/{account_id}/tunnels/{cf_tunnel_id}")
+async def delete_account_tunnel(
+    account_id: UUID,
+    cf_tunnel_id: str,
+    use_case: DeleteAccountTunnel = Depends(get_delete_account_tunnel),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    _grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.EDITOR)),
+) -> ApiResponse[None]:
+    """Delete a tunnel on this account — live API proxy."""
+    await use_case.execute(account_id, cf_tunnel_id)
+    return ApiResponse[None](success=True)
+
+
+@router.post("/cloudflare-accounts/{account_id}/zones/{zone_id}/dns-records")
+async def create_account_zone_dns_record(
+    account_id: UUID,
+    zone_id: str,
+    body: AccountDnsRecordCreate,
+    use_case: CreateAccountDnsRecord = Depends(get_create_account_dns_record),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    _grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.EDITOR)),
+) -> ApiResponse[dict]:
+    """Create a DNS record on a zone — live API proxy."""
+    cf_record_id = await use_case.execute(
+        account_id,
+        zone_id,
+        record_type=body.record_type,
+        name=body.name,
+        content=body.content,
+        ttl=body.ttl,
+        proxied=body.proxied,
+        priority=body.priority,
+    )
+    return ApiResponse[dict](success=True, data={"cf_record_id": cf_record_id})
+
+
+@router.patch("/cloudflare-accounts/{account_id}/zones/{zone_id}/dns-records/{cf_record_id}")
+async def update_account_zone_dns_record(
+    account_id: UUID,
+    zone_id: str,
+    cf_record_id: str,
+    body: AccountDnsRecordUpdate,
+    use_case: UpdateAccountDnsRecord = Depends(get_update_account_dns_record),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    _grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.EDITOR)),
+) -> ApiResponse[None]:
+    """Update a DNS record on a zone — live API proxy."""
+    await use_case.execute(
+        account_id,
+        zone_id,
+        cf_record_id,
+        record_type=body.record_type,
+        name=body.name,
+        content=body.content,
+        ttl=body.ttl,
+        proxied=body.proxied,
+        priority=body.priority,
+    )
+    return ApiResponse[None](success=True)
+
+
+@router.delete("/cloudflare-accounts/{account_id}/zones/{zone_id}/dns-records/{cf_record_id}")
+async def delete_account_zone_dns_record(
+    account_id: UUID,
+    zone_id: str,
+    cf_record_id: str,
+    use_case: DeleteAccountDnsRecord = Depends(get_delete_account_dns_record),
+    _l1: UserRead = Depends(require_permission(RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE)),
+    _grant: AccountAccessGrant = Depends(require_account_access(AccessLevel.EDITOR)),
+) -> ApiResponse[None]:
+    """Delete a DNS record on a zone — live API proxy."""
+    await use_case.execute(account_id, zone_id, cf_record_id)
+    return ApiResponse[None](success=True)
 
 
 @router.post("/cloudflare-configs")

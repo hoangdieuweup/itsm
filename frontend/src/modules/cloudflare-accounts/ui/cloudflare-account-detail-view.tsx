@@ -13,6 +13,8 @@ import {
   Check,
   Zap,
   Users,
+  Cable,
+  Globe,
 } from "lucide-react";
 import { IconCloudflare } from "@/shared/ui/icons";
 import { Button } from "@/shared/ui/button";
@@ -29,6 +31,8 @@ import { useCloudflareAccountManagersQuery } from "../hooks/use-cloudflare-accou
 import { useRemoveCloudflareAccountManager } from "../hooks/use-remove-cloudflare-account-manager";
 import { useUpdateCloudflareAccountManager } from "../hooks/use-update-cloudflare-account-manager";
 import { CloudflareAccountManagerFormDialog } from "./cloudflare-account-manager-form-dialog";
+import { AccountTunnelsTab } from "./account-tunnels-tab";
+import { AccountDnsTab } from "./account-dns-tab";
 import { m, type Variants } from "@/shared/lib/motion";
 
 interface CloudflareAccountDetailViewProps {
@@ -73,7 +77,7 @@ function ManagerAccessLevelControl({
   return (
     <Can
       I={ACTIONS.MANAGE}
-      a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}
+      a={PERMISSIONS.CLOUDFLARE_MANAGER.RESOURCE}
       fallback={
         <span
           className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${getLevelBadgeStyle(
@@ -120,6 +124,16 @@ const itemVariants: Variants = {
   },
 };
 
+/* ── Tab constants ── */
+const TABS = ["tunnels", "dns", "managers"] as const;
+type TabKey = (typeof TABS)[number];
+
+const TAB_ICONS: Record<TabKey, React.ReactNode> = {
+  tunnels: <Cable className="size-4" />,
+  dns: <Globe className="size-4" />,
+  managers: <Users className="size-4" />,
+};
+
 export function CloudflareAccountDetailView({ accountId }: CloudflareAccountDetailViewProps) {
   const t = useTranslations("cloudflareAccounts");
   const getErrorMessage = useApiErrorMessage("cloudflareAccounts");
@@ -136,6 +150,7 @@ export function CloudflareAccountDetailView({ accountId }: CloudflareAccountDeta
   const [copiedToken, setCopiedToken] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabKey>("tunnels");
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(account.cfAccountId);
@@ -212,7 +227,7 @@ export function CloudflareAccountDetailView({ accountId }: CloudflareAccountDeta
 
           {/* Action CTAs */}
           <div className="flex flex-wrap items-center gap-3">
-            <Can I={ACTIONS.VIEW} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
+            <Can I={ACTIONS.TEST_CONNECTION} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
               <Button
                 variant="outline"
                 size="sm"
@@ -225,7 +240,7 @@ export function CloudflareAccountDetailView({ accountId }: CloudflareAccountDeta
               </Button>
             </Can>
 
-            <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
+            <Can I={ACTIONS.REVEAL_TOKEN} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
               <Button
                 variant="outline"
                 size="sm"
@@ -298,103 +313,127 @@ export function CloudflareAccountDetailView({ accountId }: CloudflareAccountDeta
         )}
       </m.div>
 
-      {/* 2. Access & Managers Hub */}
-      <m.section
-        variants={itemVariants}
-        className="rounded-3xl border border-border/50 bg-card/75 p-6 backdrop-blur-xl shadow-lg shadow-black/5 dark:shadow-black/20"
-      >
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2.5">
-            <div className="flex size-8 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
-              <Users className="size-4" aria-hidden="true" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">
-                  {t("managers.title")}
-                </h2>
-                <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/15 px-2 py-0.5 font-mono text-[11px] font-bold text-blue-600 dark:text-blue-400">
-                  {managers.length}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
-            <Button
-              size="sm"
-              onClick={() => setAssignOpen(true)}
-              className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 font-semibold text-white shadow-xs hover:from-blue-700 hover:to-indigo-700 rounded-xl"
+      {/* 2. Tab Navigation */}
+      <m.div variants={itemVariants}>
+        <div className="flex gap-1 rounded-2xl border border-border/50 bg-card/60 p-1 backdrop-blur-md">
+          {TABS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
+                activeTab === tab
+                  ? "bg-primary/10 text-primary shadow-sm border border-primary/20"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60 border border-transparent"
+              }`}
             >
-              <UserPlus className="size-4" aria-hidden="true" />
-              {t("managers.assign")}
-            </Button>
-          </Can>
+              {TAB_ICONS[tab]}
+              {t(`tabs.${tab}`)}
+            </button>
+          ))}
         </div>
+      </m.div>
 
-        {updateManager.isError && (
-          <p role="alert" className="mb-4 flex items-center gap-2 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive">
-            <ShieldAlert className="size-4" aria-hidden="true" />
-            {getErrorMessage(updateManager.error)}
-          </p>
-        )}
-
-        {managers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 py-10 text-center">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground mb-2">
-              <Users className="size-5" aria-hidden="true" />
-            </div>
-            <p className="text-sm font-medium text-muted-foreground">{t("managers.empty")}</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {managers.map((manager) => {
-              const initials = getInitials(manager.name);
-              return (
-                <div
-                  key={manager.userId}
-                  className="flex items-center justify-between rounded-2xl border border-border/60 bg-card/80 p-4 backdrop-blur-md transition-all hover:border-primary/40 hover:shadow-md shadow-2xs"
-                >
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <Avatar className="size-10 shrink-0 border border-border/80 shadow-2xs">
-                      <AvatarFallback className="bg-gradient-to-br from-blue-500/20 to-indigo-500/20 text-xs font-extrabold text-blue-600 dark:text-blue-400">
-                        {initials}
-                      </AvatarFallback>
-                    </Avatar>
-
-                    <div className="overflow-hidden space-y-0.5">
-                      <p className="font-bold text-sm text-foreground truncate">{manager.name}</p>
-                      <p className="font-mono text-xs text-muted-foreground truncate">{manager.email}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0 ml-2">
-                    <ManagerAccessLevelControl
-                      manager={manager}
-                      disabled={updateManager.isPending}
-                      onChange={(accessLevel) =>
-                        updateManager.mutate({ userId: manager.userId, accessLevel })
-                      }
-                    />
-                    <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setRemoveTarget(manager.userId)}
-                        className="size-8 p-0 rounded-xl text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 dark:hover:bg-rose-950/50 cursor-pointer"
-                        aria-label={t("managers.removeConfirm.title")}
-                        title="Remove manager"
-                      >
-                        <Trash2 className="size-3.5" aria-hidden="true" />
-                      </Button>
-                    </Can>
+      {/* 3. Tab Content */}
+      <m.div variants={itemVariants}>
+        {activeTab === "tunnels" && <AccountTunnelsTab accountId={accountId} />}
+        {activeTab === "dns" && <AccountDnsTab accountId={accountId} />}
+        {activeTab === "managers" && (
+          <section className="rounded-3xl border border-border/50 bg-card/75 p-6 backdrop-blur-xl shadow-lg shadow-black/5 dark:shadow-black/20">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <Users className="size-4" aria-hidden="true" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">
+                      {t("managers.title")}
+                    </h2>
+                    <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/15 px-2 py-0.5 font-mono text-[11px] font-bold text-blue-600 dark:text-blue-400">
+                      {managers.length}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+
+              <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_MANAGER.RESOURCE}>
+                <Button
+                  size="sm"
+                  onClick={() => setAssignOpen(true)}
+                  className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 font-semibold text-white shadow-xs hover:from-blue-700 hover:to-indigo-700 rounded-xl"
+                >
+                  <UserPlus className="size-4" aria-hidden="true" />
+                  {t("managers.assign")}
+                </Button>
+              </Can>
+            </div>
+
+            {updateManager.isError && (
+              <p role="alert" className="mb-4 flex items-center gap-2 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive">
+                <ShieldAlert className="size-4" aria-hidden="true" />
+                {getErrorMessage(updateManager.error)}
+              </p>
+            )}
+
+            {managers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 py-10 text-center">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground mb-2">
+                  <Users className="size-5" aria-hidden="true" />
+                </div>
+                <p className="text-sm font-medium text-muted-foreground">{t("managers.empty")}</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {managers.map((manager) => {
+                  const initials = getInitials(manager.name);
+                  return (
+                    <div
+                      key={manager.userId}
+                      className="flex items-center justify-between rounded-2xl border border-border/60 bg-card/80 p-4 backdrop-blur-md transition-all hover:border-primary/40 hover:shadow-md shadow-2xs"
+                    >
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <Avatar className="size-10 shrink-0 border border-border/80 shadow-2xs">
+                          <AvatarFallback className="bg-gradient-to-br from-blue-500/20 to-indigo-500/20 text-xs font-extrabold text-blue-600 dark:text-blue-400">
+                            {initials}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        <div className="overflow-hidden space-y-0.5">
+                          <p className="font-bold text-sm text-foreground truncate">{manager.name}</p>
+                          <p className="font-mono text-xs text-muted-foreground truncate">{manager.email}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        <ManagerAccessLevelControl
+                          manager={manager}
+                          disabled={updateManager.isPending}
+                          onChange={(accessLevel) =>
+                            updateManager.mutate({ userId: manager.userId, accessLevel })
+                          }
+                        />
+                        <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_MANAGER.RESOURCE}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setRemoveTarget(manager.userId)}
+                            className="size-8 p-0 rounded-xl text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 dark:hover:bg-rose-950/50 cursor-pointer"
+                            aria-label={t("managers.removeConfirm.title")}
+                            title="Remove manager"
+                          >
+                            <Trash2 className="size-3.5" aria-hidden="true" />
+                          </Button>
+                        </Can>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         )}
-      </m.section>
+      </m.div>
 
       {assignOpen && (
         <CloudflareAccountManagerFormDialog accountId={accountId} onClose={() => setAssignOpen(false)} />

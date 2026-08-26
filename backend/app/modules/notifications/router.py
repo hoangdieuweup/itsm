@@ -89,7 +89,7 @@ async def test_send_notification_channel(
     channel_id: UUID,
     body: TestSendRequest,
     use_case: TestSendNotificationChannel = Depends(get_test_send_notification_channel),
-    user: UserRead = Depends(require_permission(RbacResources.NOTIFICATION_CHANNEL, RbacActions.UPDATE)),
+    user: UserRead = Depends(require_permission(RbacResources.NOTIFICATION_CHANNEL, RbacActions.TEST_SEND)),
 ) -> ApiResponse[None]:
     """UPDATE-gated, not READ — exercises the channel's real stored secret
     to send a real external message."""
