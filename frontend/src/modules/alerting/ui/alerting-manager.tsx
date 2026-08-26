@@ -44,7 +44,7 @@ export function AlertingManager({ environmentId }: { environmentId: string }) {
               </p>
             </div>
           </div>
-          <CanInProject I={ACTIONS.CREATE} a={PERMISSIONS.ALERT_RULE.RESOURCE}>
+          <CanInProject I={ACTIONS.CREATE} a={PERMISSIONS.PROJECT_ALERT_RULE.RESOURCE}>
             <Button
               size="sm"
               onClick={() => setFormTarget("create")}
@@ -66,7 +66,7 @@ export function AlertingManager({ environmentId }: { environmentId: string }) {
             <p className="text-xs text-muted-foreground mt-1 max-w-sm">
               Define metric thresholds and LogQL conditions to trigger automated alerts across Telegram, Discord & Slack.
             </p>
-            <CanInProject I={ACTIONS.CREATE} a={PERMISSIONS.ALERT_RULE.RESOURCE}>
+            <CanInProject I={ACTIONS.CREATE} a={PERMISSIONS.PROJECT_ALERT_RULE.RESOURCE}>
               <Button
                 size="sm"
                 variant="outline"
@@ -103,7 +103,7 @@ export function AlertingManager({ environmentId }: { environmentId: string }) {
                       </span>
                     </td>
                     <td className="py-2 text-right">
-                      <CanInProject I={ACTIONS.UPDATE} a={PERMISSIONS.ALERT_RULE.RESOURCE}>
+                      <CanInProject I={ACTIONS.UPDATE} a={PERMISSIONS.PROJECT_ALERT_RULE.RESOURCE}>
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
@@ -113,7 +113,7 @@ export function AlertingManager({ environmentId }: { environmentId: string }) {
                           >
                             <Pencil className="size-3.5" aria-hidden="true" />
                           </button>
-                          <CanInProject I={ACTIONS.DELETE} a={PERMISSIONS.ALERT_RULE.RESOURCE}>
+                          <CanInProject I={ACTIONS.DELETE} a={PERMISSIONS.PROJECT_ALERT_RULE.RESOURCE}>
                             <button
                               type="button"
                               onClick={() => setDeleteTarget(rule)}

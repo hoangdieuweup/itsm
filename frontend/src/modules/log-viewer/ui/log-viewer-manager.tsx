@@ -342,7 +342,7 @@ export function LogViewerManager({ environmentId }: { environmentId: string }) {
                 </div>
               </div>
             </div>
-            <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.LOKI_CONFIG}>
+            <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_LOKI_CONFIG}>
               <Button
                 size="sm"
                 onClick={() => setFormOpen(true)}
@@ -368,7 +368,7 @@ export function LogViewerManager({ environmentId }: { environmentId: string }) {
                   </h2>
                 </div>
               </div>
-              <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.LOKI_CONFIG}>
+              <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_LOKI_CONFIG}>
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"

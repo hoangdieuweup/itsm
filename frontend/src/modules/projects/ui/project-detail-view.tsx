@@ -154,7 +154,7 @@ function EnvironmentsSection({
 
                   {/* High-Tech Operations Launch Buttons */}
                   <div className="mt-5 grid grid-cols-3 gap-2">
-                    <CanInProject I={ACTIONS.READ} a={RESOURCES.CLOUDFLARE_TUNNEL}>
+                    <CanInProject I={ACTIONS.READ} a={RESOURCES.PROJECT_CLOUDFLARE_TUNNEL}>
                       <button
                         type="button"
                         onClick={() => onManageTunnels(env)}
@@ -168,7 +168,7 @@ function EnvironmentsSection({
                       </button>
                     </CanInProject>
 
-                    <CanInProject I={ACTIONS.READ} a={RESOURCES.LOKI_CONFIG}>
+                    <CanInProject I={ACTIONS.READ} a={RESOURCES.PROJECT_LOKI_CONFIG}>
                       <button
                         type="button"
                         onClick={() => onManageLogs(env)}
@@ -182,7 +182,7 @@ function EnvironmentsSection({
                       </button>
                     </CanInProject>
 
-                    <CanInProject I={ACTIONS.READ} a={RESOURCES.ALERT_RULE}>
+                    <CanInProject I={ACTIONS.READ} a={RESOURCES.PROJECT_ALERT_RULE}>
                       <button
                         type="button"
                         onClick={() => onManageAlerting(env)}

@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { Cloud, Globe, Pencil, Trash2, ExternalLink } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
-import { CanInProject } from "@/entities/permission";
+import { Can, CanInProject } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
 import { MANAGED_BY } from "@/shared/constants/cloudflare";
 import { useCloudflareConfigQuery } from "@/entities/cloudflare-config";
@@ -50,11 +50,11 @@ export function DnsManager({ environmentId }: { environmentId: string }) {
               <h2 className="flex items-center gap-2 text-sm font-bold text-foreground">
                 <Cloud className="size-4 text-primary" aria-hidden="true" /> {config.zoneName}
               </h2>
-              <CanInProject I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_DNS.RESOURCE}>
+              <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_CONFIG.RESOURCE}>
                 <Button variant="outline" size="sm" onClick={() => setUnbindConfirmOpen(true)}>
                   {t("binding.unbind")}
                 </Button>
-              </CanInProject>
+              </Can>
             </div>
           </section>
 
@@ -95,8 +95,8 @@ export function DnsManager({ environmentId }: { environmentId: string }) {
                           )}
                         </td>
                         <td className="py-2 text-right">
-                          <CanInProject I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_DNS.RESOURCE}>
-                            <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-2">
+                            <CanInProject I={ACTIONS.UPDATE} a={PERMISSIONS.PROJECT_CLOUDFLARE_DNS.RESOURCE}>
                               <button
                                 type="button"
                                 onClick={() => setRecordFormTarget(record)}
@@ -105,6 +105,8 @@ export function DnsManager({ environmentId }: { environmentId: string }) {
                               >
                                 <Pencil className="size-3.5" aria-hidden="true" />
                               </button>
+                            </CanInProject>
+                            <CanInProject I={ACTIONS.DELETE} a={PERMISSIONS.PROJECT_CLOUDFLARE_DNS.RESOURCE}>
                               <button
                                 type="button"
                                 onClick={() => setRecordDeleteTarget(record)}
@@ -113,8 +115,8 @@ export function DnsManager({ environmentId }: { environmentId: string }) {
                               >
                                 <Trash2 className="size-3.5" aria-hidden="true" />
                               </button>
-                            </div>
-                          </CanInProject>
+                            </CanInProject>
+                          </div>
                         </td>
                       </tr>
                     ))}

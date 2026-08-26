@@ -48,7 +48,7 @@ export function IncidentDetailPanel({ incident }: { incident: Incident }) {
           </div>
 
           <div className="flex shrink-0 gap-2">
-            <CanInProject I={ACTIONS.ACKNOWLEDGE} a={PERMISSIONS.INCIDENT.RESOURCE}>
+            <CanInProject I={ACTIONS.ACKNOWLEDGE} a={PERMISSIONS.PROJECT_INCIDENT.RESOURCE}>
               <Button
                 variant="outline"
                 size="sm"
@@ -64,7 +64,7 @@ export function IncidentDetailPanel({ incident }: { incident: Incident }) {
                 {t("detail.acknowledge")}
               </Button>
             </CanInProject>
-            <CanInProject I={ACTIONS.RESOLVE} a={PERMISSIONS.INCIDENT.RESOURCE}>
+            <CanInProject I={ACTIONS.RESOLVE} a={PERMISSIONS.PROJECT_INCIDENT.RESOURCE}>
               <Button
                 variant="default"
                 size="sm"

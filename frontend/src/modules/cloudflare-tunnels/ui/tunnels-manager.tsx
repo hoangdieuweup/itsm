@@ -132,8 +132,8 @@ export function TunnelsManager({ environmentId }: { environmentId: string }) {
                   </div>
                   <TunnelHostnamePreview environmentId={environmentId} tunnelId={tunnel.id} />
                 </button>
-                <CanInProject I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_TUNNEL.RESOURCE}>
-                  <div className="flex items-center gap-1 shrink-0 self-end sm:self-auto">
+                <div className="flex items-center gap-1 shrink-0 self-end sm:self-auto">
+                  <CanInProject I={ACTIONS.REFRESH_STATUS} a={PERMISSIONS.PROJECT_CLOUDFLARE_TUNNEL.RESOURCE}>
                     <button
                       type="button"
                       onClick={() => refreshStatus.mutate(tunnel.id)}
@@ -143,6 +143,13 @@ export function TunnelsManager({ environmentId }: { environmentId: string }) {
                     >
                       <RefreshCw className="size-4" aria-hidden="true" />
                     </button>
+                  </CanInProject>
+                  {/* reveal-token/delete are ACCOUNT-level-only actions (no
+                      project-scoped twin exists — see the ownership fix's
+                      D8) — CanInProject on the old resource name correctly
+                      shows these only when the global half of the union
+                      grants them. */}
+                  <CanInProject I={ACTIONS.REVEAL_TOKEN} a={PERMISSIONS.CLOUDFLARE_TUNNEL.RESOURCE}>
                     <button
                       type="button"
                       onClick={async () => {
@@ -155,6 +162,8 @@ export function TunnelsManager({ environmentId }: { environmentId: string }) {
                     >
                       <KeyRound className="size-4" aria-hidden="true" />
                     </button>
+                  </CanInProject>
+                  <CanInProject I={ACTIONS.DELETE} a={PERMISSIONS.CLOUDFLARE_TUNNEL.RESOURCE}>
                     <button
                       type="button"
                       onClick={() => setDeleteTarget(tunnel)}
@@ -164,8 +173,8 @@ export function TunnelsManager({ environmentId }: { environmentId: string }) {
                     >
                       <Trash2 className="size-4" aria-hidden="true" />
                     </button>
-                  </div>
-                </CanInProject>
+                  </CanInProject>
+                </div>
               </div>
             ))}
           </div>
