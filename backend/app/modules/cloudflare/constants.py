@@ -57,6 +57,7 @@ class ErrorCode(StrEnum):
     TUNNEL_HOSTNAME_ALREADY_EXISTS = "cloudflare_tunnel_hostname_already_exists"
     TUNNEL_INGRESS_SYNC_FAILED = "cloudflare_tunnel_ingress_sync_failed"
     TUNNEL_HOSTNAME_DOMAIN_MISMATCH = "cloudflare_tunnel_hostname_domain_mismatch"
+    TUNNEL_HOSTNAME_ENVIRONMENT_MISMATCH = "cloudflare_tunnel_hostname_environment_mismatch"
 
 
 class CloudflareAccountAuditActions(StrEnum):
