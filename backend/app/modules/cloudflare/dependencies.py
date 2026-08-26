@@ -20,14 +20,20 @@ from app.modules.cloudflare.schemas import AccountAccessGrant
 from app.modules.cloudflare.services.add_tunnel_hostname import AddTunnelHostname
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
 from app.modules.cloudflare.services.create_account import CreateCloudflareAccount
+from app.modules.cloudflare.services.create_account_dns_record import CreateAccountDnsRecord
+from app.modules.cloudflare.services.create_account_tunnel import CreateAccountTunnel
 from app.modules.cloudflare.services.create_config import CreateCloudflareConfig
 from app.modules.cloudflare.services.create_dns_record import CreateDnsRecord
 from app.modules.cloudflare.services.create_tunnel import CreateCloudflareTunnel
 from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccount
+from app.modules.cloudflare.services.delete_account_dns_record import DeleteAccountDnsRecord
+from app.modules.cloudflare.services.delete_account_tunnel import DeleteAccountTunnel
 from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
 from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
 from app.modules.cloudflare.services.delete_tunnel import DeleteCloudflareTunnel
+from app.modules.cloudflare.services.list_account_dns_records import ListAccountDnsRecords
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
+from app.modules.cloudflare.services.list_account_tunnels import ListAccountTunnels
 from app.modules.cloudflare.services.list_cloudflare_audit_logs import ListCloudflareAuditLogs
 from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
 from app.modules.cloudflare.services.list_tunnel_hostnames import ListTunnelHostnames
@@ -43,6 +49,7 @@ from app.modules.cloudflare.services.sync_dns_records import SyncDnsRecords
 from app.modules.cloudflare.services.sync_tunnels import SyncTunnels
 from app.modules.cloudflare.services.test_connection import TestCloudflareAccountConnection
 from app.modules.cloudflare.services.update_account import UpdateCloudflareAccount
+from app.modules.cloudflare.services.update_account_dns_record import UpdateAccountDnsRecord
 from app.modules.cloudflare.services.update_config import UpdateCloudflareConfig
 from app.modules.cloudflare.services.update_dns_record import UpdateDnsRecord
 from app.modules.cloudflare.services.update_manager import UpdateCloudflareAccountManager
@@ -399,3 +406,59 @@ async def get_remove_tunnel_hostname(
 ) -> RemoveTunnelHostname:
     """Provide the remove-tunnel-hostname use case."""
     return RemoveTunnelHostname(uow, client, cache, audit_api)
+
+
+async def get_list_account_tunnels(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+) -> ListAccountTunnels:
+    """Provide the list-account-tunnels use case."""
+    return ListAccountTunnels(uow, client)
+
+
+async def get_list_account_dns_records(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+) -> ListAccountDnsRecords:
+    """Provide the list-account-dns-records use case."""
+    return ListAccountDnsRecords(uow, client)
+
+
+async def get_create_account_tunnel(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+) -> CreateAccountTunnel:
+    """Provide the create-account-tunnel use case."""
+    return CreateAccountTunnel(uow, client)
+
+
+async def get_delete_account_tunnel(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+) -> DeleteAccountTunnel:
+    """Provide the delete-account-tunnel use case."""
+    return DeleteAccountTunnel(uow, client)
+
+
+async def get_create_account_dns_record(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+) -> CreateAccountDnsRecord:
+    """Provide the create-account-dns-record use case."""
+    return CreateAccountDnsRecord(uow, client)
+
+
+async def get_update_account_dns_record(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+) -> UpdateAccountDnsRecord:
+    """Provide the update-account-dns-record use case."""
+    return UpdateAccountDnsRecord(uow, client)
+
+
+async def get_delete_account_dns_record(
+    uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
+    client: CloudflareClient = Depends(get_cloudflare_client),
+) -> DeleteAccountDnsRecord:
+    """Provide the delete-account-dns-record use case."""
+    return DeleteAccountDnsRecord(uow, client)
