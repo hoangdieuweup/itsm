@@ -82,27 +82,63 @@ class RbacPermissionCatalog:
         ("cloudflare_dns", "create", "permissions.cloudflare_dns.create"),
         ("cloudflare_dns", "update", "permissions.cloudflare_dns.update"),
         ("cloudflare_dns", "delete", "permissions.cloudflare_dns.delete"),
-        # ── Cloudflare audit logs ──────────────────────────────────
+        # ── Cloudflare audit logs (ACCOUNT-level; unused after the
+        #    project-scoped split below, kept for symmetry / a future
+        #    account-level audit route) ──────────────────────────────
         ("cloudflare_audit", "read", "permissions.cloudflare_audit.read"),
-        # ── Loki / observability config ────────────────────────────
-        ("loki_config", "read", "permissions.loki_config.read"),
-        ("loki_config", "manage", "permissions.loki_config.manage"),
         # ── Notification channels ──────────────────────────────────
         ("notification_channel", "create", "permissions.notification_channel.create"),
         ("notification_channel", "read", "permissions.notification_channel.read"),
         ("notification_channel", "update", "permissions.notification_channel.update"),
         ("notification_channel", "delete", "permissions.notification_channel.delete"),
         ("notification_channel", "test_send", "permissions.notification_channel.test_send"),
-        # ── Alert rules ────────────────────────────────────────────
-        ("alert_rule", "create", "permissions.alert_rule.create"),
+        # ── Alert rules (ACCOUNT-level: available-alerts route only) ──
         ("alert_rule", "read", "permissions.alert_rule.read"),
-        ("alert_rule", "update", "permissions.alert_rule.update"),
-        ("alert_rule", "delete", "permissions.alert_rule.delete"),
-        # ── Incidents ──────────────────────────────────────────────
-        ("incident", "create", "permissions.incident.create"),
+        # ── Incidents (GLOBAL: cross-project list route only) ───────
         ("incident", "read", "permissions.incident.read"),
-        ("incident", "acknowledge", "permissions.incident.acknowledge"),
-        ("incident", "resolve", "permissions.incident.resolve"),
+        # ── PROJECT-SCOPED twins ───────────────────────────────────
+        # Distinct resource strings, not aliases. These are the ONLY
+        # resources ProjectScopedPermissionCatalog.ASSIGNABLE may ever
+        # contain. Their account-level namesakes above stay reachable only
+        # through a real cloudflare_account_managers grant (the
+        # account-manager path of require_cloudflare_environment_access),
+        # so a project role can never mint account-level power — the
+        # escalation loop a shared resource string left open. See
+        # docs/superpowers/plans/2026-08-26-project-scoped-resource-split-
+        # and-tunnel-hostname-ownership-fix.md.
+        ("project_cloudflare_config", "read", "permissions.project_cloudflare_config.read"),
+        ("project_cloudflare_dns", "read", "permissions.project_cloudflare_dns.read"),
+        ("project_cloudflare_dns", "create", "permissions.project_cloudflare_dns.create"),
+        ("project_cloudflare_dns", "update", "permissions.project_cloudflare_dns.update"),
+        ("project_cloudflare_dns", "delete", "permissions.project_cloudflare_dns.delete"),
+        # No project_cloudflare_tunnel.delete / .reveal_token, ever: a tunnel
+        # is an ACCOUNT-wide object commonly serving several unrelated
+        # projects at once (CloudflareTunnel has no environment_id column at
+        # all), so deleting one or revealing its live connector token is an
+        # account-tier action no project role may hold.
+        ("project_cloudflare_tunnel", "read", "permissions.project_cloudflare_tunnel.read"),
+        ("project_cloudflare_tunnel", "create", "permissions.project_cloudflare_tunnel.create"),
+        ("project_cloudflare_tunnel", "sync", "permissions.project_cloudflare_tunnel.sync"),
+        (
+            "project_cloudflare_tunnel",
+            "refresh_status",
+            "permissions.project_cloudflare_tunnel.refresh_status",
+        ),
+        ("project_cloudflare_hostname", "read", "permissions.project_cloudflare_hostname.read"),
+        ("project_cloudflare_hostname", "create", "permissions.project_cloudflare_hostname.create"),
+        ("project_cloudflare_hostname", "update", "permissions.project_cloudflare_hostname.update"),
+        ("project_cloudflare_hostname", "delete", "permissions.project_cloudflare_hostname.delete"),
+        ("project_cloudflare_audit", "read", "permissions.project_cloudflare_audit.read"),
+        ("project_loki_config", "read", "permissions.project_loki_config.read"),
+        ("project_loki_config", "manage", "permissions.project_loki_config.manage"),
+        ("project_alert_rule", "create", "permissions.project_alert_rule.create"),
+        ("project_alert_rule", "read", "permissions.project_alert_rule.read"),
+        ("project_alert_rule", "update", "permissions.project_alert_rule.update"),
+        ("project_alert_rule", "delete", "permissions.project_alert_rule.delete"),
+        ("project_incident", "create", "permissions.project_incident.create"),
+        ("project_incident", "read", "permissions.project_incident.read"),
+        ("project_incident", "acknowledge", "permissions.project_incident.acknowledge"),
+        ("project_incident", "resolve", "permissions.project_incident.resolve"),
     ]
 
 
@@ -129,10 +165,18 @@ class RbacResources:
     CLOUDFLARE_HOSTNAME = "cloudflare_hostname"
     CLOUDFLARE_DNS = "cloudflare_dns"
     CLOUDFLARE_AUDIT = "cloudflare_audit"
-    LOKI_CONFIG = "loki_config"
     NOTIFICATION_CHANNEL = "notification_channel"
     ALERT_RULE = "alert_rule"
     INCIDENT = "incident"
+    # Project-scoped twins — see ProjectScopedPermissionCatalog.ASSIGNABLE.
+    PROJECT_CLOUDFLARE_CONFIG = "project_cloudflare_config"
+    PROJECT_CLOUDFLARE_TUNNEL = "project_cloudflare_tunnel"
+    PROJECT_CLOUDFLARE_HOSTNAME = "project_cloudflare_hostname"
+    PROJECT_CLOUDFLARE_DNS = "project_cloudflare_dns"
+    PROJECT_CLOUDFLARE_AUDIT = "project_cloudflare_audit"
+    PROJECT_LOKI_CONFIG = "project_loki_config"
+    PROJECT_ALERT_RULE = "project_alert_rule"
+    PROJECT_INCIDENT = "project_incident"
 
 
 class RbacActions:
