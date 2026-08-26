@@ -111,29 +111,15 @@ def require_account_access_for_environment(min_level: AccessLevel):
     return check
 
 
-def require_cloudflare_environment_access(resource: str, action: str, min_level: AccessLevel):
-    """Composed check for environment-scoped Cloudflare routes (DNS, Tunnel,
-    hostnames, config-read, audit-log-read) — never used on account
-    administration or binding/unbinding routes, which stay exclusively
-    gated by require_account_access*/require_account_access_for_environment.
-
-    Tries the EXISTING account-manager path first: global resource.action
-    permission AND sufficient cloudflare_account_managers level (or
-    cloudflare_account:manage_all) — byte-for-byte today's combined
-    Layer-1+Layer-2 behavior, same queries, same success shape, for every
-    user who already passes it. Only on failure does it fall back to the
-    caller's project-scoped effective permission grant (global UNION
-    project role) for the environment's project — additive, never a
-    narrowing of what account-manager-based access already allows. Both
-    paths failing always raises InsufficientAccountAccess, so the error
-    code a caller sees never depends on which branch was tried.
-
-    held_level=None on the returned grant signals 'bypassed via a
-    mechanism other than a literal cloudflare_account_managers row' —
-    the exact same signal cloudflare_account:manage_all already uses,
-    so any code inspecting held_level treats this identically to a
-    manage_all bypass (deliberate: neither carries a real per-account
-    tier, both should satisfy any level check downstream)."""
+def require_cloudflare_environment_access(
+    account_resource: str, project_resource: str | None, action: str, min_level: AccessLevel
+):
+    """Composed check for environment-scoped Cloudflare routes. Two
+    resource names, not one: the account-manager path (tried first) checks
+    `account_resource` unchanged from before; the project-role fallback
+    checks `project_resource`, and is skipped entirely when None (tunnel
+    delete/reveal-token have no project-scoped equivalent — a Cloudflare
+    Tunnel is account-wide, so those stay account-only)."""
 
     async def check(
         environment_id: UUID,
@@ -147,7 +133,7 @@ def require_cloudflare_environment_access(resource: str, action: str, min_level:
         if config is None:
             raise CloudflareConfigNotFound()
 
-        if await rbac_api.has_permission(user.id, resource, action):
+        if await rbac_api.has_permission(user.id, account_resource, action):
             try:
                 return await resolve_account_access_grant(
                     config.cloudflare_account_id, user, rbac_api, uow, min_level
@@ -155,13 +141,14 @@ def require_cloudflare_environment_access(resource: str, action: str, min_level:
             except InsufficientAccountAccess:
                 pass
 
-        environment = await projects_api.get_environment_by_id(environment_id)
-        if environment is not None:
-            permissions = await projects_api.resolve_effective_permissions(
-                environment.project_id, user, rbac_api
-            )
-            if f"{resource}.{action}" in permissions:
-                return AccountAccessGrant(user=user, held_level=None)
+        if project_resource is not None:
+            environment = await projects_api.get_environment_by_id(environment_id)
+            if environment is not None:
+                permissions = await projects_api.resolve_effective_permissions(
+                    environment.project_id, user, rbac_api
+                )
+                if f"{project_resource}.{action}" in permissions:
+                    return AccountAccessGrant(user=user, held_level=None)
 
         raise InsufficientAccountAccess()
 

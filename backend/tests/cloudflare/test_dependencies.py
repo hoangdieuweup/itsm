@@ -202,8 +202,9 @@ class FakeProjectsApi:
 
 async def test_require_cloudflare_environment_access_existing_account_manager_path_unchanged() -> None:
     """A user who already passes today's check (global permission + account-
-    manager row) must succeed via the FIRST branch — proves zero behavior
-    change for existing users, the core promise of D3."""
+    manager row) must succeed via the FIRST branch, checking the
+    ACCOUNT-level resource name — proves zero behavior change for existing
+    users, the core promise of D3."""
     account_id = uuid4()
     row = CloudflareAccountManagerRow(
         cloudflare_account_id=account_id,
@@ -211,7 +212,9 @@ async def test_require_cloudflare_environment_access_existing_account_manager_pa
         access_level=AccessLevel.EDITOR,
         created_at=datetime.now(UTC),
     )
-    check = require_cloudflare_environment_access("cloudflare_dns", "create", AccessLevel.EDITOR)
+    check = require_cloudflare_environment_access(
+        "cloudflare_dns", "project_cloudflare_dns", "create", AccessLevel.EDITOR
+    )
 
     grant = await check(
         environment_id=uuid4(),
@@ -224,10 +227,12 @@ async def test_require_cloudflare_environment_access_existing_account_manager_pa
     assert grant.held_level is AccessLevel.EDITOR
 
 
-async def test_require_cloudflare_environment_access_falls_back_to_project_role_grant() -> None:
+async def test_project_path_checks_the_project_prefixed_name_only() -> None:
     environment_id = uuid4()
     account_id = uuid4()
-    check = require_cloudflare_environment_access("cloudflare_dns", "create", AccessLevel.EDITOR)
+    check = require_cloudflare_environment_access(
+        "cloudflare_dns", "project_cloudflare_dns", "create", AccessLevel.EDITOR
+    )
 
     grant = await check(
         environment_id=environment_id,
@@ -236,17 +241,61 @@ async def test_require_cloudflare_environment_access_falls_back_to_project_role_
         uow=FakeUowWithConfigs(None, account_id),
         projects_api=FakeProjectsApi(
             environment=_FakeEnvironment(id=environment_id, project_id=uuid4()),
-            permissions=frozenset({"cloudflare_dns.create"}),
+            permissions=frozenset({"project_cloudflare_dns.create"}),
         ),
     )
 
     assert grant.held_level is None  # bypassed via project role, mirrors manage_all's own signal
 
 
+async def test_account_level_name_in_the_project_set_is_not_accepted() -> None:
+    """The escalation regression test: holding the OLD account-level string
+    in a project-scoped effective set must never satisfy the project path."""
+    environment_id = uuid4()
+    account_id = uuid4()
+    check = require_cloudflare_environment_access(
+        "cloudflare_dns", "project_cloudflare_dns", "create", AccessLevel.EDITOR
+    )
+
+    with pytest.raises(InsufficientAccountAccess):
+        await check(
+            environment_id=environment_id,
+            auth_api=FakeAuthApi(_FAKE_USER),
+            rbac_api=FakeRbacApi(manage_all=False, global_permissions=[]),
+            uow=FakeUowWithConfigs(None, account_id),
+            projects_api=FakeProjectsApi(
+                environment=_FakeEnvironment(id=environment_id, project_id=uuid4()),
+                permissions=frozenset({"cloudflare_dns.create"}),
+            ),
+        )
+
+
+async def test_project_resource_none_skips_the_project_path_entirely() -> None:
+    """cloudflare_tunnel.delete / .reveal_token: no project name exists, so
+    no project-scoped grant of any shape can satisfy the route."""
+    environment_id = uuid4()
+    account_id = uuid4()
+    check = require_cloudflare_environment_access("cloudflare_tunnel", None, "delete", AccessLevel.EDITOR)
+
+    with pytest.raises(InsufficientAccountAccess):
+        await check(
+            environment_id=environment_id,
+            auth_api=FakeAuthApi(_FAKE_USER),
+            rbac_api=FakeRbacApi(manage_all=False, global_permissions=[]),
+            uow=FakeUowWithConfigs(None, account_id),
+            projects_api=FakeProjectsApi(
+                environment=_FakeEnvironment(id=environment_id, project_id=uuid4()),
+                permissions=frozenset({"cloudflare_tunnel.delete", "project_cloudflare_tunnel.delete"}),
+            ),
+        )
+
+
 async def test_require_cloudflare_environment_access_raises_when_both_paths_fail() -> None:
     environment_id = uuid4()
     account_id = uuid4()
-    check = require_cloudflare_environment_access("cloudflare_dns", "create", AccessLevel.EDITOR)
+    check = require_cloudflare_environment_access(
+        "cloudflare_dns", "project_cloudflare_dns", "create", AccessLevel.EDITOR
+    )
 
     with pytest.raises(InsufficientAccountAccess):
         await check(

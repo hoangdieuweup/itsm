@@ -760,6 +760,7 @@ class TestProjectRoleGrantsEnvironmentScopedCloudflareAccess:
                 ("project_role", "read"),
                 ("permission", "read"),
                 ("cloudflare_tunnel", "create"),
+                ("project_cloudflare_tunnel", "create"),
             ],
             email="cf-admin@example.com",
         )
@@ -784,14 +785,26 @@ class TestProjectRoleGrantsEnvironmentScopedCloudflareAccess:
         assert bind_resp.status_code == 200, bind_resp.text
 
         perms_resp = await client.get("/api/v1/rbac/permissions")
-        tunnel_create_id = next(
+        project_tunnel_create_id = next(
+            p["id"]
+            for p in perms_resp.json()["data"]
+            if p["resource"] == "project_cloudflare_tunnel" and p["action"] == "create"
+        )
+        account_tunnel_create_id = next(
             p["id"]
             for p in perms_resp.json()["data"]
             if p["resource"] == "cloudflare_tunnel" and p["action"] == "create"
         )
+
+        escalation_attempt = await client.post(
+            f"/api/v1/projects/{project_id}/roles",
+            json={"name": "escalation", "permissionIds": [account_tunnel_create_id]},
+        )
+        assert escalation_attempt.status_code == 409, escalation_attempt.text
+
         role_resp = await client.post(
             f"/api/v1/projects/{project_id}/roles",
-            json={"name": "tunnel-manager", "permissionIds": [tunnel_create_id]},
+            json={"name": "tunnel-manager", "permissionIds": [project_tunnel_create_id]},
         )
         assert role_resp.status_code == 200, role_resp.text
         role_id = role_resp.json()["data"]["id"]
