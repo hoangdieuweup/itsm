@@ -14,6 +14,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.core.models import ApiResponse, ErrorPayload
 from app.integrations.loki.schemas import LokiLogEntry
+from app.modules.auth.public import AuthApi, get_auth_api
 from app.modules.cloudflare.constants import AccessLevel
 from app.modules.cloudflare.public import require_account_access
 from app.modules.observability.constants import IncidentStatus, ObservabilityDefaults
@@ -279,8 +280,14 @@ async def get_incident(
 async def create_manual_incident(
     body: CreateManualIncidentRequest,
     use_case: CreateManualIncident = Depends(get_create_manual_incident),
-    user: UserRead = Depends(require_permission(RbacResources.INCIDENT, RbacActions.CREATE)),
+    auth_api: AuthApi = Depends(get_auth_api),
 ) -> ApiResponse[IncidentRead]:
+    """No Depends(require_permission(...)) here — environment_id is body-only
+    and incident.create is itself project-role-assignable (Decision, Task 8),
+    so a global-only Layer-1 gate would 403 a project-role holder before
+    their grant is ever consulted. CreateManualIncident resolves the full
+    project-permission check itself via ProjectsApi.resolve_effective_permissions."""
+    user = auth_api.current_user()
     result = await use_case.execute(**body.model_dump(), actor=user)
     return ApiResponse[IncidentRead](success=True, data=result)
 

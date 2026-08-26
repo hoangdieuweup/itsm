@@ -29,6 +29,7 @@ from app.modules.observability.exceptions import (
     LokiConfigAlreadyExists,
     LokiConfigNotFound,
     ObservabilityEnvironmentNotFound,
+    ObservabilityPermissionDenied,
 )
 from app.modules.observability.repository import (
     AbstractAlertRuleRepository,
@@ -311,11 +312,15 @@ class FakeObservabilityUnitOfWork(AbstractObservabilityUnitOfWork):
 
 
 class FakeProjectsApi:
-    def __init__(self, environments: dict) -> None:
+    def __init__(self, environments: dict, *, permissions: frozenset[str] = frozenset()) -> None:
         self._environments = environments
+        self._permissions = permissions
 
     async def get_environment_by_id(self, environment_id):
         return self._environments.get(environment_id)
+
+    async def resolve_effective_permissions(self, project_id, user, rbac_api):
+        return self._permissions
 
 
 class FakeAuditApi:
@@ -1428,7 +1433,11 @@ class TestCreateManualIncident:
         env_id, project_id = uuid4(), uuid4()
         use_case = CreateManualIncident(
             FakeObservabilityUnitOfWork(),
-            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id)}),
+            projects_api=FakeProjectsApi(
+                {env_id: SimpleNamespace(project_id=project_id)},
+                permissions=frozenset({"incident.create"}),
+            ),
+            rbac_api=object(),
             audit_api=FakeAuditApi(),
         )
         result = await use_case.execute(
@@ -1444,7 +1453,10 @@ class TestCreateManualIncident:
 
     async def test_rejects_unknown_environment(self) -> None:
         use_case = CreateManualIncident(
-            FakeObservabilityUnitOfWork(), projects_api=FakeProjectsApi({}), audit_api=FakeAuditApi()
+            FakeObservabilityUnitOfWork(),
+            projects_api=FakeProjectsApi({}),
+            rbac_api=object(),
+            audit_api=FakeAuditApi(),
         )
         with pytest.raises(ObservabilityEnvironmentNotFound):
             await use_case.execute(
@@ -1454,6 +1466,49 @@ class TestCreateManualIncident:
                 title="X",
                 actor=_actor(),
             )
+
+    async def test_rejects_when_incident_create_not_in_effective_permissions(self) -> None:
+        env_id, project_id = uuid4(), uuid4()
+        use_case = CreateManualIncident(
+            FakeObservabilityUnitOfWork(),
+            projects_api=FakeProjectsApi(
+                {env_id: SimpleNamespace(project_id=project_id)}, permissions=frozenset()
+            ),
+            rbac_api=object(),
+            audit_api=FakeAuditApi(),
+        )
+        with pytest.raises(ObservabilityPermissionDenied):
+            await use_case.execute(
+                environment_id=env_id,
+                category=IncidentCategory.TRAFFIC,
+                severity=AlertSeverity.MEDIUM,
+                title="X",
+                actor=_actor(),
+            )
+
+    async def test_allows_when_incident_create_comes_only_from_a_project_role(self) -> None:
+        """Proves the direct-call pattern honors a project-role-granted atom
+        exactly like require_project_permission_for_environment does — the
+        actor holds no global incident.create, only the union computed by
+        ProjectsApi.resolve_effective_permissions grants it."""
+        env_id, project_id = uuid4(), uuid4()
+        use_case = CreateManualIncident(
+            FakeObservabilityUnitOfWork(),
+            projects_api=FakeProjectsApi(
+                {env_id: SimpleNamespace(project_id=project_id)},
+                permissions=frozenset({"incident.create"}),
+            ),
+            rbac_api=object(),
+            audit_api=FakeAuditApi(),
+        )
+        result = await use_case.execute(
+            environment_id=env_id,
+            category=IncidentCategory.TRAFFIC,
+            severity=AlertSeverity.MEDIUM,
+            title="Project-role granted",
+            actor=_actor(),
+        )
+        assert result.project_id == project_id
 
 
 class TestListIncidents:

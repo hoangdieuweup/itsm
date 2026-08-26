@@ -252,9 +252,10 @@ async def get_handle_loki_webhook(
 async def get_create_manual_incident(
     uow: AbstractObservabilityUnitOfWork = Depends(get_uow),
     projects_api: ProjectsApi = Depends(get_projects_api),
+    rbac_api: RbacApi = Depends(get_rbac_api),
     audit_api: AuditApi = Depends(get_audit_api),
 ) -> CreateManualIncident:
-    return CreateManualIncident(uow, projects_api=projects_api, audit_api=audit_api)
+    return CreateManualIncident(uow, projects_api=projects_api, rbac_api=rbac_api, audit_api=audit_api)
 
 
 async def get_acknowledge_incident(
