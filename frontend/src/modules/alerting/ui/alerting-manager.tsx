@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
-import { Can } from "@/entities/permission";
+import { CanInProject } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
 import { useEnvironmentQuery } from "@/entities/environment";
 import { useAlertRulesQuery } from "../hooks/use-alert-rules";
@@ -44,7 +44,7 @@ export function AlertingManager({ environmentId }: { environmentId: string }) {
               </p>
             </div>
           </div>
-          <Can I={ACTIONS.CREATE} a={PERMISSIONS.ALERT_RULE.RESOURCE}>
+          <CanInProject I={ACTIONS.CREATE} a={PERMISSIONS.ALERT_RULE.RESOURCE}>
             <Button
               size="sm"
               onClick={() => setFormTarget("create")}
@@ -52,7 +52,7 @@ export function AlertingManager({ environmentId }: { environmentId: string }) {
             >
               <Plus className="size-3.5" aria-hidden="true" /> {t("addRule")}
             </Button>
-          </Can>
+          </CanInProject>
         </div>
 
         {isLoading && <div className="h-28 w-full animate-pulse rounded-2xl bg-muted/50" />}
@@ -66,7 +66,7 @@ export function AlertingManager({ environmentId }: { environmentId: string }) {
             <p className="text-xs text-muted-foreground mt-1 max-w-sm">
               Define metric thresholds and LogQL conditions to trigger automated alerts across Telegram, Discord & Slack.
             </p>
-            <Can I={ACTIONS.CREATE} a={PERMISSIONS.ALERT_RULE.RESOURCE}>
+            <CanInProject I={ACTIONS.CREATE} a={PERMISSIONS.ALERT_RULE.RESOURCE}>
               <Button
                 size="sm"
                 variant="outline"
@@ -75,7 +75,7 @@ export function AlertingManager({ environmentId }: { environmentId: string }) {
               >
                 <Plus className="size-3.5" aria-hidden="true" /> {t("addRule")}
               </Button>
-            </Can>
+            </CanInProject>
           </div>
         )}
 
@@ -103,7 +103,7 @@ export function AlertingManager({ environmentId }: { environmentId: string }) {
                       </span>
                     </td>
                     <td className="py-2 text-right">
-                      <Can I={ACTIONS.UPDATE} a={PERMISSIONS.ALERT_RULE.RESOURCE}>
+                      <CanInProject I={ACTIONS.UPDATE} a={PERMISSIONS.ALERT_RULE.RESOURCE}>
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
@@ -113,7 +113,7 @@ export function AlertingManager({ environmentId }: { environmentId: string }) {
                           >
                             <Pencil className="size-3.5" aria-hidden="true" />
                           </button>
-                          <Can I={ACTIONS.DELETE} a={PERMISSIONS.ALERT_RULE.RESOURCE}>
+                          <CanInProject I={ACTIONS.DELETE} a={PERMISSIONS.ALERT_RULE.RESOURCE}>
                             <button
                               type="button"
                               onClick={() => setDeleteTarget(rule)}
@@ -122,9 +122,9 @@ export function AlertingManager({ environmentId }: { environmentId: string }) {
                             >
                               <Trash2 className="size-3.5" aria-hidden="true" />
                             </button>
-                          </Can>
+                          </CanInProject>
                         </div>
-                      </Can>
+                      </CanInProject>
                     </td>
                   </tr>
                 ))}

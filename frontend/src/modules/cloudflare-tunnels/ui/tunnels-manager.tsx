@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Trash2, RefreshCw, KeyRound, ArrowRight } from "lucide-react";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
-import { Can } from "@/entities/permission";
+import { CanInProject } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
 import {
   useTunnelsQuery,
@@ -132,7 +132,7 @@ export function TunnelsManager({ environmentId }: { environmentId: string }) {
                   </div>
                   <TunnelHostnamePreview environmentId={environmentId} tunnelId={tunnel.id} />
                 </button>
-                <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
+                <CanInProject I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_TUNNEL.RESOURCE}>
                   <div className="flex items-center gap-1 shrink-0 self-end sm:self-auto">
                     <button
                       type="button"
@@ -165,7 +165,7 @@ export function TunnelsManager({ environmentId }: { environmentId: string }) {
                       <Trash2 className="size-4" aria-hidden="true" />
                     </button>
                   </div>
-                </Can>
+                </CanInProject>
               </div>
             ))}
           </div>

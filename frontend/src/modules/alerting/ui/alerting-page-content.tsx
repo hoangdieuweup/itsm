@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useEnvironmentQuery } from "@/entities/environment";
+import { ProjectPermissionProvider } from "@/entities/permission";
 import { AlertingManager } from "./alerting-manager";
 
 export function AlertingPageContent({ environmentId }: { environmentId: string }) {
@@ -15,7 +16,9 @@ export function AlertingPageContent({ environmentId }: { environmentId: string }
         <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
       </div>
 
-      <AlertingManager environmentId={environmentId} />
+      <ProjectPermissionProvider projectId={environment.projectId}>
+        <AlertingManager environmentId={environmentId} />
+      </ProjectPermissionProvider>
     </div>
   );
 }

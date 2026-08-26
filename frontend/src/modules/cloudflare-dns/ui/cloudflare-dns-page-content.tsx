@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useEnvironmentQuery } from "@/entities/environment";
+import { ProjectPermissionProvider } from "@/entities/permission";
 import { DnsManager } from "./dns-manager";
 
 export function CloudflareDnsPageContent({ environmentId }: { environmentId: string }) {
@@ -15,7 +16,9 @@ export function CloudflareDnsPageContent({ environmentId }: { environmentId: str
         <p className="text-sm text-muted-foreground">{t(`environmentTypes.${environment.type}`)}</p>
       </div>
 
-      <DnsManager environmentId={environmentId} />
+      <ProjectPermissionProvider projectId={environment.projectId}>
+        <DnsManager environmentId={environmentId} />
+      </ProjectPermissionProvider>
     </div>
   );
 }

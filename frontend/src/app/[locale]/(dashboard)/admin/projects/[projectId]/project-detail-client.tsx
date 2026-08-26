@@ -7,10 +7,17 @@ import { ProjectDetailView } from "@/modules/projects";
 import { TunnelsManager } from "@/modules/cloudflare-tunnels";
 import { LogViewerManager } from "@/modules/log-viewer";
 import { AlertingManager } from "@/modules/alerting";
+import { ProjectPermissionProvider } from "@/entities/permission";
 import type { Environment } from "@/entities/environment";
 import { IconCloud } from "@/shared/ui/icons";
 
-export function ProjectDetailClient({ projectId }: { projectId: string }) {
+export function ProjectDetailClient({
+  projectId,
+  children,
+}: {
+  projectId: string;
+  children?: React.ReactNode;
+}) {
   const t = useTranslations("projects");
   const tTunnels = useTranslations("cloudflareTunnels");
   const tLogs = useTranslations("logViewer");
@@ -26,7 +33,9 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
         onManageTunnels={setTunnelsDrawerTarget}
         onManageLogs={setLogsDrawerTarget}
         onManageAlerting={setAlertingDrawerTarget}
-      />
+      >
+        {children}
+      </ProjectDetailView>
       {tunnelsDrawerTarget && (
         <Drawer
           icon={IconCloud}
@@ -35,7 +44,9 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
           onClose={() => setTunnelsDrawerTarget(null)}
           closeLabel={t("actions.closeTunnelsDrawer")}
         >
-          <TunnelsManager environmentId={tunnelsDrawerTarget.id} />
+          <ProjectPermissionProvider projectId={tunnelsDrawerTarget.projectId}>
+            <TunnelsManager environmentId={tunnelsDrawerTarget.id} />
+          </ProjectPermissionProvider>
         </Drawer>
       )}
       {logsDrawerTarget && (
@@ -46,7 +57,9 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
           onClose={() => setLogsDrawerTarget(null)}
           closeLabel={t("actions.closeLogsDrawer")}
         >
-          <LogViewerManager environmentId={logsDrawerTarget.id} />
+          <ProjectPermissionProvider projectId={logsDrawerTarget.projectId}>
+            <LogViewerManager environmentId={logsDrawerTarget.id} />
+          </ProjectPermissionProvider>
         </Drawer>
       )}
       {alertingDrawerTarget && (
@@ -57,7 +70,9 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
           onClose={() => setAlertingDrawerTarget(null)}
           closeLabel={t("actions.closeAlertingDrawer")}
         >
-          <AlertingManager environmentId={alertingDrawerTarget.id} />
+          <ProjectPermissionProvider projectId={alertingDrawerTarget.projectId}>
+            <AlertingManager environmentId={alertingDrawerTarget.id} />
+          </ProjectPermissionProvider>
         </Drawer>
       )}
     </>

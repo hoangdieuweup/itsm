@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { Plus, Pencil, Trash2, ArrowRight, ExternalLink, Copy, Check } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
-import { Can } from "@/entities/permission";
+import { CanInProject } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
 import { useTunnelHostnamesQuery, useRemoveTunnelHostname } from "../hooks/use-tunnel-hostnames";
 import { useCloudflareConfigQuery } from "@/entities/cloudflare-config";
@@ -43,7 +43,7 @@ export function TunnelHostnamesPanel({ environmentId, tunnelId }: { environmentI
             </p>
           </div>
         </div>
-        <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
+        <CanInProject I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_HOSTNAME.RESOURCE}>
           <Button
             size="sm"
             onClick={() => setFormTarget("create")}
@@ -51,7 +51,7 @@ export function TunnelHostnamesPanel({ environmentId, tunnelId }: { environmentI
           >
             <Plus className="size-3.5" aria-hidden="true" /> {t("hostnames.add")}
           </Button>
-        </Can>
+        </CanInProject>
       </div>
 
       {hostnamesLoading ? (
@@ -71,7 +71,7 @@ export function TunnelHostnamesPanel({ environmentId, tunnelId }: { environmentI
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 py-10 px-4 text-center">
           <IconDns className="size-12 rounded-2xl shadow-xs mb-3 opacity-90" />
           <p className="text-sm font-bold text-foreground">{t("hostnames.empty")}</p>
-          <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
+          <CanInProject I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_HOSTNAME.RESOURCE}>
             <Button
               size="sm"
               variant="outline"
@@ -80,7 +80,7 @@ export function TunnelHostnamesPanel({ environmentId, tunnelId }: { environmentI
             >
               <Plus className="size-3.5" aria-hidden="true" /> {t("hostnames.add")}
             </Button>
-          </Can>
+          </CanInProject>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -121,7 +121,7 @@ export function TunnelHostnamesPanel({ environmentId, tunnelId }: { environmentI
                   </span>
                 </div>
               </div>
-              <Can I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_ACCOUNT.RESOURCE}>
+              <CanInProject I={ACTIONS.MANAGE} a={PERMISSIONS.CLOUDFLARE_HOSTNAME.RESOURCE}>
                 <div className="flex items-center gap-1 shrink-0 self-end sm:self-auto">
                   <button
                     type="button"
@@ -142,7 +142,7 @@ export function TunnelHostnamesPanel({ environmentId, tunnelId }: { environmentI
                     <Trash2 className="size-4" aria-hidden="true" />
                   </button>
                 </div>
-              </Can>
+              </CanInProject>
             </div>
           ))}
         </div>
