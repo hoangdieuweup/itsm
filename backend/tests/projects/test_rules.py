@@ -1,6 +1,7 @@
 """Unit tests for app.modules.projects.rules — pure decisions, no I/O."""
 
 from app.modules.projects.rules import ProjectRoleRules
+from app.modules.rbac.constants import RbacPermissionCatalog
 
 
 class TestAssignableKeys:
@@ -56,8 +57,6 @@ class TestAssignableKeys:
     def test_every_assignable_key_exists_in_the_rbac_catalog(self) -> None:
         """A tuple in ASSIGNABLE with no matching CATALOG row can never be
         granted (no Permission id exists) — a silent dead entry."""
-        from app.modules.rbac.constants import RbacPermissionCatalog
-
         catalog = {(r, a) for r, a, _ in RbacPermissionCatalog.CATALOG}
         assert ProjectRoleRules.assignable_keys() <= catalog
         assert len(ProjectRoleRules.assignable_keys()) == 33
