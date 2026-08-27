@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/shared/lib/i18n/navigation";
 import { Plus, Pencil, Trash2, Cloud } from "lucide-react";
+import { formatDate } from "@/shared/lib/datetime";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
@@ -89,7 +90,7 @@ export function CloudflareAccountsPageContent() {
                     {account.cfAccountId}
                   </td>
                   <td className="px-6 py-4 font-mono text-xs text-muted-foreground">
-                    {new Date(account.createdAt).toLocaleDateString()}
+                    {formatDate(account.createdAt)}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-1.5">

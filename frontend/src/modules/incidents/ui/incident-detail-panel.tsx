@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { CheckCircle2, Eye } from "lucide-react";
+import { formatDatetime } from "@/shared/lib/datetime";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { CanInProject, ProjectPermissionProvider } from "@/entities/permission";
@@ -43,7 +44,7 @@ export function IncidentDetailPanel({ incident }: { incident: Incident }) {
             </div>
             <h2 className="text-base font-bold text-foreground">{incident.title}</h2>
             <p className="text-xs text-muted-foreground">
-              {t("detail.detected")} {new Date(incident.detectedAt).toLocaleString()}
+              {t("detail.detected")} {formatDatetime(incident.detectedAt)}
             </p>
           </div>
 
@@ -93,13 +94,13 @@ export function IncidentDetailPanel({ incident }: { incident: Incident }) {
           {incident.acknowledgedAt && (
             <div>
               <dt className="text-xs uppercase text-muted-foreground">{t("detail.acknowledgedAt")}</dt>
-              <dd className="text-foreground">{new Date(incident.acknowledgedAt).toLocaleString()}</dd>
+              <dd className="text-foreground">{formatDatetime(incident.acknowledgedAt)}</dd>
             </div>
           )}
           {incident.resolvedAt && (
             <div>
               <dt className="text-xs uppercase text-muted-foreground">{t("detail.resolvedAt")}</dt>
-              <dd className="text-foreground">{new Date(incident.resolvedAt).toLocaleString()}</dd>
+              <dd className="text-foreground">{formatDatetime(incident.resolvedAt)}</dd>
             </div>
           )}
         </dl>

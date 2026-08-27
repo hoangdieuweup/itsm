@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Plus } from "lucide-react";
+import { formatDatetime } from "@/shared/lib/datetime";
 import { Button } from "@/shared/ui/button";
 import { Label } from "@/shared/ui/label";
 import { Can } from "@/entities/permission";
@@ -215,7 +216,7 @@ export function IncidentsPageContent() {
                   <span className="truncate font-semibold text-sm text-foreground">{incident.title}</span>
                 </div>
                 <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                  {new Date(incident.detectedAt).toLocaleString()}
+                  {formatDatetime(incident.detectedAt)}
                 </span>
               </button>
             ))}
