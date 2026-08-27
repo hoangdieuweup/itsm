@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { ScrollText } from "lucide-react";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
+import { formatDatetime } from "@/shared/lib/datetime";
 import { useAuditLogsQuery } from "../hooks/use-audit-logs";
 import { AUDIT_EVENT_TYPE, type AuditLogFilters } from "../api/fetchers";
 
@@ -99,7 +100,7 @@ export function AuditLogPageContent() {
                 {data.items.map((entry) => (
                   <tr key={entry.id} className="transition-colors hover:bg-muted/40">
                     <td className="px-6 py-4 font-mono text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(entry.timestamp).toLocaleString()}
+                      {formatDatetime(entry.timestamp)}
                     </td>
                     <td className="px-6 py-4">
                       <span className="inline-flex rounded-lg border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-purple-600 dark:text-purple-400">

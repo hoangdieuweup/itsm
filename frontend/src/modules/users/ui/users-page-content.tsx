@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
+import { formatDatetime } from "@/shared/lib/datetime";
 import { Can, RESOURCES, ACTIONS } from "@/entities/permission";
 import { USER_STATUS, useUsers, type User } from "@/entities/user";
 import { IconUsers } from "@/shared/ui/icons";
@@ -210,7 +211,7 @@ export function UsersPageContent() {
                       </td>
                       <td className="px-6 py-4 text-xs font-mono text-muted-foreground">
                         {user.lastLoginAt
-                          ? new Date(user.lastLoginAt).toLocaleString()
+                          ? formatDatetime(user.lastLoginAt)
                           : "—"}
                       </td>
                       <td className="px-6 py-4 text-right">
