@@ -100,6 +100,7 @@
         "read": "Xem thông tin tài khoản Cloudflare",
         "update": "Đổi tên / Xoay token tài khoản",
         "delete": "Xóa tài khoản Cloudflare",
+        "manage": "Quản lý tunnel, DNS record và tài nguyên zone trên tài khoản Cloudflare",
         "test_connection": "Kiểm tra kết nối token",
         "reveal_token": "Hiển thị API token đã giải mã",
         "manage_all": "Toàn quyền quản trị tài khoản Cloudflare"

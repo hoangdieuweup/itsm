@@ -100,6 +100,7 @@
         "read": "View Cloudflare account details",
         "update": "Edit account name / Rotate token",
         "delete": "Delete Cloudflare accounts",
+        "manage": "Manage tunnels, DNS records, and zone resources on Cloudflare accounts",
         "test_connection": "Test Cloudflare token connection",
         "reveal_token": "Reveal decrypted API token",
         "manage_all": "Full administrative access to Cloudflare accounts"
