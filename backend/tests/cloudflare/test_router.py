@@ -347,6 +347,7 @@ async def _bind_environment(
             ("cloudflare_account", "create"),
             ("cloudflare_account", "read"),
             ("cloudflare_config", "manage"),
+            ("cloudflare_traffic", "read"),
             ("project", "create"),
             ("environment", "create"),
             ("environment", "read"),

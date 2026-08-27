@@ -22,7 +22,7 @@ class TestRbacPermissionCatalog:
             assert ("project_cloudflare_dns", action) in resources_actions
             assert ("project_alert_rule", action) in resources_actions
         assert ("project_cloudflare_config", "read") in resources_actions
-        assert ("project_cloudflare_audit", "read") in resources_actions
+        assert ("project_cloudflare_traffic", "read") in resources_actions
         for action in ("read", "manage"):
             assert ("project_loki_config", action) in resources_actions
         for action in ("create", "read", "acknowledge", "resolve"):

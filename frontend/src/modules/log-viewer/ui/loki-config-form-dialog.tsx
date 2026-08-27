@@ -8,7 +8,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
-import { LOKI_AUTH_TYPE, type LokiAuthType, type LokiConfig } from "../model/schema";
+import { LOKI_AUTH_TYPE, type LokiAuthType, type LokiConfig } from "@/entities/loki-config";
 import { useCreateLokiConfig, useUpdateLokiConfig } from "../hooks/use-loki-config";
 import { IconGrafana } from "@/shared/ui/icons";
 

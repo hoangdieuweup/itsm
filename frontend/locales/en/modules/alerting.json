@@ -33,6 +33,7 @@
     "cfAlertType": "Cloudflare alert type",
     "cfAlertTypeLoading": "Loading available alerts…",
     "cfAlertTypePlaceholder": "Select an alert type",
+    "cfAlertTypeError": "Couldn't load Cloudflare alert types.",
     "cloudflareNotBoundHint": "This environment has no Cloudflare account bound yet — bind one from the DNS page first.",
     "lokiEndpointUrl": "Loki endpoint URL",
     "lokiQuery": "LogQL query",
@@ -54,6 +55,7 @@
   "errors": {
     "alert_rule_not_found": "This alert rule no longer exists.",
     "cloudflare_not_bound_for_alerting": "This environment has no Cloudflare account bound.",
+    "cloudflare_account_not_found_for_alerting": "This Cloudflare account could not be found.",
     "missing_cf_alert_type": "Select a Cloudflare alert type before saving.",
     "observability_environment_not_found": "This environment no longer exists."
   },

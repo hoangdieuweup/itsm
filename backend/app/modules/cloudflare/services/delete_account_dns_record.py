@@ -28,6 +28,4 @@ class DeleteAccountDnsRecord(AbstractUseCase):
         if ciphertext is None:
             raise CloudflareAccountNotFound()
         plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
-        await self._client.delete_dns_record(
-            zone_id=zone_id, cf_record_id=cf_record_id, api_token=plaintext
-        )
+        await self._client.delete_dns_record(zone_id=zone_id, cf_record_id=cf_record_id, api_token=plaintext)

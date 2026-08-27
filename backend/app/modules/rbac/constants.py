@@ -82,8 +82,10 @@ class RbacPermissionCatalog:
         ("cloudflare_dns", "create", "permissions.cloudflare_dns.create"),
         ("cloudflare_dns", "update", "permissions.cloudflare_dns.update"),
         ("cloudflare_dns", "delete", "permissions.cloudflare_dns.delete"),
-        # ── Cloudflare audit logs (ACCOUNT-level; unused after the
-        ("cloudflare_audit", "read", "permissions.cloudflare_audit.read"),
+        # ── Cloudflare traffic stats (GraphQL Analytics, ACCOUNT-level;
+        # kept for symmetry — the account-level route this would gate
+        # doesn't exist yet, project_cloudflare_traffic is what's used) ──
+        ("cloudflare_traffic", "read", "permissions.cloudflare_traffic.read"),
         # ── Notification channels ──────────────────────────────────
         ("notification_channel", "create", "permissions.notification_channel.create"),
         ("notification_channel", "read", "permissions.notification_channel.read"),
@@ -112,7 +114,7 @@ class RbacPermissionCatalog:
         ("project_cloudflare_hostname", "create", "permissions.project_cloudflare_hostname.create"),
         ("project_cloudflare_hostname", "update", "permissions.project_cloudflare_hostname.update"),
         ("project_cloudflare_hostname", "delete", "permissions.project_cloudflare_hostname.delete"),
-        ("project_cloudflare_audit", "read", "permissions.project_cloudflare_audit.read"),
+        ("project_cloudflare_traffic", "read", "permissions.project_cloudflare_traffic.read"),
         ("project_loki_config", "read", "permissions.project_loki_config.read"),
         ("project_loki_config", "manage", "permissions.project_loki_config.manage"),
         ("project_alert_rule", "create", "permissions.project_alert_rule.create"),
@@ -148,7 +150,7 @@ class RbacResources:
     CLOUDFLARE_TUNNEL = "cloudflare_tunnel"
     CLOUDFLARE_HOSTNAME = "cloudflare_hostname"
     CLOUDFLARE_DNS = "cloudflare_dns"
-    CLOUDFLARE_AUDIT = "cloudflare_audit"
+    CLOUDFLARE_TRAFFIC = "cloudflare_traffic"
     NOTIFICATION_CHANNEL = "notification_channel"
     ALERT_RULE = "alert_rule"
     INCIDENT = "incident"
@@ -157,7 +159,7 @@ class RbacResources:
     PROJECT_CLOUDFLARE_TUNNEL = "project_cloudflare_tunnel"
     PROJECT_CLOUDFLARE_HOSTNAME = "project_cloudflare_hostname"
     PROJECT_CLOUDFLARE_DNS = "project_cloudflare_dns"
-    PROJECT_CLOUDFLARE_AUDIT = "project_cloudflare_audit"
+    PROJECT_CLOUDFLARE_TRAFFIC = "project_cloudflare_traffic"
     PROJECT_LOKI_CONFIG = "project_loki_config"
     PROJECT_ALERT_RULE = "project_alert_rule"
     PROJECT_INCIDENT = "project_incident"

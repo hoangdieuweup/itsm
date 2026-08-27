@@ -72,6 +72,25 @@ class CloudflareApi:
             cf_account_id=account.cf_account_id,
             api_token=plaintext,
             cloudflare_account_id=account.id,
+            zone_id=config.zone_id,
+        )
+
+    @facade
+    async def get_ready_client_for_account(self, cloudflare_account_id: UUID) -> ReadyCloudflareClient | None:
+        """Resolves a Cloudflare account id directly — no environment/config
+        lookup, since some routes (e.g. available-alerts) are account-scoped
+        with no environment anywhere in their path. Returns None if the
+        account doesn't exist or has no stored token."""
+        account = await self._uow.accounts.get_by_id(cloudflare_account_id)
+        ciphertext = await self._uow.accounts.get_token_ciphertext(cloudflare_account_id)
+        if account is None or ciphertext is None:
+            return None
+        plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
+        return ReadyCloudflareClient(
+            client=self._client,
+            cf_account_id=account.cf_account_id,
+            api_token=plaintext,
+            cloudflare_account_id=account.id,
         )
 
     @facade

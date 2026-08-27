@@ -28,3 +28,14 @@ class CloudflareDnsOperationRejected(ValidationFailedError):
 
     code = CloudflareErrorCode.DNS_OPERATION_REJECTED
     message = "Cloudflare rejected this DNS record operation"
+
+
+class CloudflareAnalyticsQueryRejected(ValidationFailedError):
+    """Raised when Cloudflare's GraphQL Analytics API returns a body-level
+    `errors` array (e.g. a token missing the Zone:Analytics:Read permission,
+    or a malformed query) — distinct from InvalidCloudflareToken (401/403 at
+    the HTTP layer) and CloudflareDnsOperationRejected (the REST v4
+    envelope's success=false), because GraphQL's own error shape is neither."""
+
+    code = CloudflareErrorCode.ANALYTICS_QUERY_REJECTED
+    message = "Cloudflare rejected this analytics query"

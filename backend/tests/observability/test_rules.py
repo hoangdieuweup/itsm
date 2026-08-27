@@ -58,3 +58,22 @@ class TestCategoryForCloudflareAlertType:
             AlertingRules.category_for_cloudflare_alert_type("dedicated_ssl_certificate_event_type")
             == IncidentCategory.TRAFFIC
         )
+
+
+class TestSupportsZoneFilter:
+    def test_true_when_zones_key_present(self) -> None:
+        filter_options = [{"Key": "zones", "ComparisonOperator": "==", "Range": "1-n"}]
+        assert AlertingRules.supports_zone_filter(filter_options) is True
+
+    def test_true_when_zones_is_one_of_several_keys(self) -> None:
+        filter_options = [{"Key": "slo"}, {"Key": "zones"}]
+        assert AlertingRules.supports_zone_filter(filter_options) is True
+
+    def test_false_when_no_zones_key(self) -> None:
+        assert AlertingRules.supports_zone_filter([{"Key": "slo"}]) is False
+
+    def test_false_when_empty(self) -> None:
+        assert AlertingRules.supports_zone_filter([]) is False
+
+    def test_false_when_none(self) -> None:
+        assert AlertingRules.supports_zone_filter(None) is False

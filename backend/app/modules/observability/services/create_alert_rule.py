@@ -1,11 +1,15 @@
 """Create an alert rule. CLOUDFLARE_NATIVE: resolve the environment's bound
 Cloudflare account -> ensure a webhook destination exists for it -> create
 the Notification Policy -> persist with the real cf_policy_id (Decision #9).
-LOKI_QUERY: push the rule into Loki's own Ruler so it actually gets
-evaluated (Decision #10) — storing it in our DB alone would never cause
-Loki to fire anything. Nothing persists locally until the external call
-that source needs has already succeeded, mirroring the "call the external
-system first" convention every prior Cloudflare-write use case follows."""
+The policy is scoped to the environment's own bound zone (filters.zones)
+whenever the chosen alert_type supports it — a Cloudflare account is often
+shared by several environments/projects, and an unscoped policy would fire
+for every zone on the account, not just this one. LOKI_QUERY: push the rule
+into Loki's own Ruler so it actually gets evaluated (Decision #10) —
+storing it in our DB alone would never cause Loki to fire anything. Nothing
+persists locally until the external call that source needs has already
+succeeded, mirroring the "call the external system first" convention every
+prior Cloudflare-write use case follows."""
 
 from uuid import UUID
 
@@ -28,6 +32,7 @@ from app.modules.observability.exceptions import (
     MissingCloudflareAlertType,
     ObservabilityEnvironmentNotFound,
 )
+from app.modules.observability.rules import AlertingRules
 from app.modules.observability.schemas import AlertRuleRead
 from app.modules.observability.uow import AbstractObservabilityUnitOfWork
 from app.modules.projects.public import ProjectsApi
@@ -110,12 +115,19 @@ class CreateAlertRule(AbstractUseCase):
         webhook_destination_id = await self._cloudflare_api.ensure_webhook_destination(
             ready.cloudflare_account_id, webhook_url=webhook_url
         )
+        available = await ready.client.list_available_alerts(
+            cf_account_id=ready.cf_account_id, api_token=ready.api_token
+        )
+        matching = next((item for item in available if item.get("type") == cf_alert_type), None)
+        filter_options = matching.get("filter_options") if matching else None
+        zone_id = ready.zone_id if AlertingRules.supports_zone_filter(filter_options) else None
         return await ready.client.create_policy(
             cf_account_id=ready.cf_account_id,
             api_token=ready.api_token,
             name=name,
             alert_type=cf_alert_type,
             webhook_destination_id=webhook_destination_id,
+            zone_id=zone_id,
         )
 
     @helper

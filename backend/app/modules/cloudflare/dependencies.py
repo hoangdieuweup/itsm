@@ -31,10 +31,10 @@ from app.modules.cloudflare.services.delete_account_tunnel import DeleteAccountT
 from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
 from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
 from app.modules.cloudflare.services.delete_tunnel import DeleteCloudflareTunnel
+from app.modules.cloudflare.services.get_traffic_stats import GetCloudflareTrafficStats
 from app.modules.cloudflare.services.list_account_dns_records import ListAccountDnsRecords
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
 from app.modules.cloudflare.services.list_account_tunnels import ListAccountTunnels
-from app.modules.cloudflare.services.list_cloudflare_audit_logs import ListCloudflareAuditLogs
 from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
 from app.modules.cloudflare.services.list_tunnel_hostnames import ListTunnelHostnames
 from app.modules.cloudflare.services.list_tunnels import ListTunnels
@@ -272,12 +272,13 @@ async def get_list_zones(
     return ListZones(uow, client)
 
 
-async def get_list_cloudflare_audit_logs(
+async def get_get_cloudflare_traffic_stats(
     uow: AbstractCloudflareUnitOfWork = Depends(get_uow),
     client: CloudflareClient = Depends(get_cloudflare_client),
-) -> ListCloudflareAuditLogs:
-    """Provide the list-audit-logs use case."""
-    return ListCloudflareAuditLogs(uow, client)
+    projects_api: ProjectsApi = Depends(get_projects_api),
+) -> GetCloudflareTrafficStats:
+    """Provide the get-traffic-stats use case."""
+    return GetCloudflareTrafficStats(uow, client, projects_api)
 
 
 async def get_list_dns_records(uow: AbstractCloudflareUnitOfWork = Depends(get_uow)) -> ListDnsRecords:

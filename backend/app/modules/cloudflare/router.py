@@ -19,7 +19,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 
 from app.core.models import ApiResponse
-from app.integrations.cloudflare.schemas import CloudflareAuditLogEntry, ZoneOption
+from app.integrations.cloudflare.schemas import CloudflareTrafficStats, ZoneOption
 from app.modules.cloudflare.constants import AccessLevel
 from app.modules.cloudflare.dependencies import (
     get_add_tunnel_hostname,
@@ -36,10 +36,10 @@ from app.modules.cloudflare.dependencies import (
     get_delete_config,
     get_delete_dns_record,
     get_delete_tunnel,
+    get_get_cloudflare_traffic_stats,
     get_list_account_dns_records,
     get_list_account_managers,
     get_list_account_tunnels,
-    get_list_cloudflare_audit_logs,
     get_list_dns_records,
     get_list_tunnel_hostnames,
     get_list_tunnels,
@@ -105,10 +105,10 @@ from app.modules.cloudflare.services.delete_account_tunnel import DeleteAccountT
 from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
 from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
 from app.modules.cloudflare.services.delete_tunnel import DeleteCloudflareTunnel
+from app.modules.cloudflare.services.get_traffic_stats import GetCloudflareTrafficStats
 from app.modules.cloudflare.services.list_account_dns_records import ListAccountDnsRecords
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
 from app.modules.cloudflare.services.list_account_tunnels import ListAccountTunnels
-from app.modules.cloudflare.services.list_cloudflare_audit_logs import ListCloudflareAuditLogs
 from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
 from app.modules.cloudflare.services.list_tunnel_hostnames import ListTunnelHostnames
 from app.modules.cloudflare.services.list_tunnels import ListTunnels
@@ -509,26 +509,28 @@ async def sync_environment_dns_records(
     return ApiResponse[list[DnsRecordRead]](success=True, data=records)
 
 
-@router.get("/environments/{environment_id}/cloudflare-audit-logs")
-async def list_cloudflare_audit_logs(
+@router.get("/environments/{environment_id}/cloudflare-traffic-stats")
+async def get_cloudflare_traffic_stats(
     environment_id: UUID,
     since: datetime | None = None,
-    before: datetime | None = None,
-    use_case: ListCloudflareAuditLogs = Depends(get_list_cloudflare_audit_logs),
+    until: datetime | None = None,
+    use_case: GetCloudflareTrafficStats = Depends(get_get_cloudflare_traffic_stats),
     _grant: AccountAccessGrant = Depends(
         require_cloudflare_environment_access(
-            RbacResources.CLOUDFLARE_AUDIT,
-            RbacResources.PROJECT_CLOUDFLARE_AUDIT,
+            RbacResources.CLOUDFLARE_TRAFFIC,
+            RbacResources.PROJECT_CLOUDFLARE_TRAFFIC,
             RbacActions.READ,
             AccessLevel.VIEWER,
         )
     ),
-) -> ApiResponse[list[CloudflareAuditLogEntry]]:
-    """List this environment's Cloudflare Audit Log entries, filtered to its
-    bound zone. Logpull (raw traffic) was dropped from Phase 6 — Enterprise
-    plan only; this is config-change history, not HTTP request logs."""
-    entries = await use_case.execute(environment_id=environment_id, since=since, before=before)
-    return ApiResponse[list[CloudflareAuditLogEntry]](success=True, data=entries)
+) -> ApiResponse[CloudflareTrafficStats]:
+    """Aggregated Cloudflare traffic (GraphQL Analytics, Free-plan
+    compatible) for this environment's own hostname over the given range —
+    defaults to the last 24 hours when since/until are omitted. Raw
+    per-request logs (Logpull/Logpush) are Enterprise-only; this is the
+    aggregated substitute every plan can use."""
+    stats = await use_case.execute(environment_id=environment_id, since=since, until=until)
+    return ApiResponse[CloudflareTrafficStats](success=True, data=stats)
 
 
 @router.post("/environments/{environment_id}/dns-records")

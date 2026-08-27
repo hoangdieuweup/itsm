@@ -23,6 +23,7 @@ from app.modules.observability.constants import (
 )
 from app.modules.observability.exceptions import (
     AlertRuleNotFound,
+    CloudflareAccountNotFoundForAlerting,
     CloudflareNotBoundForAlerting,
     IncidentNotFound,
     InvalidIncidentTransition,
@@ -827,12 +828,15 @@ class TestStreamLogTail:
 
 
 class FakeReadyCloudflareClient:
-    def __init__(self, client, cf_account_id="cf-1", api_token="tok", cloudflare_account_id=None) -> None:
-        self.client, self.cf_account_id, self.api_token, self.cloudflare_account_id = (
+    def __init__(
+        self, client, cf_account_id="cf-1", api_token="tok", cloudflare_account_id=None, zone_id="z1"
+    ) -> None:
+        self.client, self.cf_account_id, self.api_token, self.cloudflare_account_id, self.zone_id = (
             client,
             cf_account_id,
             api_token,
             cloudflare_account_id or uuid4(),
+            zone_id,
         )
 
 
@@ -841,8 +845,13 @@ class FakeCloudflareApiForAlertRules:
         self._ready = ready
         self._webhook_destination_id = webhook_destination_id
         self.ensure_calls: list[tuple] = []
+        self.account_calls: list = []
 
     async def get_ready_client_for_environment(self, environment_id):
+        return self._ready
+
+    async def get_ready_client_for_account(self, cloudflare_account_id):
+        self.account_calls.append(cloudflare_account_id)
         return self._ready
 
     async def ensure_webhook_destination(self, cloudflare_account_id, *, webhook_url):
@@ -868,7 +877,13 @@ class FakeCloudflareClientForPolicy:
         self.deleted.append(kwargs)
 
     async def list_available_alerts(self, **kwargs):
-        return [{"type": "advanced_ddos_attack_l4_alert"}, {"type": "health_check_status_notification"}]
+        return [
+            {
+                "type": "advanced_ddos_attack_l4_alert",
+                "filter_options": [{"Key": "zones", "ComparisonOperator": "==", "Range": "1-n"}],
+            },
+            {"type": "health_check_status_notification"},
+        ]
 
 
 class FakeLokiClientForRuleGroup:
@@ -907,6 +922,63 @@ class TestCreateAlertRuleCloudflareNative:
         assert cloudflare_api.ensure_calls
         assert cf_client.created[0]["alert_type"] == "advanced_ddos_attack_l4_alert"
 
+    async def test_scopes_the_policy_to_the_environments_zone_when_the_alert_type_supports_it(self) -> None:
+        """Regression test: a Cloudflare account is often shared by several
+        environments/projects — an unscoped policy would fire for every
+        zone on the account, not just this environment's own zone."""
+        env_id = uuid4()
+        cf_client = FakeCloudflareClientForPolicy()
+        cloudflare_api = FakeCloudflareApiForAlertRules(
+            ready=FakeReadyCloudflareClient(cf_client, zone_id="zone-abc")
+        )
+        use_case = CreateAlertRule(
+            FakeObservabilityUnitOfWork(),
+            cloudflare_api=cloudflare_api,
+            loki_client=None,
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4())}),
+            audit_api=FakeAuditApi(),
+        )
+
+        await use_case.execute(
+            environment_id=env_id,
+            name="DDoS",
+            source=AlertRuleSource.CLOUDFLARE_NATIVE,
+            cf_alert_type="advanced_ddos_attack_l4_alert",
+            condition=None,
+            severity=AlertSeverity.HIGH,
+            channel_ids=[],
+            actor=_actor(),
+        )
+
+        assert cf_client.created[0]["zone_id"] == "zone-abc"
+
+    async def test_leaves_the_policy_account_wide_when_the_alert_type_has_no_zone_filter(self) -> None:
+        env_id = uuid4()
+        cf_client = FakeCloudflareClientForPolicy()
+        cloudflare_api = FakeCloudflareApiForAlertRules(
+            ready=FakeReadyCloudflareClient(cf_client, zone_id="zone-abc")
+        )
+        use_case = CreateAlertRule(
+            FakeObservabilityUnitOfWork(),
+            cloudflare_api=cloudflare_api,
+            loki_client=None,
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4())}),
+            audit_api=FakeAuditApi(),
+        )
+
+        await use_case.execute(
+            environment_id=env_id,
+            name="Origin Health",
+            source=AlertRuleSource.CLOUDFLARE_NATIVE,
+            cf_alert_type="health_check_status_notification",
+            condition=None,
+            severity=AlertSeverity.HIGH,
+            channel_ids=[],
+            actor=_actor(),
+        )
+
+        assert cf_client.created[0]["zone_id"] is None
+
     async def test_unbound_environment_raises(self) -> None:
         env_id = uuid4()
         cloudflare_api = FakeCloudflareApiForAlertRules(ready=None)
@@ -935,6 +1007,9 @@ class TestCreateAlertRuleCloudflareNative:
         env_id = uuid4()
 
         class FailingCfClient:
+            async def list_available_alerts(self, **kwargs):
+                return []
+
             async def create_policy(self, **kwargs):
                 raise CloudflareDnsOperationRejected()
 
@@ -1008,20 +1083,34 @@ class TestCreateAlertRuleLokiQuery:
 
 class TestListAvailableAlerts:
     async def test_shapes_raw_dicts_into_options(self) -> None:
-        env_id = uuid4()
+        account_id = uuid4()
         cf_client = FakeCloudflareClientForPolicy()
         cloudflare_api = FakeCloudflareApiForAlertRules(ready=FakeReadyCloudflareClient(cf_client))
         use_case = ListAvailableAlerts(cloudflare_api)
 
-        options = await use_case.execute(env_id)
+        options = await use_case.execute(account_id)
 
         assert options[0].alert_type == "advanced_ddos_attack_l4_alert"
         assert options[0].display_name
 
-    async def test_unbound_environment_raises(self) -> None:
+    async def test_calls_get_ready_client_for_account_with_the_exact_account_id(self) -> None:
+        """Regression test: the route's path param is a Cloudflare account
+        id, not an environment id — this must resolve via
+        get_ready_client_for_account, and with the SAME id it was given,
+        never silently dropped or swapped for something else."""
+        account_id = uuid4()
+        cf_client = FakeCloudflareClientForPolicy()
+        cloudflare_api = FakeCloudflareApiForAlertRules(ready=FakeReadyCloudflareClient(cf_client))
+        use_case = ListAvailableAlerts(cloudflare_api)
+
+        await use_case.execute(account_id)
+
+        assert cloudflare_api.account_calls == [account_id]
+
+    async def test_nonexistent_account_raises(self) -> None:
         cloudflare_api = FakeCloudflareApiForAlertRules(ready=None)
         use_case = ListAvailableAlerts(cloudflare_api)
-        with pytest.raises(CloudflareNotBoundForAlerting):
+        with pytest.raises(CloudflareAccountNotFoundForAlerting):
             await use_case.execute(uuid4())
 
 

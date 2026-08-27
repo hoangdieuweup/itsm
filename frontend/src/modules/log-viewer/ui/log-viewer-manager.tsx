@@ -2,34 +2,28 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Pencil, Trash2, Play, RefreshCw, AlertTriangle, Radio, Pause } from "lucide-react";
+import { Play, RefreshCw, AlertTriangle, Radio, Pause } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
-import { CanInProject } from "@/entities/permission";
-import { ACTIONS, RESOURCES } from "@/shared/constants/permissions";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
-import { useLokiConfigQuery, useDeleteLokiConfig } from "../hooks/use-loki-config";
+import { formatDatetime, defaultRange } from "@/shared/lib/datetime";
+import { useLokiConfigQuery, type LokiConfig } from "@/entities/loki-config";
+import { useCloudflareConfigQuery } from "@/entities/cloudflare-config";
 import { useRunLogQuery } from "../hooks/use-log-query";
 import { useLogTail } from "../hooks/use-log-tail";
-import { useCloudflareAuditLogsQuery } from "../hooks/use-cloudflare-audit-logs";
+import { useCloudflareTrafficStatsQuery } from "../hooks/use-cloudflare-traffic-stats";
 import type { LogEntry } from "../model/schema";
-import { LokiConfigFormDialog } from "./loki-config-form-dialog";
-import { IconGrafana } from "@/shared/ui/icons";
 
-type TabKey = "loki" | "cloudflareAuditLog";
+type TabKey = "loki" | "cloudflareTraffic";
 
-function toDatetimeLocal(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function defaultRange(rangeMinutes: number): { start: string; end: string } {
-  const end = new Date();
-  const start = new Date(end.getTime() - rangeMinutes * 60_000);
-  return { start: toDatetimeLocal(start), end: toDatetimeLocal(end) };
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** exponent;
+  return `${exponent === 0 ? value : value.toFixed(1)} ${units[exponent]}`;
 }
 
 function LogResultsTable({ entries }: { entries: LogEntry[] }) {
@@ -38,31 +32,33 @@ function LogResultsTable({ entries }: { entries: LogEntry[] }) {
     return <p className="text-sm text-muted-foreground">{t("query.empty")}</p>;
   }
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-            <th className="py-2 pr-4">{t("query.timestamp")}</th>
-            <th className="py-2 pr-4">{t("query.line")}</th>
-            <th className="py-2">{t("query.labels")}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {entries.map((entry, index) => (
-            <tr key={`${entry.timestamp}-${index}`}>
-              <td className="whitespace-nowrap py-2 pr-4 align-top font-mono text-xs text-muted-foreground">
-                {entry.timestamp}
-              </td>
-              <td className="py-2 pr-4 align-top font-mono text-xs break-all">{entry.line}</td>
-              <td className="py-2 align-top text-xs text-muted-foreground">
-                {Object.entries(entry.labels)
-                  .map(([key, value]) => `${key}=${value}`)
-                  .join(", ")}
-              </td>
+    <div className="flex flex-col min-h-0 overflow-hidden rounded-2xl border border-border/50 bg-card/75 backdrop-blur-xl shadow-sm">
+      <div className="flex-1 overflow-auto max-h-[60vh]">
+        <table className="w-full min-w-[600px] text-left text-sm">
+          <thead className="sticky top-0 z-10 border-b border-border/40 bg-card/95 backdrop-blur-md text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
+            <tr>
+              <th scope="col" className="px-5 py-3 font-bold text-foreground/80">{t("query.timestamp")}</th>
+              <th scope="col" className="px-5 py-3 font-bold text-foreground/80">{t("query.line")}</th>
+              <th scope="col" className="px-5 py-3 font-bold text-foreground/80">{t("query.labels")}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-border/40">
+            {entries.map((entry, index) => (
+              <tr key={`${entry.timestamp}-${index}`} className="transition-colors hover:bg-muted/30">
+                <td className="whitespace-nowrap px-5 py-3 align-top font-mono text-xs text-muted-foreground">
+                  {entry.timestamp}
+                </td>
+                <td className="px-5 py-3 align-top font-mono text-xs break-all">{entry.line}</td>
+                <td className="px-5 py-3 align-top text-xs text-muted-foreground">
+                  {Object.entries(entry.labels)
+                    .map(([key, value]) => `${key}=${value}`)
+                    .join(", ")}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -206,13 +202,15 @@ function LokiQueryTab({ environmentId, defaultQuery, defaultRangeMinutes }: {
   );
 }
 
-function CloudflareAuditLogTab({ environmentId }: { environmentId: string }) {
+function CloudflareTrafficTab({ environmentId }: { environmentId: string }) {
   const t = useTranslations("logViewer");
-  const [since, setSince] = useState("");
-  const [before, setBefore] = useState("");
-  const { data, isLoading, refetch, isFetching } = useCloudflareAuditLogsQuery(environmentId, {
-    since: since ? new Date(since).toISOString() : undefined,
-    before: before ? new Date(before).toISOString() : undefined,
+  const getErrorMessage = useApiErrorMessage("logViewer");
+  const initialRange = defaultRange(24 * 60); // last 24h
+  const [since, setSince] = useState(initialRange.start);
+  const [until, setUntil] = useState(initialRange.end);
+  const { data, isLoading, error, refetch, isFetching } = useCloudflareTrafficStatsQuery(environmentId, {
+    since: new Date(since).toISOString(),
+    until: new Date(until).toISOString(),
   });
 
   if (isLoading) {
@@ -220,241 +218,236 @@ function CloudflareAuditLogTab({ environmentId }: { environmentId: string }) {
   }
 
   if (data === null) {
-    return <p className="text-sm text-muted-foreground">{t("auditLog.notBound")}</p>;
+    return <p className="text-sm text-muted-foreground">{t("traffic.notBound")}</p>;
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
-          <Label htmlFor="audit-log-since">{t("auditLog.since")}</Label>
+          <Label htmlFor="traffic-since">{t("traffic.since")}</Label>
           <Input
-            id="audit-log-since"
+            id="traffic-since"
             type="datetime-local"
             value={since}
             onChange={(event) => setSince(event.target.value)}
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="audit-log-before">{t("auditLog.before")}</Label>
+          <Label htmlFor="traffic-until">{t("traffic.until")}</Label>
           <Input
-            id="audit-log-before"
+            id="traffic-until"
             type="datetime-local"
-            value={before}
-            onChange={(event) => setBefore(event.target.value)}
+            value={until}
+            onChange={(event) => setUntil(event.target.value)}
           />
         </div>
         <Button type="button" variant="outline" onClick={() => refetch()} disabled={isFetching}>
           <RefreshCw className="mr-1.5 size-3.5" aria-hidden="true" />
-          {t("auditLog.refresh")}
+          {t("traffic.refresh")}
         </Button>
       </div>
 
       {isFetching && <Skeleton className="h-32 w-full" />}
 
-      {!isFetching && data && data.length === 0 && (
-        <p className="text-sm text-muted-foreground">{t("auditLog.empty")}</p>
+      {!isFetching && error && (
+        <p className="flex items-center gap-2 text-sm text-destructive">
+          <AlertTriangle className="size-3.5 shrink-0" aria-hidden="true" />
+          {getErrorMessage(error)}
+        </p>
       )}
 
-      {!isFetching && data && data.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                <th className="py-2 pr-4">{t("auditLog.when")}</th>
-                <th className="py-2 pr-4">{t("auditLog.actor")}</th>
-                <th className="py-2 pr-4">{t("auditLog.action")}</th>
-                <th className="py-2 pr-4">{t("auditLog.resource")}</th>
-                <th className="py-2">{t("auditLog.newValue")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {data.map((entry) => (
-                <tr key={entry.id}>
-                  <td className="whitespace-nowrap py-2 pr-4 align-top font-mono text-xs text-muted-foreground">
-                    {entry.when}
-                  </td>
-                  <td className="py-2 pr-4 align-top">{entry.actorEmail ?? "—"}</td>
-                  <td className="py-2 pr-4 align-top font-mono text-xs">{entry.actionType}</td>
-                  <td className="py-2 pr-4 align-top text-muted-foreground">
-                    {entry.resourceType ?? "—"}
-                    {entry.resourceProduct ? ` (${entry.resourceProduct})` : ""}
-                  </td>
-                  <td className="py-2 align-top break-all text-muted-foreground">{entry.newValue ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {!isFetching && !error && data && (
+        <>
+          <p className="text-xs text-muted-foreground">{t("traffic.hostnameHint", { hostname: data.hostname })}</p>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-border/50 bg-card/75 p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                {t("traffic.totalRequests")}
+              </p>
+              <p className="mt-1 text-2xl font-bold text-foreground">{data.totalRequests.toLocaleString()}</p>
+            </div>
+            <div className="rounded-2xl border border-border/50 bg-card/75 p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                {t("traffic.totalBytes")}
+              </p>
+              <p className="mt-1 text-2xl font-bold text-foreground">{formatBytes(data.totalBytes)}</p>
+            </div>
+          </div>
+
+          {data.totalRequests === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("traffic.empty")}</p>
+          ) : (
+            <>
+              {data.statusCodes.length > 0 && (
+                <div className="flex flex-col gap-2 rounded-2xl border border-border/50 bg-card/75 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    {t("traffic.statusCodes")}
+                  </p>
+                  {data.statusCodes.map((entry) => {
+                    const widthPercent = Math.max(4, Math.round((entry.requests / data.totalRequests) * 100));
+                    return (
+                      <div key={entry.status} className="flex items-center gap-3 text-sm">
+                        <span className="w-12 shrink-0 font-mono text-xs text-muted-foreground">{entry.status}</span>
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                          <div className="h-full rounded-full bg-primary" style={{ width: `${widthPercent}%` }} />
+                        </div>
+                        <span className="w-16 shrink-0 text-right text-xs text-muted-foreground">
+                          {entry.requests.toLocaleString()}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {data.buckets.length > 0 && (
+                <div className="flex flex-col min-h-0 overflow-hidden rounded-2xl border border-border/50 bg-card/75 backdrop-blur-xl shadow-sm">
+                  <div className="flex-1 overflow-auto max-h-[60vh]">
+                    <table className="w-full min-w-[500px] text-left text-sm">
+                      <thead className="sticky top-0 z-10 border-b border-border/40 bg-card/95 backdrop-blur-md text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
+                        <tr>
+                          <th scope="col" className="px-5 py-3 font-bold text-foreground/80">{t("traffic.bucketStart")}</th>
+                          <th scope="col" className="px-5 py-3 font-bold text-foreground/80">{t("traffic.requests")}</th>
+                          <th scope="col" className="px-5 py-3 font-bold text-foreground/80">{t("traffic.bytes")}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/40">
+                        {data.buckets.map((bucket) => (
+                          <tr key={bucket.bucketStart} className="transition-colors hover:bg-muted/30">
+                            <td className="whitespace-nowrap px-5 py-3 align-top font-mono text-xs text-muted-foreground">
+                              {formatDatetime(bucket.bucketStart)}
+                            </td>
+                            <td className="px-5 py-3 align-top text-sm">{bucket.requests.toLocaleString()}</td>
+                            <td className="px-5 py-3 align-top text-sm text-muted-foreground">
+                              {formatBytes(bucket.bytes)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
     </div>
   );
 }
 
+function LogViewerTabSection({
+  environmentId,
+  tabs,
+  activeTab,
+  onSelectTab,
+  lokiConfig,
+  hasCloudflare,
+}: {
+  environmentId: string;
+  tabs: { key: TabKey; label: string }[];
+  activeTab: TabKey | null;
+  onSelectTab: (key: TabKey) => void;
+  lokiConfig: LokiConfig | null;
+  hasCloudflare: boolean;
+}) {
+  const t = useTranslations("logViewer");
+  return (
+    <section className="flex flex-col gap-4 rounded-xl border bg-card p-5">
+      <div role="tablist" aria-label={t("config.title")} className="flex gap-1 border-b">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            id={`log-viewer-tab-${tab.key}`}
+            aria-selected={activeTab === tab.key}
+            aria-controls={`log-viewer-panel-${tab.key}`}
+            onClick={() => onSelectTab(tab.key)}
+            className={`cursor-pointer border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+              activeTab === tab.key
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {lokiConfig && (
+        <div role="tabpanel" id="log-viewer-panel-loki" aria-labelledby="log-viewer-tab-loki" hidden={activeTab !== "loki"}>
+          {activeTab === "loki" && (
+            <LokiQueryTab
+              environmentId={environmentId}
+              defaultQuery={lokiConfig.defaultQuery}
+              defaultRangeMinutes={lokiConfig.defaultRangeMinutes}
+            />
+          )}
+        </div>
+      )}
+
+      {hasCloudflare && (
+        <div
+          role="tabpanel"
+          id="log-viewer-panel-cloudflareTraffic"
+          aria-labelledby="log-viewer-tab-cloudflareTraffic"
+          hidden={activeTab !== "cloudflareTraffic"}
+        >
+          {activeTab === "cloudflareTraffic" && <CloudflareTrafficTab environmentId={environmentId} />}
+        </div>
+      )}
+    </section>
+  );
+}
+
 /**
- * The reusable log-viewer surface — Loki config, Loki/Cloudflare-audit-log
+ * The reusable log-viewer surface — Loki config, Loki/Cloudflare-traffic
  * tabs — with no page-level chrome of its own. Shared by the full-page route
  * (`LogViewerPageContent`, which adds the `<h1>`/padding wrapper) and the
- * inline drawer opened from the environment chip on Project Detail.
+ * inline drawer opened from the environment chip on Project Detail. Only
+ * shows a tab for whichever of Loki/Cloudflare is actually configured.
  */
 export function LogViewerManager({ environmentId }: { environmentId: string }) {
   const t = useTranslations("logViewer");
-  const { data: config, isLoading: configLoading } = useLokiConfigQuery(environmentId);
-  const deleteConfig = useDeleteLokiConfig(environmentId);
+  const { data: config, isLoading: lokiLoading } = useLokiConfigQuery(environmentId);
+  const { data: cloudflareConfig, isLoading: cloudflareLoading } = useCloudflareConfigQuery(environmentId);
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabKey>("loki");
+
+  const [activeTab, setActiveTab] = useState<TabKey | null>(null);
+
+  const configLoading = lokiLoading || cloudflareLoading;
+  const hasLoki = Boolean(config);
+  const hasCloudflare = Boolean(cloudflareConfig);
 
   const tabs: { key: TabKey; label: string }[] = [
-    { key: "loki", label: t("tabs.loki") },
-    { key: "cloudflareAuditLog", label: t("tabs.cloudflareAuditLog") },
+    ...(hasLoki ? [{ key: "loki" as const, label: t("tabs.loki") }] : []),
+    ...(hasCloudflare ? [{ key: "cloudflareTraffic" as const, label: t("tabs.cloudflareTraffic") }] : []),
   ];
+  const resolvedActiveTab = tabs.some((tab) => tab.key === activeTab) ? activeTab : (tabs[0]?.key ?? null);
+
+  if (configLoading) {
+    return <Skeleton className="h-28 w-full rounded-2xl" />;
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      {configLoading && <Skeleton className="h-28 w-full rounded-2xl" />}
-
-      {!configLoading && !config && (
-        <section className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-card via-card/90 to-purple-500/5 p-7 backdrop-blur-xl shadow-lg shadow-black/5 dark:shadow-black/20">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-            <div className="flex items-start gap-4">
-              <IconGrafana className="size-12 shrink-0 rounded-2xl shadow-xs" />
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold tracking-tight text-foreground">
-                    {t("config.title")}
-                  </h2>
-                  <span className="rounded-full bg-purple-500/10 px-2.5 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                    LogQL
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed max-w-md">
-                  {t("config.description")}
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <span className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                    ⚡ Live Tail Streaming
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                    🔒 Multi-Tenant Auth
-                  </span>
-                </div>
-              </div>
-            </div>
-            <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_LOKI_CONFIG}>
-              <Button
-                size="sm"
-                onClick={() => setFormOpen(true)}
-                className="shrink-0 bg-gradient-to-r from-purple-600 to-indigo-600 font-semibold text-white shadow-md shadow-purple-500/20 hover:from-purple-700 hover:to-indigo-700 self-start sm:self-auto cursor-pointer"
-              >
-                {t("config.configure")}
-              </Button>
-            </CanInProject>
-          </div>
-        </section>
+      {tabs.length > 0 ? (
+        <LogViewerTabSection
+          environmentId={environmentId}
+          tabs={tabs}
+          activeTab={resolvedActiveTab}
+          onSelectTab={setActiveTab}
+          lokiConfig={hasLoki ? (config ?? null) : null}
+          hasCloudflare={hasCloudflare}
+        />
+      ) : (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 py-14 text-center">
+          <p className="text-sm font-medium text-muted-foreground">{t("config.noSourceConfigured")}</p>
+        </div>
       )}
-
-      {!configLoading && config && (
-        <>
-          <section className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card/80 p-5 backdrop-blur-xl shadow-xs">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <IconGrafana className="size-8 shrink-0 rounded-xl shadow-xs" />
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Endpoint</span>
-                  <h2 className="text-sm font-bold font-mono text-foreground truncate max-w-sm">
-                    {config.endpointUrl}
-                  </h2>
-                </div>
-              </div>
-              <CanInProject I={ACTIONS.MANAGE} a={RESOURCES.PROJECT_LOKI_CONFIG}>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setFormOpen(true)}
-                    aria-label={t("config.edit")}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
-                  >
-                    <Pencil className="size-4" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteConfirmOpen(true)}
-                    aria-label={t("config.delete")}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-rose-500/10 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="size-4" aria-hidden="true" />
-                  </button>
-                </div>
-              </CanInProject>
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-4 rounded-xl border bg-card p-5">
-            <div role="tablist" aria-label={t("config.title")} className="flex gap-1 border-b">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  role="tab"
-                  id={`log-viewer-tab-${tab.key}`}
-                  aria-selected={activeTab === tab.key}
-                  aria-controls={`log-viewer-panel-${tab.key}`}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`cursor-pointer border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                    activeTab === tab.key
-                      ? "border-primary text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            <div
-              role="tabpanel"
-              id="log-viewer-panel-loki"
-              aria-labelledby="log-viewer-tab-loki"
-              hidden={activeTab !== "loki"}
-            >
-              {activeTab === "loki" && (
-                <LokiQueryTab
-                  environmentId={environmentId}
-                  defaultQuery={config.defaultQuery}
-                  defaultRangeMinutes={config.defaultRangeMinutes}
-                />
-              )}
-            </div>
-
-            <div
-              role="tabpanel"
-              id="log-viewer-panel-cloudflareAuditLog"
-              aria-labelledby="log-viewer-tab-cloudflareAuditLog"
-              hidden={activeTab !== "cloudflareAuditLog"}
-            >
-              {activeTab === "cloudflareAuditLog" && <CloudflareAuditLogTab environmentId={environmentId} />}
-            </div>
-          </section>
-        </>
-      )}
-
-      {formOpen && (
-        <LokiConfigFormDialog environmentId={environmentId} config={config ?? null} onClose={() => setFormOpen(false)} />
-      )}
-
-      <ConfirmDialog
-        isOpen={deleteConfirmOpen}
-        onClose={() => setDeleteConfirmOpen(false)}
-        onConfirm={() => {
-          deleteConfig.mutate(undefined, { onSuccess: () => setDeleteConfirmOpen(false) });
-        }}
-        title={t("config.deleteConfirm.title")}
-        description={t("config.deleteConfirm.description")}
-        variant="destructive"
-        isLoading={deleteConfig.isPending}
-      />
     </div>
   );
 }

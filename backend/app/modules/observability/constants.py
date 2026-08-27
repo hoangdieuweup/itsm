@@ -24,6 +24,7 @@ class ErrorCode(StrEnum):
     INVALID_INCIDENT_TRANSITION = "invalid_incident_transition"
     INVALID_WEBHOOK_SECRET = "invalid_webhook_secret"
     CLOUDFLARE_NOT_BOUND = "cloudflare_not_bound_for_alerting"
+    CLOUDFLARE_ACCOUNT_NOT_FOUND_FOR_ALERTING = "cloudflare_account_not_found_for_alerting"
     MISSING_CF_ALERT_TYPE = "missing_cf_alert_type"
     PERMISSION_DENIED = "observability_permission_denied"
 
