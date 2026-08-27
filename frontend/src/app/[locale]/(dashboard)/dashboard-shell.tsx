@@ -19,6 +19,75 @@ interface Breadcrumb {
   parentHref?: string;
 }
 
+type NavTranslate = ReturnType<typeof useTranslations<"common.nav">>;
+
+/**
+ * Nested pages, which carry a back link to their list page.
+ * Order matters: the `/logs` rule must be checked before the generic project
+ * detail rule, otherwise a log page resolves as a plain detail page.
+ */
+function detailBreadcrumb(pathname: string, t: NavTranslate): Breadcrumb | null {
+  if (
+    pathname.startsWith(ROUTES.adminCloudflareAccounts) &&
+    pathname !== ROUTES.adminCloudflareAccounts
+  ) {
+    return {
+      currentLabel: t("detail"),
+      parentLabel: t("cloudflareAccounts"),
+      parentHref: ROUTES.adminCloudflareAccounts,
+    };
+  }
+  if (pathname.startsWith(ROUTES.adminEnvironments)) {
+    return {
+      currentLabel: t("environments"),
+      parentLabel: t("cloudflareAccounts"),
+      parentHref: ROUTES.adminCloudflareAccounts,
+    };
+  }
+  if (pathname.startsWith(ROUTES.adminProjects) && pathname.includes("/logs")) {
+    const segments = pathname.split("/");
+    const projectId = segments[segments.indexOf("projects") + 1];
+    return {
+      currentLabel: t("logs"),
+      parentLabel: t("detail"),
+      parentHref: `${ROUTES.adminProjects}/${projectId}`,
+    };
+  }
+  if (pathname.startsWith(ROUTES.adminProjects) && pathname !== ROUTES.adminProjects) {
+    return {
+      currentLabel: t("detail"),
+      parentLabel: t("projects"),
+      parentHref: ROUTES.adminProjects,
+    };
+  }
+  if (pathname.startsWith(ROUTES.adminIncidents) && pathname !== ROUTES.adminIncidents) {
+    return {
+      currentLabel: t("detail"),
+      parentLabel: t("incidents"),
+      parentHref: ROUTES.adminIncidents,
+    };
+  }
+  return null;
+}
+
+/** Top-level list pages — no back link. */
+function listBreadcrumb(pathname: string, t: NavTranslate): Breadcrumb | null {
+  if (pathname.startsWith(ROUTES.adminUsers)) return { currentLabel: t("users") };
+  if (pathname.startsWith(ROUTES.adminRoles)) return { currentLabel: t("roles") };
+  if (pathname === ROUTES.adminProjects) return { currentLabel: t("projects") };
+  if (pathname === ROUTES.adminAuditLog) return { currentLabel: t("auditLog") };
+  if (pathname === ROUTES.adminCloudflareAccounts) return { currentLabel: t("cloudflareAccounts") };
+  if (pathname === ROUTES.adminIncidents) return { currentLabel: t("incidents") };
+  return null;
+}
+
+function resolveBreadcrumb(pathname: string, t: NavTranslate): Breadcrumb {
+  return (
+    detailBreadcrumb(pathname, t) ??
+    listBreadcrumb(pathname, t) ?? { currentLabel: t("dashboard") }
+  );
+}
+
 export function DashboardShell({ children }: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const t = useTranslations("common.nav");
@@ -26,68 +95,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
   const td = useTranslations("common.dashboard");
   const pathname = usePathname();
 
-  const getBreadcrumb = (): Breadcrumb => {
-    if (
-      pathname.startsWith(ROUTES.adminCloudflareAccounts) &&
-      pathname !== ROUTES.adminCloudflareAccounts
-    ) {
-      return {
-        currentLabel: t("detail"),
-        parentLabel: t("cloudflareAccounts"),
-        parentHref: ROUTES.adminCloudflareAccounts,
-      };
-    }
-    if (pathname.startsWith(ROUTES.adminEnvironments)) {
-      return {
-        currentLabel: t("environments"),
-        parentLabel: t("cloudflareAccounts"),
-        parentHref: ROUTES.adminCloudflareAccounts,
-      };
-    }
-    if (
-      pathname.startsWith(ROUTES.adminProjects) &&
-      pathname.includes("/logs")
-    ) {
-      const projectId = pathname.split("/")[pathname.split("/").indexOf("projects") + 1];
-      return {
-        currentLabel: t("logs"),
-        parentLabel: t("detail"),
-        parentHref: `${ROUTES.adminProjects}/${projectId}`,
-      };
-    }
-    if (
-      pathname.startsWith(ROUTES.adminProjects) &&
-      pathname !== ROUTES.adminProjects
-    ) {
-      return {
-        currentLabel: t("detail"),
-        parentLabel: t("projects"),
-        parentHref: ROUTES.adminProjects,
-      };
-    }
-    if (
-      pathname.startsWith(ROUTES.adminIncidents) &&
-      pathname !== ROUTES.adminIncidents
-    ) {
-      return {
-        currentLabel: t("detail"),
-        parentLabel: t("incidents"),
-        parentHref: ROUTES.adminIncidents,
-      };
-    }
-
-    // Top-level list pages — no back link
-    if (pathname.startsWith(ROUTES.adminUsers)) return { currentLabel: t("users") };
-    if (pathname.startsWith(ROUTES.adminRoles)) return { currentLabel: t("roles") };
-    if (pathname === ROUTES.adminProjects) return { currentLabel: t("projects") };
-    if (pathname === ROUTES.adminAuditLog) return { currentLabel: t("auditLog") };
-    if (pathname === ROUTES.adminCloudflareAccounts) return { currentLabel: t("cloudflareAccounts") };
-    if (pathname === ROUTES.adminIncidents) return { currentLabel: t("incidents") };
-
-    return { currentLabel: t("dashboard") };
-  };
-
-  const breadcrumb = getBreadcrumb();
+  const breadcrumb = resolveBreadcrumb(pathname, t);
 
   return (
     <div className="relative flex h-screen w-full bg-background text-foreground selection:bg-primary/20 selection:text-primary overflow-hidden">

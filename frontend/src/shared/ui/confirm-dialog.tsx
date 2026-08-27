@@ -1,18 +1,11 @@
 "use client";
 
-import { useEffect, useCallback, useId, useSyncExternalStore } from "react";
+import { useEffect, useCallback, useId } from "react";
 import { createPortal } from "react-dom";
 import { X, AlertTriangle, AlertCircle, Info, Loader2 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { m } from "@/shared/lib/motion";
-
-const emptySubscribe = () => () => {};
-const useIsMounted = () =>
-  useSyncExternalStore(
-    emptySubscribe,
-    () => true,
-    () => false,
-  );
+import { useIsMounted } from "@/shared/hooks/use-is-mounted";
 
 export interface ConfirmDialogProps {
   isOpen: boolean;
