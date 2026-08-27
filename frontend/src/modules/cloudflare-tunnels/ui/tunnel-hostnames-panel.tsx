@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Plus, Pencil, Trash2, ArrowRight, ExternalLink, Copy, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowRight, Copy, Check } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { CanInProject } from "@/entities/permission";

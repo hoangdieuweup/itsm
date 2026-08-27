@@ -1,19 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect, useSyncExternalStore } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import { Shield, Key, X } from "lucide-react";
 import type { PermissionItem } from "@/entities/role";
 import { AnimatePresence, m } from "@/shared/lib/motion";
-
-const emptySubscribe = () => () => {};
-const useIsMounted = () =>
-  useSyncExternalStore(
-    emptySubscribe,
-    () => true,
-    () => false,
-  );
+import { useIsMounted } from "@/shared/hooks/use-is-mounted";
 
 interface RolePermissionsCellProps {
   permissions: PermissionItem[];

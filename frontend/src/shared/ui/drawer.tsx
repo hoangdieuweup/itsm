@@ -4,7 +4,6 @@ import {
   useCallback,
   useEffect,
   useId,
-  useSyncExternalStore,
   type ComponentType,
   type ReactNode,
 } from "react";
@@ -12,14 +11,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { m } from "@/shared/lib/motion";
-
-const emptySubscribe = () => () => {};
-const useIsMounted = () =>
-  useSyncExternalStore(
-    emptySubscribe,
-    () => true,
-    () => false,
-  );
+import { useIsMounted } from "@/shared/hooks/use-is-mounted";
 
 export interface DrawerProps {
   /** Rendered next to the title in a small rounded icon badge. */

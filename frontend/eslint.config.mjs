@@ -26,20 +26,37 @@ const eslintConfig = defineConfig([
       ],
     },
     rules: {
-      "boundaries/element-types": [
+      // eslint-plugin-boundaries v7 API: the rule was renamed from
+      // `boundaries/element-types`, `rules` became `policies`, and both sides
+      // of a policy now take an entity selector object instead of a bare string.
+      "boundaries/dependencies": [
         "error",
         {
           default: "disallow",
-          rules: [
-            { from: "app", allow: ["module", "entity", "shared"] },
-            { from: "module", allow: ["entity", "shared"] }, // NOT other modules
-            { from: "entity", allow: ["shared"] }, // NOT modules
-            // "shared" has nothing below it in the dependency direction, but
-            // (unlike "module"/"entity") its pattern has no capture group, so
-            // e.g. src/shared/ui and src/shared/lib are distinct boundary
-            // elements — they must be allowed to depend on each other, or
-            // shared/ui/button.tsx couldn't import shared/lib/utils.
-            { from: "shared", allow: ["shared"] },
+          policies: [
+            {
+              from: { element: { type: "app" } },
+              allow: { to: { element: { types: { anyOf: ["module", "entity", "shared"] } } } },
+            },
+            {
+              // NOT other modules
+              from: { element: { type: "module" } },
+              allow: { to: { element: { types: { anyOf: ["entity", "shared"] } } } },
+            },
+            {
+              // NOT modules
+              from: { element: { type: "entity" } },
+              allow: { to: { element: { type: "shared" } } },
+            },
+            {
+              // "shared" has nothing below it in the dependency direction, but
+              // (unlike "module"/"entity") its pattern has no capture group, so
+              // e.g. src/shared/ui and src/shared/lib are distinct boundary
+              // elements — they must be allowed to depend on each other, or
+              // shared/ui/button.tsx couldn't import shared/lib/utils.
+              from: { element: { type: "shared" } },
+              allow: { to: { element: { type: "shared" } } },
+            },
           ],
         },
       ],
