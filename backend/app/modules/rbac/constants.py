@@ -56,6 +56,7 @@ class RbacPermissionCatalog:
         ("cloudflare_account", "read", "permissions.cloudflare_account.read"),
         ("cloudflare_account", "update", "permissions.cloudflare_account.update"),
         ("cloudflare_account", "delete", "permissions.cloudflare_account.delete"),
+        ("cloudflare_account", "manage", "permissions.cloudflare_account.manage"),
         ("cloudflare_account", "test_connection", "permissions.cloudflare_account.test_connection"),
         ("cloudflare_account", "reveal_token", "permissions.cloudflare_account.reveal_token"),
         ("cloudflare_account", "manage_all", "permissions.cloudflare_account.manage_all"),
