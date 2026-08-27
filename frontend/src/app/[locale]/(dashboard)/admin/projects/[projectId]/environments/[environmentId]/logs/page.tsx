@@ -7,10 +7,10 @@ import { RESOURCES, ACTIONS } from "@/shared/constants/permissions";
 import { fetchEnvironmentById, environmentsKeys } from "@/entities/environment";
 import { LogViewerPageContent } from "@/modules/log-viewer";
 
-export default async function AdminEnvironmentLogsPage({
+export default async function ProjectEnvironmentLogsPage({
   params,
 }: {
-  params: Promise<{ locale: string; environmentId: string }>;
+  params: Promise<{ locale: string; projectId: string; environmentId: string }>;
 }) {
   const { locale, environmentId } = await params;
   setRequestLocale(locale);

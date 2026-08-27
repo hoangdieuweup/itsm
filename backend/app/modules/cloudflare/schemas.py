@@ -256,6 +256,7 @@ class ReadyCloudflareClient(FrozenModel):
     cf_account_id: str
     api_token: str
     cloudflare_account_id: UUID
+    zone_id: str | None = None
 
 
 class AccountTunnelCreate(CustomModel):

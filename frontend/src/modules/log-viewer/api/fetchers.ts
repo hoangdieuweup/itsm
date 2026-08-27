@@ -1,31 +1,12 @@
 import { apiFetch, ApiRequestError } from "@/shared/lib/api-client";
 import { API_CONFIG } from "@/shared/constants/api";
+import { lokiConfigSchema, type LokiAuthType, type LokiConfig } from "@/entities/loki-config";
 import {
-  cloudflareAuditLogEntrySchema,
-  lokiConfigSchema,
+  cloudflareTrafficStatsSchema,
   logQueryResultSchema,
-  type CloudflareAuditLogEntry,
+  type CloudflareTrafficStats,
   type LogEntry,
-  type LokiAuthType,
-  type LokiConfig,
 } from "../model/schema";
-
-/**
- * Fetches one environment's Loki config, or null if unconfigured (GET
- * returns 404 `loki_config_not_found`, normalized to null — "not yet
- * configured" is expected UI state, not an error).
- */
-export async function fetchLokiConfigOrNull(environmentId: string): Promise<LokiConfig | null> {
-  try {
-    const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.OBSERVABILITY.LOKI_CONFIG(environmentId));
-    return lokiConfigSchema.parse(raw);
-  } catch (error) {
-    if (error instanceof ApiRequestError && error.code === "loki_config_not_found") {
-      return null;
-    }
-    throw error;
-  }
-}
 
 export interface LokiConfigFormValues {
   endpointUrl: string;
@@ -75,23 +56,25 @@ export async function runLogQuery(environmentId: string, data: LogQueryValues): 
 }
 
 /**
- * Fetches an environment's Cloudflare Audit Log entries, or null if the
- * environment has no Cloudflare zone bound (GET returns 404
- * `cloudflare_config_not_found`, normalized to null — same OrNull pattern
- * as fetchLokiConfigOrNull). Deliberately does NOT reach into
- * modules/cloudflare-dns for a separate "is bound" check — that would be a
- * forbidden module-to-module import; this endpoint's own 404 already tells
- * us everything we need.
+ * Fetches aggregated Cloudflare traffic stats (GraphQL Analytics —
+ * Free-plan compatible substitute for Logpull/Logpush, which are
+ * Enterprise-only) for the environment's own hostname. Returns null only
+ * when the environment has no Cloudflare zone bound (404
+ * `cloudflare_config_not_found`), same OrNull convention as elsewhere in this
+ * module (e.g. fetchLokiConfigOrNull). A missing `base_url` (422
+ * `cloudflare_environment_base_url_not_configured`) is left to propagate as
+ * a normal query error instead, since it's a distinct, actionable state
+ * ("configure this environment's base URL") rather than "nothing to show."
  */
-export async function fetchCloudflareAuditLogsOrNull(
+export async function fetchCloudflareTrafficStatsOrNull(
   environmentId: string,
-  params: { since?: string; before?: string },
-): Promise<CloudflareAuditLogEntry[] | null> {
+  params: { since?: string; until?: string },
+): Promise<CloudflareTrafficStats | null> {
   try {
-    const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_AUDIT_LOGS.ROOT(environmentId), {
+    const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_TRAFFIC_STATS.ROOT(environmentId), {
       params,
     });
-    return cloudflareAuditLogEntrySchema.array().parse(raw);
+    return cloudflareTrafficStatsSchema.parse(raw);
   } catch (error) {
     if (error instanceof ApiRequestError && error.code === "cloudflare_config_not_found") {
       return null;

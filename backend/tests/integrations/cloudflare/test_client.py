@@ -9,6 +9,7 @@ import pytest
 
 from app.integrations.cloudflare.client import CloudflareClient
 from app.integrations.cloudflare.exceptions import (
+    CloudflareAnalyticsQueryRejected,
     CloudflareApiUnavailable,
     CloudflareDnsOperationRejected,
     InvalidCloudflareToken,
@@ -405,80 +406,45 @@ class TestDeleteTunnel:
             await client.delete_tunnel(cf_account_id="acc-1", cf_tunnel_id="tun-1", api_token="tok")
 
 
-class TestGetAccountAuditLogs:
-    async def test_filters_by_zone_and_maps_fields(self) -> None:
+class TestListAvailableAlerts:
+    async def test_flattens_the_category_keyed_result_map(self) -> None:
+        """Cloudflare's real response shape (confirmed against its live API
+        reference) is `result: {category_name: [alert_type_dict, ...]}`, not
+        a flat list — this is the regression test for that mismatch."""
+
         def handler(request: httpx.Request) -> httpx.Response:
-            assert request.url.path == "/client/v4/accounts/acc-1/audit_logs"
-            assert request.url.params["zone.name"] == "example.com"
-            assert request.url.params["since"] == "2026-01-01T00:00:00+00:00"
+            assert request.url.path == "/client/v4/accounts/acc1/alerting/v3/available_alerts"
             return httpx.Response(
                 200,
                 json={
                     "success": True,
-                    "result": [
-                        {
-                            "id": "log-1",
-                            "when": "2026-01-01T00:05:00Z",
-                            "actor": {"email": "a@b.com", "ip": "1.2.3.4"},
-                            "action": {"type": "update"},
-                            "resource": {"type": "dns_record", "product": "dns"},
-                            "newValue": "1.2.3.4",
-                        }
-                    ],
+                    "result": {
+                        "Origin Monitoring": [
+                            {"type": "http_alert_origin_error", "display_name": "Origin Error Rate Alert"}
+                        ],
+                        "Security Events": [
+                            {"type": "advanced_ddos_attack_l4_alert", "display_name": "L4 DDoS Alert"},
+                            {"type": "advanced_ddos_attack_l7_alert", "display_name": "L7 DDoS Alert"},
+                        ],
+                    },
                 },
             )
 
         client = CloudflareClient(transport=httpx.MockTransport(handler))
-        entries = await client.get_account_audit_logs(
-            cf_account_id="acc-1",
-            api_token="tok",
-            zone_name="example.com",
-            since=datetime(2026, 1, 1, tzinfo=UTC),
-            before=None,
-        )
-        assert len(entries) == 1
-        assert entries[0].id == "log-1"
-        assert entries[0].actor_email == "a@b.com"
-        assert entries[0].actor_ip == "1.2.3.4"
-        assert entries[0].action_type == "update"
-        assert entries[0].resource_type == "dns_record"
-        assert entries[0].resource_product == "dns"
-        assert entries[0].new_value == "1.2.3.4"
-
-    async def test_omits_since_before_when_not_given(self) -> None:
-        def handler(request: httpx.Request) -> httpx.Response:
-            assert "since" not in request.url.params
-            assert "before" not in request.url.params
-            return httpx.Response(200, json={"success": True, "result": []})
-
-        client = CloudflareClient(transport=httpx.MockTransport(handler))
-        entries = await client.get_account_audit_logs(
-            cf_account_id="acc-1", api_token="tok", zone_name="example.com", since=None, before=None
-        )
-        assert entries == []
-
-    async def test_raises_rejected_on_error(self) -> None:
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(403, json={"success": False, "errors": [{"message": "forbidden"}]})
-
-        client = CloudflareClient(transport=httpx.MockTransport(handler))
-        with pytest.raises(CloudflareDnsOperationRejected):
-            await client.get_account_audit_logs(
-                cf_account_id="acc-1", api_token="tok", zone_name="example.com", since=None, before=None
-            )
-
-
-class TestListAvailableAlerts:
-    async def test_success_returns_result_list(self) -> None:
-        def handler(request: httpx.Request) -> httpx.Response:
-            assert request.url.path == "/client/v4/accounts/acc1/alerting/v3/available_alerts"
-            return httpx.Response(
-                200, json={"success": True, "result": [{"type": "advanced_ddos_attack_l4_alert"}]}
-            )
-
-        client = CloudflareClient(transport=httpx.MockTransport(handler))
         alerts = await client.list_available_alerts(cf_account_id="acc1", api_token="tok")
-        assert alerts == [{"type": "advanced_ddos_attack_l4_alert"}]
+
+        assert {a["type"] for a in alerts} == {
+            "http_alert_origin_error",
+            "advanced_ddos_attack_l4_alert",
+            "advanced_ddos_attack_l7_alert",
+        }
+
+    async def test_success_with_empty_result_map_returns_empty_list(self) -> None:
+        client = CloudflareClient(
+            transport=httpx.MockTransport(lambda r: httpx.Response(200, json={"success": True, "result": {}}))
+        )
+        alerts = await client.list_available_alerts(cf_account_id="acc1", api_token="tok")
+        assert alerts == []
 
     async def test_rejected_raises(self) -> None:
         client = CloudflareClient(
@@ -554,6 +520,37 @@ class TestCreatePolicy:
             webhook_destination_id="wh-123",
         )
         assert policy_id == "policy-789"
+
+    async def test_omits_filters_when_no_zone_id_given(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            payload = json.loads(request.read())
+            assert "filters" not in payload
+            return httpx.Response(200, json={"success": True, "result": {"id": "policy-789"}})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        await client.create_policy(
+            cf_account_id="acc1",
+            api_token="tok",
+            name="My rule",
+            alert_type="health_check_status_notification",
+            webhook_destination_id="wh-123",
+        )
+
+    async def test_scopes_to_zone_when_zone_id_given(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            payload = json.loads(request.read())
+            assert payload["filters"] == {"zones": ["zone-abc"]}
+            return httpx.Response(200, json={"success": True, "result": {"id": "policy-789"}})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        await client.create_policy(
+            cf_account_id="acc1",
+            api_token="tok",
+            name="My rule",
+            alert_type="advanced_ddos_attack_l4_alert",
+            webhook_destination_id="wh-123",
+            zone_id="zone-abc",
+        )
 
     async def test_rejected_raises(self) -> None:
         client = CloudflareClient(
@@ -655,3 +652,130 @@ class TestTestPolicy:
         client = CloudflareClient(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
         with pytest.raises(CloudflareApiUnavailable):
             await client.test_policy(cf_account_id="acc1", api_token="tok", policy_id="p")
+
+
+class TestGetZoneTrafficStats:
+    async def test_success_parses_totals_timeseries_and_status_codes(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.method == "POST"
+            assert request.url.path == "/client/v4/graphql"
+            payload = json.loads(request.read())
+            assert payload["variables"]["zoneTag"] == "zone1"
+            assert payload["variables"]["filter"]["clientRequestHTTPHost"] == "app.example.com"
+            assert payload["variables"]["filter"]["requestSource"] == "eyeball"
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "viewer": {
+                            "zones": [
+                                {
+                                    "totals": [{"count": 42, "sum": {"edgeResponseBytes": 1024}}],
+                                    "timeseries": [
+                                        {
+                                            "count": 10,
+                                            "sum": {"edgeResponseBytes": 200},
+                                            "dimensions": {"datetimeHour": "2026-01-01T00:00:00Z"},
+                                        }
+                                    ],
+                                    "byStatus": [{"count": 40, "dimensions": {"edgeResponseStatus": 200}}],
+                                }
+                            ]
+                        }
+                    },
+                    "errors": None,
+                },
+            )
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        stats = await client.get_zone_traffic_stats(
+            zone_id="zone1",
+            api_token="tok",
+            hostname="app.example.com",
+            since=datetime(2026, 1, 1, tzinfo=UTC),
+            until=datetime(2026, 1, 2, tzinfo=UTC),
+        )
+
+        assert stats.hostname == "app.example.com"
+        assert stats.total_requests == 42
+        assert stats.total_bytes == 1024
+        assert stats.buckets[0].requests == 10
+        assert stats.buckets[0].bucket_start == "2026-01-01T00:00:00Z"
+        assert stats.status_codes[0].status == 200
+        assert stats.status_codes[0].requests == 40
+
+    async def test_returns_zero_value_stats_when_no_zone_matches(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"data": {"viewer": {"zones": []}}, "errors": None})
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        stats = await client.get_zone_traffic_stats(
+            zone_id="zone1",
+            api_token="tok",
+            hostname="app.example.com",
+            since=datetime(2026, 1, 1, tzinfo=UTC),
+            until=datetime(2026, 1, 2, tzinfo=UTC),
+        )
+
+        assert stats.total_requests == 0
+        assert stats.total_bytes == 0
+        assert stats.buckets == []
+        assert stats.status_codes == []
+
+    async def test_raises_invalid_token_on_401(self) -> None:
+        client = CloudflareClient(transport=httpx.MockTransport(lambda r: httpx.Response(401)))
+        with pytest.raises(InvalidCloudflareToken):
+            await client.get_zone_traffic_stats(
+                zone_id="zone1",
+                api_token="bad",
+                hostname="app.example.com",
+                since=datetime(2026, 1, 1, tzinfo=UTC),
+                until=datetime(2026, 1, 2, tzinfo=UTC),
+            )
+
+    async def test_raises_unavailable_on_5xx(self) -> None:
+        client = CloudflareClient(transport=httpx.MockTransport(lambda r: httpx.Response(500)))
+        with pytest.raises(CloudflareApiUnavailable):
+            await client.get_zone_traffic_stats(
+                zone_id="zone1",
+                api_token="tok",
+                hostname="app.example.com",
+                since=datetime(2026, 1, 1, tzinfo=UTC),
+                until=datetime(2026, 1, 2, tzinfo=UTC),
+            )
+
+    async def test_raises_unavailable_on_transport_error(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("refused")
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        with pytest.raises(CloudflareApiUnavailable):
+            await client.get_zone_traffic_stats(
+                zone_id="zone1",
+                api_token="tok",
+                hostname="app.example.com",
+                since=datetime(2026, 1, 1, tzinfo=UTC),
+                until=datetime(2026, 1, 2, tzinfo=UTC),
+            )
+
+    async def test_raises_analytics_query_rejected_with_joined_message_on_graphql_errors(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "data": None,
+                    "errors": [{"message": "not authorized"}, {"message": "missing scope"}],
+                },
+            )
+
+        client = CloudflareClient(transport=httpx.MockTransport(handler))
+        with pytest.raises(CloudflareAnalyticsQueryRejected) as exc_info:
+            await client.get_zone_traffic_stats(
+                zone_id="zone1",
+                api_token="tok",
+                hostname="app.example.com",
+                since=datetime(2026, 1, 1, tzinfo=UTC),
+                until=datetime(2026, 1, 2, tzinfo=UTC),
+            )
+        assert "not authorized" in exc_info.value.message
+        assert "missing scope" in exc_info.value.message

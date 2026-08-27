@@ -38,7 +38,7 @@
     "cloudflare_tunnel": "Tunnel Cloudflare (cấp tài khoản)",
     "cloudflare_hostname": "Hostname công khai CF (cấp tài khoản)",
     "cloudflare_dns": "DNS Records CF (cấp tài khoản)",
-    "cloudflare_audit": "Nhật ký CF (cấp tài khoản)",
+    "cloudflare_traffic": "Thống kê lưu lượng CF (cấp tài khoản)",
     "notification_channel": "Kênh thông báo",
     "alert_rule": "Quy tắc cảnh báo (cấp tài khoản)",
     "incident": "Quản lý sự cố (cấp tài khoản)",
@@ -46,7 +46,7 @@
     "project_cloudflare_dns": "DNS Records CF (dự án)",
     "project_cloudflare_tunnel": "Tunnel Cloudflare (dự án)",
     "project_cloudflare_hostname": "Hostname công khai CF (dự án)",
-    "project_cloudflare_audit": "Nhật ký CF (dự án)",
+    "project_cloudflare_traffic": "Thống kê lưu lượng CF (dự án)",
     "project_loki_config": "Loki / Xem Log (dự án)",
     "project_alert_rule": "Quy tắc cảnh báo (dự án)",
     "project_incident": "Quản lý sự cố (dự án)"
@@ -132,8 +132,8 @@
         "update": "Sửa DNS record (mọi tài khoản bạn quản trị)",
         "delete": "Xóa DNS record (mọi tài khoản bạn quản trị)"
       },
-      "cloudflare_audit": {
-        "read": "Xem nhật ký hoạt động Cloudflare (mọi tài khoản bạn quản trị)"
+      "cloudflare_traffic": {
+        "read": "Xem thống kê lưu lượng Cloudflare (mọi tài khoản bạn quản trị)"
       },
       "notification_channel": {
         "create": "Tạo kênh thông báo mới",
@@ -169,8 +169,8 @@
         "update": "Sửa service target hostname của dự án này",
         "delete": "Xóa hostname công khai của dự án này"
       },
-      "project_cloudflare_audit": {
-        "read": "Xem nhật ký hoạt động Cloudflare của dự án này"
+      "project_cloudflare_traffic": {
+        "read": "Xem thống kê lưu lượng Cloudflare của dự án này"
       },
       "project_loki_config": {
         "read": "Xem cấu hình Loki & truy vấn log của dự án này",

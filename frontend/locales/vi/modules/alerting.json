@@ -33,6 +33,7 @@
     "cfAlertType": "Loại cảnh báo Cloudflare",
     "cfAlertTypeLoading": "Đang tải danh sách cảnh báo…",
     "cfAlertTypePlaceholder": "Chọn loại cảnh báo",
+    "cfAlertTypeError": "Không tải được danh sách loại cảnh báo Cloudflare.",
     "cloudflareNotBoundHint": "Môi trường này chưa gắn tài khoản Cloudflare — hãy gắn ở trang DNS trước.",
     "lokiEndpointUrl": "URL endpoint Loki",
     "lokiQuery": "Truy vấn LogQL",
@@ -54,6 +55,7 @@
   "errors": {
     "alert_rule_not_found": "Quy tắc cảnh báo này không còn tồn tại.",
     "cloudflare_not_bound_for_alerting": "Môi trường này chưa gắn tài khoản Cloudflare.",
+    "cloudflare_account_not_found_for_alerting": "Không tìm thấy tài khoản Cloudflare này.",
     "missing_cf_alert_type": "Vui lòng chọn loại cảnh báo Cloudflare trước khi lưu.",
     "observability_environment_not_found": "Môi trường này không còn tồn tại."
   },

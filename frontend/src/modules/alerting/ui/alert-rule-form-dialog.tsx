@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Plus } from "lucide-react";
+import { AlertTriangle, Plus } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -109,12 +109,22 @@ function CloudflareNativeFields({
   onChange: (value: string) => void;
 }) {
   const t = useTranslations("alerting");
+  const getErrorMessage = useApiErrorMessage("alerting");
   const { data: config } = useCloudflareConfigQuery(environmentId);
   const accountId = config?.cloudflareAccountId ?? null;
-  const { data: options, isLoading } = useAvailableAlertsQuery(accountId);
+  const { data: options, isLoading, isError, error } = useAvailableAlertsQuery(accountId);
 
   if (!accountId) {
     return <p className="text-sm text-muted-foreground">{t("fields.cloudflareNotBoundHint")}</p>;
+  }
+
+  if (isError) {
+    return (
+      <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
+        <AlertTriangle className="size-3.5 shrink-0" aria-hidden="true" />
+        {getErrorMessage(error)}
+      </p>
+    );
   }
 
   return (

@@ -40,3 +40,16 @@ class AlertingRules:
         adds) — the closest generic fit. DNS_DRIFT/TUNNEL_DRIFT are Phase
         10's reconciliation-job territory and are never set here."""
         return AlertingRules._CLOUDFLARE_ALERT_TYPE_CATEGORY.get(alert_type, IncidentCategory.TRAFFIC)
+
+    @staticmethod
+    @rule
+    def supports_zone_filter(filter_options: list[dict] | None) -> bool:
+        """True when Cloudflare's own filter_options for this alert type
+        (from GET .../available_alerts) include a "zones" key — confirmed
+        against Cloudflare's real API, not every alert type supports zone
+        scoping (account-wide alerts like billing or BGP hijack
+        notifications have no zone concept at all, and Cloudflare rejects
+        an unsupported filter key)."""
+        if not filter_options:
+            return False
+        return any(option.get("Key") == "zones" for option in filter_options)

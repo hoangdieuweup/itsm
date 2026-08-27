@@ -416,6 +416,7 @@ async def _bind_environment(client: AsyncClient, engine: AsyncEngine, *, cf_clie
             ("cloudflare_account", "create"),
             ("cloudflare_account", "read"),
             ("cloudflare_config", "manage"),
+            ("alert_rule", "read"),
             ("project", "create"),
             ("environment", "create"),
             ("environment", "read"),
@@ -607,6 +608,26 @@ class TestAlertRuleRoutes:
 
         response = await client.get(f"/api/v1/cloudflare-accounts/{account_id}/available-alerts")
         assert response.status_code == 403
+        del app.dependency_overrides[get_cloudflare_client]
+
+    async def test_available_alerts_returns_options_for_the_bound_account(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        """Regression test for the account_id/environment_id mismatch bug —
+        this endpoint's path param is a Cloudflare account id, and the
+        creator from _bind_environment is that account's OWNER manager, so
+        this proves the full router -> service -> facade -> client chain
+        actually resolves and returns data instead of always 404ing."""
+        cf_client = FakeCloudflareClientForAlerting()
+        _environment_id, account_id = await _bind_environment(client, engine, cf_client=cf_client)
+
+        response = await client.get(f"/api/v1/cloudflare-accounts/{account_id}/available-alerts")
+
+        assert response.status_code == 200, response.text
+        data = response.json()["data"]
+        assert data == [
+            {"alertType": "advanced_ddos_attack_l4_alert", "displayName": "Advanced Ddos Attack L4 Alert"}
+        ]
         del app.dependency_overrides[get_cloudflare_client]
 
 

@@ -1,5 +1,4 @@
 {
-  "drawerSubtitle": "Grafana Loki & Cloudflare Audit Log Telemetry",
   "environmentTypes": {
     "dev": "Development",
     "staging": "Staging",
@@ -27,7 +26,8 @@
     "deleteConfirm": {
       "title": "Delete this Loki configuration?",
       "description": "This removes the connection details for this environment. You can reconfigure it later."
-    }
+    },
+    "noSourceConfigured": "No log source configured for this environment."
   },
   "form": {
     "cancel": "Cancel",
@@ -39,7 +39,7 @@
   },
   "tabs": {
     "loki": "Loki",
-    "cloudflareAuditLog": "Cloudflare Audit Log"
+    "cloudflareTraffic": "Traffic"
   },
   "query": {
     "queryLabel": "LogQL query",
@@ -55,17 +55,19 @@
     "pause": "Pause",
     "liveHint": "Time range is disabled while live tailing — new lines stream in as they arrive."
   },
-  "auditLog": {
-    "since": "Since",
-    "before": "Before",
+  "traffic": {
+    "since": "From",
+    "until": "To",
     "refresh": "Refresh",
-    "empty": "No audit log entries for this range.",
-    "notBound": "This environment has no Cloudflare zone bound yet — audit log entries need a bound zone.",
-    "when": "When",
-    "actor": "Actor",
-    "action": "Action",
-    "resource": "Resource",
-    "newValue": "New value"
+    "totalRequests": "Total requests",
+    "totalBytes": "Data transferred",
+    "statusCodes": "Status codes",
+    "bucketStart": "Hour",
+    "requests": "Requests",
+    "bytes": "Bytes",
+    "hostnameHint": "Showing traffic for {hostname}",
+    "empty": "No traffic recorded for this range.",
+    "notBound": "This environment has no Cloudflare zone bound yet — traffic stats need a bound zone."
   },
   "errors": {
     "loki_config_not_found": "This environment has no Loki configuration yet.",
@@ -73,7 +75,9 @@
     "loki_invalid_credential": "Loki rejected the provided credential.",
     "loki_query_rejected": "Loki rejected this query.",
     "loki_unavailable": "Loki could not be reached.",
-    "cloudflare_config_not_found": "This environment is not bound to a Cloudflare account/zone."
+    "cloudflare_config_not_found": "This environment is not bound to a Cloudflare account/zone.",
+    "cloudflare_environment_base_url_not_configured": "Set a base URL on this environment to see its traffic stats.",
+    "cloudflare_analytics_query_rejected": "Cloudflare rejected this analytics query — check that the API token has the Zone: Analytics: Read permission."
   },
   "messages": {
     "configCreated": "Loki config saved.",

@@ -131,7 +131,7 @@ class ProjectScopedPermissionCatalog:
             ("project_cloudflare_hostname", "create"),
             ("project_cloudflare_hostname", "update"),
             ("project_cloudflare_hostname", "delete"),
-            ("project_cloudflare_audit", "read"),
+            ("project_cloudflare_traffic", "read"),
             ("project_loki_config", "read"),
             ("project_loki_config", "manage"),
             ("project_alert_rule", "create"),

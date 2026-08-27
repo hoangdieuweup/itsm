@@ -57,6 +57,16 @@ class CloudflareConfigAlreadyExists(ConflictError):
     message = "This environment is already bound to a Cloudflare account/zone"
 
 
+class EnvironmentBaseUrlNotConfigured(ValidationFailedError):
+    """Raised when traffic stats are requested for an environment with no
+    base_url set — there is no hostname to filter Cloudflare's zone-wide
+    traffic down to (same sharing concern DNS/Tunnel hostname matching
+    already solved this session)."""
+
+    code = ErrorCode.ENVIRONMENT_BASE_URL_NOT_CONFIGURED
+    message = "This environment has no base URL configured"
+
+
 class CloudflareEnvironmentNotFound(NotFoundError):
     """Raised when the referenced environment_id does not exist. Module-local
     on purpose — cloudflare defines its own rather than importing projects'

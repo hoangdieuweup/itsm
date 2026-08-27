@@ -21,7 +21,7 @@ class TestAssignableKeys:
         assert ("project_cloudflare_tunnel", "create") in keys
         assert ("project_cloudflare_hostname", "update") in keys
         assert ("project_cloudflare_config", "read") in keys
-        assert ("project_cloudflare_audit", "read") in keys
+        assert ("project_cloudflare_traffic", "read") in keys
         assert ("project_loki_config", "manage") in keys
         assert ("project_alert_rule", "create") in keys
         assert ("project_incident", "acknowledge") in keys
@@ -40,9 +40,16 @@ class TestAssignableKeys:
         """Regression guard for the exact escalation this split closes: an
         account-level resource string must NEVER re-enter ASSIGNABLE."""
         account_level = {
-            "cloudflare_account", "cloudflare_manager", "cloudflare_config",
-            "cloudflare_tunnel", "cloudflare_hostname", "cloudflare_dns",
-            "cloudflare_audit", "loki_config", "alert_rule", "incident",
+            "cloudflare_account",
+            "cloudflare_manager",
+            "cloudflare_config",
+            "cloudflare_tunnel",
+            "cloudflare_hostname",
+            "cloudflare_dns",
+            "cloudflare_traffic",
+            "loki_config",
+            "alert_rule",
+            "incident",
         }
         offenders = [k for k in ProjectRoleRules.assignable_keys() if k[0] in account_level]
         assert offenders == []

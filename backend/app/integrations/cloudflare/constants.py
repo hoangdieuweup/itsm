@@ -9,3 +9,4 @@ class CloudflareErrorCode(StrEnum):
     UNAVAILABLE = "cloudflare_api_unavailable"
     INVALID_TOKEN = "cloudflare_invalid_token"
     DNS_OPERATION_REJECTED = "cloudflare_dns_operation_rejected"
+    ANALYTICS_QUERY_REJECTED = "cloudflare_analytics_query_rejected"

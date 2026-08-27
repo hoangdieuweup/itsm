@@ -11,17 +11,30 @@ class ZoneOption(FrozenModel):
     name: str
 
 
-class CloudflareAuditLogEntry(FrozenModel):
-    """A deliberately narrow, purpose-built read-model of one Cloudflare
-    account audit log entry — not a pass-through of Cloudflare's full (large,
-    evolving) entry shape. Extend with more fields only when a real consumer
-    needs them (e.g. a future phase wanting resource.id for deep-linking)."""
+class CloudflareTrafficBucket(FrozenModel):
+    """One hourly bucket of aggregated HTTP request traffic, from the
+    GraphQL Analytics API's httpRequestsAdaptiveGroups node."""
 
-    id: str
-    when: str
-    actor_email: str | None
-    actor_ip: str | None
-    action_type: str
-    resource_type: str | None
-    resource_product: str | None
-    new_value: str | None
+    bucket_start: str
+    requests: int
+    bytes: int
+
+
+class CloudflareTrafficStatusCount(FrozenModel):
+    """Request count for one edge HTTP response status code."""
+
+    status: int
+    requests: int
+
+
+class CloudflareTrafficStats(FrozenModel):
+    """Aggregated traffic for one environment's own hostname, over a caller
+    -supplied time range — deliberately narrow (no chart-library-shaped
+    payload, no raw per-request rows: Logpull/Logpush are Enterprise-only,
+    this is the Free-plan-compatible GraphQL Analytics substitute)."""
+
+    hostname: str
+    total_requests: int
+    total_bytes: int
+    buckets: list[CloudflareTrafficBucket]
+    status_codes: list[CloudflareTrafficStatusCount]

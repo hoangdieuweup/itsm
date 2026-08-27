@@ -1,5 +1,4 @@
 {
-  "drawerSubtitle": "Nhật ký truy vấn Grafana Loki & Cloudflare Audit Log",
   "environmentTypes": {
     "dev": "Phát triển",
     "staging": "Staging",
@@ -27,7 +26,8 @@
     "deleteConfirm": {
       "title": "Xóa cấu hình Loki này?",
       "description": "Thao tác này sẽ xóa thông tin kết nối của môi trường này. Bạn có thể cấu hình lại sau."
-    }
+    },
+    "noSourceConfigured": "Chưa cấu hình nguồn log cho môi trường này."
   },
   "form": {
     "cancel": "Hủy",
@@ -39,7 +39,7 @@
   },
   "tabs": {
     "loki": "Loki",
-    "cloudflareAuditLog": "Audit Log Cloudflare"
+    "cloudflareTraffic": "Lưu lượng"
   },
   "query": {
     "queryLabel": "Truy vấn LogQL",
@@ -55,17 +55,19 @@
     "pause": "Tạm dừng",
     "liveHint": "Khoảng thời gian bị vô hiệu hoá khi đang xem trực tiếp — dòng log mới sẽ tự động xuất hiện."
   },
-  "auditLog": {
+  "traffic": {
     "since": "Từ",
-    "before": "Đến",
+    "until": "Đến",
     "refresh": "Làm mới",
-    "empty": "Không có mục audit log nào trong khoảng thời gian này.",
-    "notBound": "Môi trường này chưa liên kết zone Cloudflare — cần liên kết zone để xem audit log.",
-    "when": "Thời điểm",
-    "actor": "Người thực hiện",
-    "action": "Hành động",
-    "resource": "Đối tượng",
-    "newValue": "Giá trị mới"
+    "totalRequests": "Tổng số request",
+    "totalBytes": "Dung lượng truyền tải",
+    "statusCodes": "Mã trạng thái",
+    "bucketStart": "Giờ",
+    "requests": "Số request",
+    "bytes": "Dung lượng",
+    "hostnameHint": "Đang hiển thị lưu lượng cho {hostname}",
+    "empty": "Không có lưu lượng nào trong khoảng thời gian này.",
+    "notBound": "Môi trường này chưa liên kết zone Cloudflare — cần liên kết zone để xem lưu lượng."
   },
   "errors": {
     "loki_config_not_found": "Môi trường này chưa có cấu hình Loki.",
@@ -73,7 +75,9 @@
     "loki_invalid_credential": "Loki từ chối thông tin xác thực đã cung cấp.",
     "loki_query_rejected": "Loki từ chối truy vấn này.",
     "loki_unavailable": "Không thể kết nối tới Loki.",
-    "cloudflare_config_not_found": "Môi trường này chưa liên kết tài khoản/zone Cloudflare."
+    "cloudflare_config_not_found": "Môi trường này chưa liên kết tài khoản/zone Cloudflare.",
+    "cloudflare_environment_base_url_not_configured": "Hãy đặt base URL cho môi trường này để xem thống kê lưu lượng.",
+    "cloudflare_analytics_query_rejected": "Cloudflare từ chối truy vấn thống kê này — kiểm tra API token đã có quyền Zone: Analytics: Read chưa."
   },
   "messages": {
     "configCreated": "Lưu cấu hình Loki thành công.",

@@ -267,7 +267,7 @@ class TestGetReadyClientForEnvironment:
     async def test_returns_ready_client_when_bound(self) -> None:
         env_id, account_id = uuid4(), uuid4()
         account = SimpleNamespace(id=account_id, cf_account_id="cf-123")
-        config = SimpleNamespace(cloudflare_account_id=account_id)
+        config = SimpleNamespace(cloudflare_account_id=account_id, zone_id="z1")
         ciphertext = FernetCodec.encrypt("real-token", key=TEST_KEY)
         client = FakeCloudflareClient()
         api = CloudflareApi(
@@ -284,6 +284,31 @@ class TestGetReadyClientForEnvironment:
         assert ready.api_token == "real-token"
         assert ready.client is client
         assert ready.cloudflare_account_id == account_id
+        assert ready.zone_id == "z1"
+
+
+class TestGetReadyClientForAccount:
+    async def test_returns_none_when_account_does_not_exist(self) -> None:
+        api = CloudflareApi(FakeUow(FakeAccountsRepo()), client=FakeCloudflareClient(), projects_api=object())
+        assert await api.get_ready_client_for_account(uuid4()) is None
+
+    async def test_returns_ready_client_when_account_exists(self) -> None:
+        account_id = uuid4()
+        account = SimpleNamespace(id=account_id, cf_account_id="cf-123")
+        ciphertext = FernetCodec.encrypt("real-token", key=TEST_KEY)
+        client = FakeCloudflareClient()
+        api = CloudflareApi(
+            FakeUow(FakeAccountsRepo({account_id: account}, {account_id: ciphertext})),
+            client=client,
+            projects_api=object(),
+        )
+        ready = await api.get_ready_client_for_account(account_id)
+        assert ready is not None
+        assert ready.cf_account_id == "cf-123"
+        assert ready.api_token == "real-token"
+        assert ready.client is client
+        assert ready.cloudflare_account_id == account_id
+        assert ready.zone_id is None
 
 
 class TestEnsureWebhookDestination:

@@ -76,8 +76,8 @@ export const API_CONFIG = {
       HOSTNAME_DETAIL: (environmentId: string, tunnelId: string, hostnameId: string) =>
         `/environments/${environmentId}/cloudflare-tunnels/${tunnelId}/hostnames/${hostnameId}`,
     },
-    CLOUDFLARE_AUDIT_LOGS: {
-      ROOT: (environmentId: string) => `/environments/${environmentId}/cloudflare-audit-logs`,
+    CLOUDFLARE_TRAFFIC_STATS: {
+      ROOT: (environmentId: string) => `/environments/${environmentId}/cloudflare-traffic-stats`,
     },
     OBSERVABILITY: {
       LOKI_CONFIG: (environmentId: string) => `/environments/${environmentId}/loki-config`,

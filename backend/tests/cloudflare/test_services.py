@@ -1,7 +1,7 @@
 """Unit tests for app.modules.cloudflare.services — Fake-based, no database,
 no real Cloudflare API calls."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
@@ -11,7 +11,7 @@ from app.core.crypto import FernetCodec
 from app.integrations.cache.exceptions import CacheUnavailable
 from app.integrations.cloudflare.exceptions import CloudflareApiUnavailable as CfUnavailable
 from app.integrations.cloudflare.exceptions import InvalidCloudflareToken
-from app.integrations.cloudflare.schemas import CloudflareAuditLogEntry, ZoneOption
+from app.integrations.cloudflare.schemas import CloudflareTrafficStats, ZoneOption
 from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import (
     AccessLevel,
@@ -30,6 +30,7 @@ from app.modules.cloudflare.exceptions import (
     DnsRecordNotFound,
     DnsRecordsExistForConfig,
     DnsRecordSyncFailed,
+    EnvironmentBaseUrlNotConfigured,
     InsufficientAccountAccess,
     LastOwnerRemovalBlocked,
     MissingDnsRecordPriority,
@@ -64,8 +65,8 @@ from app.modules.cloudflare.services.delete_account import DeleteCloudflareAccou
 from app.modules.cloudflare.services.delete_config import DeleteCloudflareConfig
 from app.modules.cloudflare.services.delete_dns_record import DeleteDnsRecord
 from app.modules.cloudflare.services.delete_tunnel import DeleteCloudflareTunnel
+from app.modules.cloudflare.services.get_traffic_stats import GetCloudflareTrafficStats
 from app.modules.cloudflare.services.list_account_managers import ListCloudflareAccountManagers
-from app.modules.cloudflare.services.list_cloudflare_audit_logs import ListCloudflareAuditLogs
 from app.modules.cloudflare.services.list_dns_records import ListDnsRecords
 from app.modules.cloudflare.services.list_tunnel_hostnames import ListTunnelHostnames
 from app.modules.cloudflare.services.list_tunnels import ListTunnels
@@ -2722,23 +2723,22 @@ class TestSyncTunnels:
         assert tunnels == []
 
 
-class FakeAuditLogClient(FakeCloudflareClient):
-    def __init__(self, entries: list | None = None, raises: Exception | None = None) -> None:
+class FakeTrafficStatsClient(FakeCloudflareClient):
+    def __init__(self, stats: CloudflareTrafficStats | None = None, raises: Exception | None = None) -> None:
         super().__init__(raises=raises)
-        self._entries = entries if entries is not None else []
-        self.calls: list[dict] = []
+        self._stats = stats
+        self.traffic_calls: list[dict] = []
 
-    async def get_account_audit_logs(self, *, cf_account_id, api_token, zone_name, since, before):
-        self.calls.append(
-            {"cf_account_id": cf_account_id, "zone_name": zone_name, "since": since, "before": before}
-        )
+    async def get_zone_traffic_stats(self, *, zone_id, api_token, hostname, since, until):
+        self.traffic_calls.append({"zone_id": zone_id, "hostname": hostname, "since": since, "until": until})
         if self._raises is not None:
             raise self._raises
-        return self._entries
+        return self._stats
 
 
-class TestListCloudflareAuditLogs:
-    async def _setup(self, uow: "FakeCloudflareUnitOfWork"):
+class TestGetCloudflareTrafficStats:
+    async def _setup(self, *, base_url: str | None):
+        uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
@@ -2749,34 +2749,70 @@ class TestListCloudflareAuditLogs:
         await uow.configs.create(
             environment_id=env_id, cloudflare_account_id=account.id, zone_id="z1", zone_name="example.com"
         )
-        return env_id
+        projects_api = FakeProjectsApi({env_id: _fake_environment(env_id, base_url)})
+        return uow, env_id, projects_api
 
     async def test_raises_config_not_found_for_unbound_environment(self) -> None:
         uow = FakeCloudflareUnitOfWork()
-        client = FakeAuditLogClient()
-        use_case = ListCloudflareAuditLogs(uow, client)
+        client = FakeTrafficStatsClient()
+        projects_api = FakeProjectsApi({})
+        use_case = GetCloudflareTrafficStats(uow, client, projects_api)
+
         with pytest.raises(CloudflareConfigNotFound):
-            await use_case.execute(environment_id=uuid4(), since=None, before=None)
+            await use_case.execute(environment_id=uuid4(), since=None, until=None)
 
-    async def test_calls_client_with_bound_zone_name(self) -> None:
-        uow = FakeCloudflareUnitOfWork()
-        env_id = await self._setup(uow)
-        entries = [
-            CloudflareAuditLogEntry(
-                id="log-1",
-                when="2026-01-01T00:00:00Z",
-                actor_email="a@b.com",
-                actor_ip="1.2.3.4",
-                action_type="update",
-                resource_type="dns_record",
-                resource_product="dns",
-                new_value="x",
+    async def test_raises_base_url_not_configured_when_environment_has_none(self) -> None:
+        uow, env_id, projects_api = await self._setup(base_url=None)
+        client = FakeTrafficStatsClient()
+        use_case = GetCloudflareTrafficStats(uow, client, projects_api)
+
+        with pytest.raises(EnvironmentBaseUrlNotConfigured):
+            await use_case.execute(environment_id=env_id, since=None, until=None)
+
+    async def test_calls_client_with_hostname_parsed_from_base_url(self) -> None:
+        uow, env_id, projects_api = await self._setup(base_url="https://app.example.com/some/path")
+        stats = CloudflareTrafficStats(
+            hostname="app.example.com", total_requests=1, total_bytes=2, buckets=[], status_codes=[]
+        )
+        client = FakeTrafficStatsClient(stats=stats)
+        use_case = GetCloudflareTrafficStats(uow, client, projects_api)
+
+        result = await use_case.execute(environment_id=env_id, since=None, until=None)
+
+        assert result == stats
+        assert client.traffic_calls[0]["hostname"] == "app.example.com"
+        assert client.traffic_calls[0]["zone_id"] == "z1"
+
+    async def test_defaults_to_a_24_hour_range_ending_now_when_omitted(self) -> None:
+        uow, env_id, projects_api = await self._setup(base_url="https://app.example.com")
+        client = FakeTrafficStatsClient(
+            stats=CloudflareTrafficStats(
+                hostname="app.example.com", total_requests=0, total_bytes=0, buckets=[], status_codes=[]
             )
-        ]
-        client = FakeAuditLogClient(entries=entries)
-        use_case = ListCloudflareAuditLogs(uow, client)
+        )
+        use_case = GetCloudflareTrafficStats(uow, client, projects_api)
 
-        result = await use_case.execute(environment_id=env_id, since=None, before=None)
+        before_call = datetime.now(UTC)
+        await use_case.execute(environment_id=env_id, since=None, until=None)
+        after_call = datetime.now(UTC)
 
-        assert result == entries
-        assert client.calls[0]["zone_name"] == "example.com"
+        call = client.traffic_calls[0]
+        assert before_call <= call["until"] <= after_call
+        assert call["until"] - call["since"] == timedelta(hours=24)
+
+    async def test_uses_caller_supplied_range_when_given(self) -> None:
+        uow, env_id, projects_api = await self._setup(base_url="https://app.example.com")
+        client = FakeTrafficStatsClient(
+            stats=CloudflareTrafficStats(
+                hostname="app.example.com", total_requests=0, total_bytes=0, buckets=[], status_codes=[]
+            )
+        )
+        use_case = GetCloudflareTrafficStats(uow, client, projects_api)
+        since = datetime(2026, 1, 1, tzinfo=UTC)
+        until = datetime(2026, 1, 2, tzinfo=UTC)
+
+        await use_case.execute(environment_id=env_id, since=since, until=until)
+
+        call = client.traffic_calls[0]
+        assert call["since"] == since
+        assert call["until"] == until

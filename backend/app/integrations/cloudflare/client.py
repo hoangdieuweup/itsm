@@ -8,6 +8,7 @@ owns the business domain (accounts, 2-layer ACL, DNS records, configs) and
 reaches this client only through modules/cloudflare/dependencies.py.
 """
 
+import logging
 from datetime import datetime
 
 import httpx
@@ -15,11 +16,19 @@ import httpx
 from app.core.base.markers import helper, integration
 from app.integrations.cloudflare.config import cloudflare_settings
 from app.integrations.cloudflare.exceptions import (
+    CloudflareAnalyticsQueryRejected,
     CloudflareApiUnavailable,
     CloudflareDnsOperationRejected,
     InvalidCloudflareToken,
 )
-from app.integrations.cloudflare.schemas import CloudflareAuditLogEntry, ZoneOption
+from app.integrations.cloudflare.schemas import (
+    CloudflareTrafficBucket,
+    CloudflareTrafficStats,
+    CloudflareTrafficStatusCount,
+    ZoneOption,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class CloudflareClient:
@@ -129,6 +138,13 @@ class CloudflareClient:
             raise CloudflareApiUnavailable(status_code=response.status_code)
         body = response.json()
         if response.is_error or not body.get("success", False):
+            logger.warning(
+                "Cloudflare rejected %s %s (status=%s): %s",
+                method,
+                path,
+                response.status_code,
+                body.get("errors"),
+            )
             raise CloudflareDnsOperationRejected()
         return body
 
@@ -290,52 +306,126 @@ class CloudflareClient:
             page += 1
         return records
 
+    @helper
+    async def _graphql(self, query: str, variables: dict, api_token: str) -> dict:
+        """POST /graphql. A different envelope than _write's REST v4 shape —
+        no `success` key; the response is {"data": ..., "errors": null|[...]}.
+        A body-level non-null `errors` array is Cloudflare's own signal of
+        rejection (bad query, or a permission the token lacks, e.g.
+        Zone:Analytics:Read for httpRequestsAdaptiveGroups)."""
+        try:
+            async with httpx.AsyncClient(
+                base_url=str(cloudflare_settings.API_BASE_URL), transport=self._transport
+            ) as client:
+                response = await client.post(
+                    "/graphql",
+                    json={"query": query, "variables": variables},
+                    headers={"Authorization": f"Bearer {api_token}"},
+                    timeout=cloudflare_settings.HTTP_TIMEOUT_SECONDS,
+                )
+        except httpx.HTTPError as exc:
+            raise CloudflareApiUnavailable() from exc
+
+        if response.status_code in (401, 403):
+            raise InvalidCloudflareToken()
+        if response.status_code >= 500:
+            raise CloudflareApiUnavailable(status_code=response.status_code)
+        body = response.json()
+        errors = body.get("errors")
+        if errors:
+            logger.warning("Cloudflare GraphQL query rejected: %s", errors)
+            raise CloudflareAnalyticsQueryRejected(message="; ".join(e.get("message", "") for e in errors))
+        return body["data"]
 
     @integration
-    async def get_account_audit_logs(
-        self,
-        *,
-        cf_account_id: str,
-        api_token: str,
-        zone_name: str,
-        since: datetime | None,
-        before: datetime | None,
-    ) -> list[CloudflareAuditLogEntry]:
-        """GET /accounts/{cf_account_id}/audit_logs?zone.name=<zone_name>.
-        zone.name filters to just this environment's bound zone per the
-        reference doc's own recommendation — never returns account-wide
-        entries for other zones this environment doesn't own. Reuses _write
-        (the de-facto generic "authenticated call + envelope check" helper —
-        3 existing Tunnel GET methods already reuse it too) rather than a
-        new helper; failures surface as CloudflareDnsOperationRejected,
-        consistent with that existing precedent, not a scope-creeping rename."""
-        params: dict[str, str] = {"zone.name": zone_name}
-        if since is not None:
-            params["since"] = since.isoformat()
-        if before is not None:
-            params["before"] = before.isoformat()
-        body = await self._write(f"/accounts/{cf_account_id}/audit_logs", "GET", api_token, params=params)
-        return [
-            CloudflareAuditLogEntry(
-                id=entry["id"],
-                when=entry["when"],
-                actor_email=entry.get("actor", {}).get("email"),
-                actor_ip=entry.get("actor", {}).get("ip"),
-                action_type=entry.get("action", {}).get("type", ""),
-                resource_type=entry.get("resource", {}).get("type"),
-                resource_product=entry.get("resource", {}).get("product"),
-                new_value=entry.get("newValue"),
+    async def get_zone_traffic_stats(
+        self, *, zone_id: str, api_token: str, hostname: str, since: datetime, until: datetime
+    ) -> CloudflareTrafficStats:
+        """GraphQL Analytics httpRequestsAdaptiveGroups, filtered to one
+        hostname — never the whole shared zone (a zone can host many
+        unrelated environments). Free-plan compatible, unlike Logpull/
+        Logpush (Enterprise-only). Combines totals + hourly buckets + status
+        breakdown into one request (3 aliased groups) to minimize the
+        GraphQL API's account-wide 300-queries/5-minutes rate limit."""
+        query = """
+        query TrafficStats($zoneTag: string, $filter: filter) {
+          viewer {
+            zones(filter: { zoneTag: $zoneTag }) {
+              totals: httpRequestsAdaptiveGroups(filter: $filter, limit: 1) {
+                count
+                sum { edgeResponseBytes }
+              }
+              timeseries: httpRequestsAdaptiveGroups(
+                filter: $filter, limit: 500, orderBy: [datetimeHour_ASC]
+              ) {
+                count
+                sum { edgeResponseBytes }
+                dimensions { datetimeHour }
+              }
+              byStatus: httpRequestsAdaptiveGroups(
+                filter: $filter, limit: 50, orderBy: [count_DESC]
+              ) {
+                count
+                dimensions { edgeResponseStatus }
+              }
+            }
+          }
+        }
+        """
+        variables = {
+            "zoneTag": zone_id,
+            "filter": {
+                "datetime_geq": since.isoformat(),
+                "datetime_lt": until.isoformat(),
+                "clientRequestHTTPHost": hostname,
+                "requestSource": "eyeball",
+            },
+        }
+        data = await self._graphql(query, variables, api_token)
+        zones = data["viewer"]["zones"]
+        if not zones:
+            return CloudflareTrafficStats(
+                hostname=hostname, total_requests=0, total_bytes=0, buckets=[], status_codes=[]
             )
-            for entry in body.get("result", [])
-        ]
+        zone = zones[0]
+        if zone["totals"]:
+            total_requests: int = zone["totals"][0]["count"]
+            total_bytes: int = zone["totals"][0]["sum"]["edgeResponseBytes"]
+        else:
+            total_requests = 0
+            total_bytes = 0
+        return CloudflareTrafficStats(
+            hostname=hostname,
+            total_requests=total_requests,
+            total_bytes=total_bytes,
+            buckets=[
+                CloudflareTrafficBucket(
+                    bucket_start=row["dimensions"]["datetimeHour"],
+                    requests=row["count"],
+                    bytes=row["sum"]["edgeResponseBytes"],
+                )
+                for row in zone["timeseries"]
+            ],
+            status_codes=[
+                CloudflareTrafficStatusCount(
+                    status=row["dimensions"]["edgeResponseStatus"], requests=row["count"]
+                )
+                for row in zone["byStatus"]
+            ],
+        )
 
     @integration
     async def list_available_alerts(self, *, cf_account_id: str, api_token: str) -> list[dict]:
-        """GET /accounts/{cf_account_id}/alerting/v3/available_alerts. Returns
-        the raw result list — the observability service layer shapes it into
-        AvailableAlertOption."""
+        """GET /accounts/{cf_account_id}/alerting/v3/available_alerts.
+        Cloudflare returns `result` as a map keyed by category name (e.g.
+        "Origin Monitoring"), each value a list of alert-type dicts —
+        confirmed against Cloudflare's live API reference, not the flat list
+        this previously assumed. Flattened here so the observability service
+        layer never needs to know categories exist. No pagination — not
+        documented for this endpoint."""
         body = await self._write(f"/accounts/{cf_account_id}/alerting/v3/available_alerts", "GET", api_token)
-        return body.get("result", [])
+        result = body.get("result") or {}
+        return [item for category_items in result.values() for item in category_items]
 
     @integration
     async def create_webhook_destination(
@@ -354,21 +444,33 @@ class CloudflareClient:
 
     @integration
     async def create_policy(
-        self, *, cf_account_id: str, api_token: str, name: str, alert_type: str, webhook_destination_id: str
+        self,
+        *,
+        cf_account_id: str,
+        api_token: str,
+        name: str,
+        alert_type: str,
+        webhook_destination_id: str,
+        zone_id: str | None = None,
     ) -> str:
         """POST /accounts/{cf_account_id}/alerting/v3/policies. mechanisms.webhooks
         points at the already-registered destination id. Returns the real
-        policy_id — persisted as alert_rules.cf_policy_id for 2-way sync."""
+        policy_id — persisted as alert_rules.cf_policy_id for 2-way sync.
+        zone_id, when given, scopes the policy to that one zone via
+        filters.zones — without it, Cloudflare fires this policy for every
+        zone under the account, not just the one this alert rule was
+        created for. The caller decides whether zone_id is appropriate for
+        this alert_type (not every type supports zone filtering)."""
+        payload: dict = {
+            "name": name,
+            "alert_type": alert_type,
+            "enabled": True,
+            "mechanisms": {"webhooks": [{"id": webhook_destination_id}]},
+        }
+        if zone_id is not None:
+            payload["filters"] = {"zones": [zone_id]}
         body = await self._write(
-            f"/accounts/{cf_account_id}/alerting/v3/policies",
-            "POST",
-            api_token,
-            json={
-                "name": name,
-                "alert_type": alert_type,
-                "enabled": True,
-                "mechanisms": {"webhooks": [{"id": webhook_destination_id}]},
-            },
+            f"/accounts/{cf_account_id}/alerting/v3/policies", "POST", api_token, json=payload
         )
         return body["result"]["id"]
 

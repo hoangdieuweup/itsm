@@ -74,6 +74,16 @@ class CloudflareNotBoundForAlerting(NotFoundError):
     message = "This environment has no Cloudflare account bound"
 
 
+class CloudflareAccountNotFoundForAlerting(NotFoundError):
+    """Raised when listing available alert types for a Cloudflare account id
+    that doesn't exist or has no stored token. Distinct from
+    CloudflareNotBoundForAlerting, which is about an ENVIRONMENT having no
+    bound account — this route has no environment in its path at all."""
+
+    code = ErrorCode.CLOUDFLARE_ACCOUNT_NOT_FOUND_FOR_ALERTING
+    message = "Cloudflare account not found"
+
+
 class MissingCloudflareAlertType(ValidationFailedError):
     """Raised when a CLOUDFLARE_NATIVE alert rule is created without
     cf_alert_type — required for that source, unlike LOKI_QUERY where it's

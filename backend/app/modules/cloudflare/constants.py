@@ -58,6 +58,7 @@ class ErrorCode(StrEnum):
     TUNNEL_INGRESS_SYNC_FAILED = "cloudflare_tunnel_ingress_sync_failed"
     TUNNEL_HOSTNAME_DOMAIN_MISMATCH = "cloudflare_tunnel_hostname_domain_mismatch"
     TUNNEL_HOSTNAME_ENVIRONMENT_MISMATCH = "cloudflare_tunnel_hostname_environment_mismatch"
+    ENVIRONMENT_BASE_URL_NOT_CONFIGURED = "cloudflare_environment_base_url_not_configured"
 
 
 class CloudflareAccountAuditActions(StrEnum):
