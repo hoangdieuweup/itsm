@@ -38,6 +38,7 @@
     "account": "Account",
     "detail": "Detail",
     "environments": "Environments",
+    "logs": "Logs",
     "breadcrumb": "Breadcrumb"
   },
   "dashboard": {

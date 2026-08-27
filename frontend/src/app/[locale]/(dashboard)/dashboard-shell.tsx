@@ -46,6 +46,17 @@ export function DashboardShell({ children }: DashboardShellProps) {
     }
     if (
       pathname.startsWith(ROUTES.adminProjects) &&
+      pathname.includes("/logs")
+    ) {
+      const projectId = pathname.split("/")[pathname.split("/").indexOf("projects") + 1];
+      return {
+        currentLabel: t("logs"),
+        parentLabel: t("detail"),
+        parentHref: `${ROUTES.adminProjects}/${projectId}`,
+      };
+    }
+    if (
+      pathname.startsWith(ROUTES.adminProjects) &&
       pathname !== ROUTES.adminProjects
     ) {
       return {
