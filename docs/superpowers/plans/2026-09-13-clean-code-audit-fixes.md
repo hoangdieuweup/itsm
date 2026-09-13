@@ -1212,3 +1212,26 @@ Member dialog and notification recipients picker: `useUsers(PAGINATION.MAX_PAGE_
 - [ ] 19 missing-row tests raise the module `*NotFound`.
 - [ ] New zod schema tests pass; `tsc`, `eslint` (boundaries, no-cycle) clean.
 - [ ] Dashboard, Cloudflare account detail and DNS tab render with translated tooltips in en and vi.
+
+---
+
+## Execution Notes (2026-09-13)
+
+Deviations from the steps above:
+- Task 6: `entities/permission/ui/can-in-project.test.tsx` mocked `projectId: "p1"`, which the new schema rejects. The fixture now uses a UUID, as `ProjectPermissionSetRead` does.
+- Task 10: applying ui-ux-pro-max's 4.5:1 contrast rule moved every DNS badge to the 700/300 text shades. HTTPS uses `lime`, the widest free hue between amber and emerald, instead of `cyan`, which sits next to teal.
+- Task 11: the DNS edit/delete icons are also `aria-hidden`.
+- Tasks 13 and 14 were added after reviewing `app/core/pagination.py` usage. Still open: user pickers stop at `PAGINATION.MAX_PAGE_SIZE` until `GET /users` supports server-side search.
+
+Verification:
+- Backend full suite: 682 passed, 15 failed. All 15 are in `tests/cloudflare/test_router.py` (403 responses) and fail identically on `develop` (629bd73), before this branch and the WIP commits.
+- Backend: `ruff check` clean, `lint-imports` 11/11 contracts kept, `check_module_boundaries.py --strict` clean.
+- Frontend: `tsc --noEmit` clean, `eslint` 0 errors (1 pre-existing unused-import warning in `log-viewer-manager.tsx`), vitest 47 passed.
+- GitNexus: `check --cycles` clean; branch-level `detect-changes` touches only the symbols planned above.
+- Not run: `pnpm build` and a manual browser pass over the dashboard, Cloudflare account detail and DNS tab.
+
+Environment notes:
+- Backend tests need Docker (Postgres/Mongo testcontainers) and a Redis at `CACHE__URL`. `backend/.env` points at port 6380 while `docker compose up redis` exposes 6379, so run tests with `CACHE__URL=redis://localhost:6379/0`.
+
+Follow-ups:
+- `backend/app/modules/projects/repository.py` is now 639 lines, past the ~500-600 budget; split it together with the deferred `cloudflare/repository.py` (1084) and `router.py` split.
