@@ -74,7 +74,9 @@
       "manageCloudflare": "Cloudflare Edge",
       "viewIncidents": "Incident Control",
       "viewAuditLog": "Audit Trail"
-    }
+    },
+    "defaultUserName": "Operator",
+    "defaultRole": "Member"
   },
   "errorPages": {
     "forbidden": {
