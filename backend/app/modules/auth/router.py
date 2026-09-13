@@ -89,9 +89,7 @@ async def refresh(
     refresh_token_use_case: RefreshToken = Depends(get_refresh_token),
 ) -> ApiResponse[None]:
     """Exchange a valid refresh token cookie for a new session token pair."""
-    new_tokens = await refresh_token_use_case.execute(
-        request.cookies.get(AuthCookies.REFRESH_TOKEN)
-    )
+    new_tokens = await refresh_token_use_case.execute(request.cookies.get(AuthCookies.REFRESH_TOKEN))
     AuthSessionResponses.set_session_cookies(response, new_tokens)
     return ApiResponse[None](success=True)
 
