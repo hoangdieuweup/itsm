@@ -270,9 +270,7 @@ class UserRoleRepository(AbstractUserRoleRepository):
     @helper
     async def _load_role_ids_for_user(self, user_id: UUID) -> list[UUID]:
         """Direct database read of all role_ids assigned to user_id."""
-        rows = await self._session.scalars(
-            select(UserRole.role_id).where(UserRole.user_id == user_id)
-        )
+        rows = await self._session.scalars(select(UserRole.role_id).where(UserRole.user_id == user_id))
         return list(rows)
 
     @database

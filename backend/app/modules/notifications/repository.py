@@ -187,4 +187,3 @@ class NotificationChannelRepository(AbstractNotificationChannelRepository):
     async def get_config_ciphertext_fields(self, channel_id: UUID) -> dict:
         row = await self._session.get(NotificationChannel, channel_id)
         return dict(row.config) if row is not None else {}
-
