@@ -76,6 +76,40 @@
       "viewAuditLog": "Audit Trail"
     }
   },
+  "errorPages": {
+    "forbidden": {
+      "code": "403",
+      "badge": "SECURITY_DENIED",
+      "title": "Access Denied",
+      "description": "You do not have the required permissions to access this resource or view this environment."
+    },
+    "notFound": {
+      "code": "404",
+      "badge": "PAGE_NOT_FOUND",
+      "title": "Page Not Found",
+      "description": "The page or resource you are looking for does not exist, has been removed, or is temporarily unavailable."
+    },
+    "serverError": {
+      "code": "500",
+      "badge": "SYSTEM_EXCEPTION",
+      "title": "System Error",
+      "description": "An unexpected server condition interrupted this operation. Our telemetry has captured the event."
+    },
+    "appError": {
+      "code": "ERR",
+      "badge": "EXECUTION_ERROR",
+      "title": "Application Error",
+      "description": "An unexpected application error occurred."
+    },
+    "actions": {
+      "tryAgain": "Try Again",
+      "backToDashboard": "Dashboard",
+      "goBack": "Go Back",
+      "diagnostics": "Diagnostics",
+      "digest": "Digest",
+      "stackTrace": "Stack Trace"
+    }
+  },
   "noPermission": {
     "title": "Access Denied",
     "description": "You don't have permission to view this page."

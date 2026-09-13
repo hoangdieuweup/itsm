@@ -76,6 +76,40 @@
       "viewAuditLog": "Nhật ký hệ thống"
     }
   },
+  "errorPages": {
+    "forbidden": {
+      "code": "403",
+      "badge": "TRUY CẬP BỊ TỪ CHỐI",
+      "title": "Truy cập bị từ chối",
+      "description": "Bạn không có đủ quyền hạn để truy cập tài nguyên hoặc môi trường này."
+    },
+    "notFound": {
+      "code": "404",
+      "badge": "KHÔNG TÌM THẤY TRANG",
+      "title": "Không tìm thấy trang",
+      "description": "Trang hoặc tài nguyên bạn đang tìm kiếm không tồn tại, đã bị xóa hoặc tạm thời không khả dụng."
+    },
+    "serverError": {
+      "code": "500",
+      "badge": "LỖI HỆ THỐNG",
+      "title": "Lỗi hệ thống máy chủ",
+      "description": "Đã xảy ra sự cố ngoài dự kiến trong quá trình xử lý yêu cầu. Hệ thống giám sát đã ghi nhận sự cố này."
+    },
+    "appError": {
+      "code": "ERR",
+      "badge": "LỖI ỨNG DỤNG",
+      "title": "Lỗi ứng dụng",
+      "description": "Đã xảy ra lỗi không xác định trong quá trình thực thi ứng dụng."
+    },
+    "actions": {
+      "tryAgain": "Thử lại",
+      "backToDashboard": "Về trang tổng quan",
+      "goBack": "Quay lại",
+      "diagnostics": "Thông tin chuẩn đoán",
+      "digest": "Mã định danh",
+      "stackTrace": "Chi tiết lỗi"
+    }
+  },
   "noPermission": {
     "title": "Truy cập bị từ chối",
     "description": "Bạn không có quyền truy cập trang này."
