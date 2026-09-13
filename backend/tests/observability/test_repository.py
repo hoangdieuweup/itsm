@@ -22,6 +22,7 @@ from app.modules.observability.constants import (
     IncidentStatus,
     LokiAuthType,
 )
+from app.modules.observability.exceptions import AlertRuleNotFound, IncidentNotFound, LokiConfigNotFound
 from app.modules.observability.models import AlertRule, AlertRuleChannel, Incident, LokiConfig
 from app.modules.observability.repository import AlertRuleRepository, IncidentRepository, LokiConfigRepository
 from app.modules.projects.models import Environment, Project
@@ -405,3 +406,31 @@ class TestIncidentRepository:
         items, total = await repo.list_page_filtered(project_id=project_id, limit=10, offset=0)
         assert total == 1
         assert items[0].title == "In scope"
+
+
+class TestUpdatesRaiseNotFoundForMissingRows:
+    async def test_loki_config(self, _session: AsyncSession) -> None:
+        with pytest.raises(LokiConfigNotFound):
+            await LokiConfigRepository(_session).update_by_environment_id(
+                uuid4(),
+                endpoint_url="http://loki:3100",
+                tenant_id=None,
+                auth_type=LokiAuthType.NONE,
+                credential=None,
+                default_query='{job="app"}',
+                default_range_minutes=15,
+            )
+
+    async def test_alert_rule_set_cf_policy_id(self, _session: AsyncSession) -> None:
+        with pytest.raises(AlertRuleNotFound):
+            await AlertRuleRepository(_session).set_cf_policy_id(uuid4(), cf_policy_id="p")
+
+    async def test_alert_rule_update(self, _session: AsyncSession) -> None:
+        with pytest.raises(AlertRuleNotFound):
+            await AlertRuleRepository(_session).update(uuid4(), name="x")
+
+    async def test_incident(self, _session: AsyncSession) -> None:
+        with pytest.raises(IncidentNotFound):
+            await IncidentRepository(_session).update_status(
+                uuid4(), status=IncidentStatus.ACKNOWLEDGED, actor_id=None, at=datetime.now(UTC)
+            )

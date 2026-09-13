@@ -1,6 +1,7 @@
 """Unit tests for app.modules.cloudflare.services — Fake-based, no database,
 no real Cloudflare API calls."""
 
+import logging
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from uuid import UUID, uuid4
@@ -104,6 +105,9 @@ class FakeCloudflareAccountRepository(AbstractCloudflareAccountRepository):
 
     async def list_for_ids(self, account_ids: list[UUID]) -> list[CloudflareAccountRead]:
         return [self._rows[i] for i in account_ids if i in self._rows]
+
+    async def list_all(self) -> list[CloudflareAccountRead]:
+        return sorted(self._rows.values(), key=lambda row: row.label)
 
     async def create(
         self, *, label: str, cf_account_id: str, api_token: str, created_by: UUID | None
@@ -1135,6 +1139,17 @@ class TestListVisibleCloudflareAccounts:
 
         assert accounts == []
 
+    async def test_manage_all_sees_accounts_beyond_a_single_page(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        for index in range(1001):
+            await uow.accounts.create(
+                label=f"A{index}", cf_account_id=f"cf-{index}", api_token="x", created_by=ACTOR_ID
+            )
+
+        accounts = await ListVisibleCloudflareAccounts(uow, FakeRbacApi(manage_all=True)).execute(uuid4())
+
+        assert len(accounts) == 1001
+
 
 class TestCreateCloudflareConfig:
     async def test_binds_environment_to_verified_zone(self) -> None:
@@ -1420,6 +1435,14 @@ class FailingDnsRecordsRepo(FakeDnsRecordsRepo):
         raise RuntimeError("simulated DB failure")
 
 
+def _assert_first_critical_log_carries_exception(caplog: pytest.LogCaptureFixture) -> None:
+    """The first CRITICAL record is the failed local write. The use case
+    re-raises `from None`, so this record is the only place its cause survives."""
+    critical = [record for record in caplog.records if record.levelno == logging.CRITICAL]
+    assert critical, "expected a CRITICAL log for the failed local write"
+    assert critical[0].exc_info is not None
+
+
 class TestCreateDnsRecord:
     async def test_creates_record_with_real_cf_record_id(self) -> None:
         uow = FakeCloudflareUnitOfWork()
@@ -1463,7 +1486,9 @@ class TestCreateDnsRecord:
                 env_id, DnsRecordType.MX, "app", "mail.example.com", None, False, 1, actor=actor
             )
 
-    async def test_local_failure_after_cf_success_attempts_compensating_delete(self) -> None:
+    async def test_local_failure_after_cf_success_attempts_compensating_delete(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         uow = FakeCloudflareUnitOfWork()
         uow.dns_records = FailingDnsRecordsRepo()
         account = await uow.accounts.create(
@@ -1483,6 +1508,8 @@ class TestCreateDnsRecord:
             await CreateDnsRecord(uow, client, FakeAuditApi()).execute(
                 env_id, DnsRecordType.A, "app", "1.2.3.4", None, False, 1, actor=actor
             )
+
+        _assert_first_critical_log_carries_exception(caplog)
 
         assert client.deleted == ["rec-orphan-risk"]
 
@@ -1547,7 +1574,9 @@ class TestUpdateDnsRecord:
         assert updated.content == "5.6.7.8"
         assert updated.ttl == 300
 
-    async def test_local_failure_after_cf_success_attempts_compensating_revert(self) -> None:
+    async def test_local_failure_after_cf_success_attempts_compensating_revert(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
             label="A",
@@ -1580,6 +1609,8 @@ class TestUpdateDnsRecord:
             await UpdateDnsRecord(uow, client, FakeAuditApi()).execute(
                 env_id, existing.id, "9.9.9.9", None, True, 600, actor=actor
             )
+
+        _assert_first_critical_log_carries_exception(caplog)
 
         # First call = the real update; second call = the compensating
         # revert back to the original content/ttl.
@@ -1686,7 +1717,9 @@ class TestDeleteDnsRecord:
         assert client.deleted == ["rec1"]
         assert await uow.dns_records.get_by_id(existing.id) is None
 
-    async def test_local_failure_after_cf_delete_succeeds_raises_sync_failed(self) -> None:
+    async def test_local_failure_after_cf_delete_succeeds_raises_sync_failed(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
             label="A",
@@ -1717,6 +1750,8 @@ class TestDeleteDnsRecord:
 
         with pytest.raises(DnsRecordSyncFailed):
             await DeleteDnsRecord(uow, client, FakeAuditApi()).execute(env_id, existing.id, actor=actor)
+
+        _assert_first_critical_log_carries_exception(caplog)
 
         # Cloudflare's side really is deleted — no compensating action exists.
         assert client.deleted == ["rec1"]
@@ -2315,7 +2350,9 @@ class TestAddTunnelHostname:
 
         assert cache.released_keys == [f"lock:tunnel:{tunnel.id}"]
 
-    async def test_local_write_failure_triggers_compensating_put_back_and_raises_sync_failed(self) -> None:
+    async def test_local_write_failure_triggers_compensating_put_back_and_raises_sync_failed(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         starting_ingress = [{"service": "http_status:404"}]
         uow, config, tunnel, client, projects_api = await self._setup(ingress=starting_ingress)
 
@@ -2334,6 +2371,8 @@ class TestAddTunnelHostname:
             await use_case.execute(
                 config.environment_id, tunnel.id, "app.example.com", "http://x", actor=actor
             )
+
+        _assert_first_critical_log_carries_exception(caplog)
 
         assert client.put_calls[0] == [
             {"hostname": "app.example.com", "service": "http://x"},
@@ -2438,7 +2477,9 @@ class TestUpdateTunnelHostname:
             )
         assert client.put_calls == []
 
-    async def test_local_write_failure_triggers_compensating_put_back(self) -> None:
+    async def test_local_write_failure_triggers_compensating_put_back(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         uow, config, tunnel, hostname_row, client = await self._setup_with_hostname()
 
         class BrokenHostnameRepo:
@@ -2456,6 +2497,8 @@ class TestUpdateTunnelHostname:
             await use_case.execute(
                 config.environment_id, tunnel.id, hostname_row.id, "http://new", actor=actor
             )
+
+        _assert_first_critical_log_carries_exception(caplog)
 
         assert client.put_calls[-1] == [{"hostname": "app.example.com", "service": "http://old"}]
 
@@ -2561,7 +2604,9 @@ class TestRemoveTunnelHostname:
             await use_case.execute(config.environment_id, tunnel.id, hostname_row.id, actor=actor)
         assert client.put_calls == []
 
-    async def test_local_delete_failure_triggers_compensating_put_back(self) -> None:
+    async def test_local_delete_failure_triggers_compensating_put_back(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         uow, config, tunnel, hostname_row, client, catch_all = await self._setup_with_hostname()
         starting_ingress = [{"hostname": "app.example.com", "service": "http://x"}, catch_all]
 
@@ -2578,6 +2623,8 @@ class TestRemoveTunnelHostname:
 
         with pytest.raises(TunnelIngressSyncFailed):
             await use_case.execute(config.environment_id, tunnel.id, hostname_row.id, actor=actor)
+
+        _assert_first_critical_log_carries_exception(caplog)
 
         assert client.put_calls[0] == [catch_all]
         assert client.put_calls[-1] == starting_ingress

@@ -101,6 +101,7 @@ class UpdateTunnelHostname(AbstractUseCase):
                     "compensating PUT-back (tunnel_id=%s, hostname_id=%s)",
                     tunnel_id,
                     hostname_id,
+                    exc_info=True,
                 )
                 try:
                     await self._client.put_tunnel_configuration(
@@ -115,6 +116,7 @@ class UpdateTunnelHostname(AbstractUseCase):
                         "Compensating PUT-back ALSO failed — ingress may be out of sync, manual "
                         "reconciliation required (tunnel_id=%s)",
                         tunnel_id,
+                        exc_info=True,
                     )
                 raise TunnelIngressSyncFailed() from None
         finally:

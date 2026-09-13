@@ -14,6 +14,7 @@ import {
   type NotificationChannelType,
 } from "@/entities/notification-channel";
 import { useUsers, USER_STATUS } from "@/entities/user";
+import { PAGINATION } from "@/shared/constants/pagination";
 import { IconGmail, IconTelegram, IconNotification } from "@/shared/ui/icons";
 import { useCreateNotificationChannel } from "../hooks/use-create-channel";
 import { useUpdateNotificationChannel } from "../hooks/use-update-channel";
@@ -91,7 +92,7 @@ function EmailRecipientsPickerList({
   onChange: (emails: string[]) => void;
 }) {
   const t = useTranslations("notifications");
-  const { data } = useUsers(200, 0);
+  const { data } = useUsers(PAGINATION.MAX_PAGE_SIZE, 0);
   const [search, setSearch] = useState("");
 
   const activeUsers = useMemo(

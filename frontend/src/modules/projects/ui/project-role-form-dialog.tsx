@@ -10,11 +10,9 @@ import { Label } from "@/shared/ui/label";
 import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { IconPermission } from "@/shared/ui/icons";
-import {
-  fetchAssignablePermissions,
-  type ProjectRole,
-  type ProjectRolePermissionItem,
-} from "../api/fetchers";
+import type { PermissionItem } from "@/entities/role";
+import { fetchAssignablePermissions } from "../api/fetchers";
+import type { ProjectRole } from "../model/schema";
 import { assignablePermissionsKeys } from "../api/query-keys";
 import { useCreateProjectRole } from "../hooks/use-create-project-role";
 import { useUpdateProjectRole } from "../hooks/use-update-project-role";
@@ -66,7 +64,7 @@ function ProjectRoleFormInner({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const groupedPermissions = useMemo(() => {
-    const groups: Record<string, ProjectRolePermissionItem[]> = {};
+    const groups: Record<string, PermissionItem[]> = {};
     for (const perm of assignablePermissions) {
       const list = groups[perm.resource] ?? [];
       list.push(perm);

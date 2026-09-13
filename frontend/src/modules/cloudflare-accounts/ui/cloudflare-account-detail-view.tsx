@@ -25,7 +25,8 @@ import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useCloudflareAccountQuery } from "@/entities/cloudflare-account";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
-import { ACCESS_LEVEL, type AccessLevel, type CloudflareAccountManager } from "../api/fetchers";
+import { ACCESS_LEVEL, type AccessLevel } from "@/shared/constants/cloudflare";
+import type { CloudflareAccountManager } from "../model/schema";
 import { useTestCloudflareAccountConnection } from "../hooks/use-test-cloudflare-account-connection";
 import { useRevealCloudflareAccountToken } from "../hooks/use-reveal-cloudflare-account-token";
 import { useCloudflareAccountManagersQuery } from "../hooks/use-cloudflare-account-managers";
@@ -64,11 +65,11 @@ function ManagerAccessLevelControl({
 }) {
   const t = useTranslations("cloudflareAccounts");
 
-  const getLevelBadgeStyle = (level: string) => {
-    switch (level.toLowerCase()) {
-      case "owner":
+  const getLevelBadgeStyle = (level: AccessLevel) => {
+    switch (level) {
+      case ACCESS_LEVEL.OWNER:
         return "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300";
-      case "admin":
+      case ACCESS_LEVEL.EDITOR:
         return "border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300";
       default:
         return "border-border/70 bg-muted/60 text-foreground";
@@ -213,7 +214,7 @@ function AccountHeroBanner({ accountId }: { accountId: string }) {
                 type="button"
                 onClick={handleCopyId}
                 className="group flex items-center gap-1.5 rounded-xl border border-border/70 bg-muted/60 px-2.5 py-1 font-mono text-xs font-semibold text-foreground transition-colors hover:border-primary/40 hover:bg-muted cursor-pointer shadow-2xs"
-                title="Click to copy Account ID"
+                title={t("actions.copyAccountId")}
               >
                 <span>{account.cfAccountId}</span>
                 {copiedId ? (
@@ -299,7 +300,7 @@ function AccountHeroBanner({ accountId }: { accountId: string }) {
             onClick={handleCopyToken}
             className="size-8 shrink-0 p-0 text-amber-700 hover:bg-amber-500/20 dark:text-amber-300 cursor-pointer rounded-xl"
             aria-label={t("actions.copyToken")}
-            title="Copy API Token"
+            title={t("actions.copyApiToken")}
           >
             {copiedToken ? <Check className="size-4 text-emerald-500" /> : <Copy className="size-4" />}
           </Button>
@@ -380,7 +381,7 @@ function ManagerCard({
             onClick={onRemove}
             className="size-8 p-0 rounded-xl text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 dark:hover:bg-rose-950/50 cursor-pointer"
             aria-label={t("managers.removeConfirm.title")}
-            title="Remove manager"
+            title={t("managers.remove")}
           >
             <Trash2 className="size-3.5" aria-hidden="true" />
           </Button>

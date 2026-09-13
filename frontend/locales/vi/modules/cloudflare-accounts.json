@@ -21,7 +21,11 @@
     "revealToken": "Xem token",
     "hideToken": "Ẩn token",
     "copyToken": "Sao chép",
-    "manageAccess": "Quản lý quyền truy cập"
+    "manageAccess": "Quản lý quyền truy cập",
+    "copyAccountId": "Sao chép Account ID",
+    "copyApiToken": "Sao chép API token",
+    "editDnsRecord": "Sửa bản ghi DNS",
+    "deleteDnsRecord": "Xóa bản ghi DNS"
   },
   "form": {
     "createTitle": "Thêm tài khoản Cloudflare",
@@ -54,7 +58,8 @@
     "removeConfirm": {
       "title": "Xóa người quản lý này?",
       "description": "Họ sẽ mất toàn bộ quyền truy cập tài khoản này."
-    }
+    },
+    "remove": "Gỡ người quản lý"
   },
   "tabs": {
     "tunnels": "Tunnels",

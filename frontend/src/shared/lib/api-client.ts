@@ -10,6 +10,7 @@
  */
 import axios, { type AxiosError, type AxiosRequestConfig } from "axios";
 import { API_CONFIG } from "@/shared/constants/api";
+import { AUTH_ERROR_CODE } from "@/shared/constants/auth";
 
 export interface ApiErrorPayload {
   code: string;
@@ -64,13 +65,15 @@ function flushPendingQueue(error: Error | null): void {
   pendingQueue = [];
 }
 
+const AUTH_BYPASS_PATHS = [
+  API_CONFIG.ENDPOINTS.AUTH.REFRESH,
+  API_CONFIG.ENDPOINTS.AUTH.OAUTH_PREFIX,
+  API_CONFIG.ENDPOINTS.AUTH.LOGOUT,
+] as const;
+
 function isAuthBypassUrl(url?: string): boolean {
   if (!url) return false;
-  return (
-    url.includes("/auth/refresh") ||
-    url.includes("/auth/oauth") ||
-    url.includes("/auth/logout")
-  );
+  return AUTH_BYPASS_PATHS.some((path) => url.includes(path));
 }
 
 function shouldAttemptTokenRefresh(
@@ -84,7 +87,7 @@ function shouldAttemptTokenRefresh(
     return false;
   }
   const is401 = error.response?.status === 401;
-  const isAuthCode = error.response?.data?.error?.code === "auth_not_authenticated";
+  const isAuthCode = error.response?.data?.error?.code === AUTH_ERROR_CODE.NOT_AUTHENTICATED;
   return is401 || isAuthCode;
 }
 

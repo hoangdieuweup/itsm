@@ -7,7 +7,9 @@ import { ProjectPermissionProvider } from "../model/project-permission-context";
 import { CanInProject } from "./can-in-project";
 
 vi.mock("@/shared/lib/api-client", () => ({
-  apiFetch: vi.fn(() => Promise.resolve({ projectId: "p1", permissions: ["environment.update"] })),
+  apiFetch: vi.fn(() =>
+    Promise.resolve({ projectId: "b3f1c2e4-1111-4444-8888-000000000000", permissions: ["environment.update"] }),
+  ),
 }));
 
 function renderWithProviders(ui: React.ReactNode, globalPermissions: string[] = []) {
@@ -15,7 +17,7 @@ function renderWithProviders(ui: React.ReactNode, globalPermissions: string[] = 
   return render(
     <QueryClientProvider client={queryClient}>
       <PermissionProvider permissions={globalPermissions as never}>
-        <ProjectPermissionProvider projectId="p1">{ui}</ProjectPermissionProvider>
+        <ProjectPermissionProvider projectId="b3f1c2e4-1111-4444-8888-000000000000">{ui}</ProjectPermissionProvider>
       </PermissionProvider>
     </QueryClientProvider>,
   );

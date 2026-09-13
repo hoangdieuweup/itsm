@@ -10,6 +10,7 @@ export const API_CONFIG = {
       ME: "/auth/me",
       REFRESH: "/auth/refresh",
       LOGOUT: "/auth/logout",
+      OAUTH_PREFIX: "/auth/oauth",
     },
     USERS: {
       ROOT: "/users",

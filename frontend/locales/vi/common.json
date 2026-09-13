@@ -74,7 +74,9 @@
       "manageCloudflare": "Hạ tầng Cloudflare",
       "viewIncidents": "Trung tâm sự cố",
       "viewAuditLog": "Nhật ký hệ thống"
-    }
+    },
+    "defaultUserName": "Người vận hành",
+    "defaultRole": "Thành viên"
   },
   "errorPages": {
     "forbidden": {

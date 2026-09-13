@@ -16,12 +16,12 @@ import { Skeleton } from "@/shared/ui/skeleton";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
-import { DNS_TYPE_COLORS } from "../model/dns";
+import { DNS_TYPE_COLORS, isDnsType } from "../model/dns";
 import { DnsRecordFormDialog } from "./dns-record-form-dialog";
 import { useDeleteAccountDnsRecord } from "../hooks/use-account-mutations";
 
 function DnsTypeBadge({ type }: { type: string }) {
-  const color = DNS_TYPE_COLORS[type] ?? "border-border/70 bg-muted/40 text-muted-foreground";
+  const color = isDnsType(type) ? DNS_TYPE_COLORS[type] : "border-border/70 bg-muted/40 text-muted-foreground";
   return (
     <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 font-mono text-[11px] font-bold ${color}`}>
       {type}
@@ -123,9 +123,10 @@ function DnsRecordsTable({ accountId, zoneId }: { accountId: string; zoneId: str
                           size="sm"
                           onClick={() => setEditTarget(record)}
                           className="size-7 p-0 rounded-lg text-blue-600 hover:bg-blue-500/10 cursor-pointer"
-                          title="Edit"
+                          title={t("actions.editDnsRecord")}
+                          aria-label={t("actions.editDnsRecord")}
                         >
-                          <Pencil className="size-3" />
+                          <Pencil className="size-3" aria-hidden="true" />
                         </Button>
                       </Can>
                       <Can I={ACTIONS.DELETE} a={PERMISSIONS.CLOUDFLARE_DNS.RESOURCE}>
@@ -134,9 +135,10 @@ function DnsRecordsTable({ accountId, zoneId }: { accountId: string; zoneId: str
                           size="sm"
                           onClick={() => setDeleteTarget(record.id)}
                           className="size-7 p-0 rounded-lg text-rose-600 hover:bg-rose-500/10 cursor-pointer"
-                          title="Delete"
+                          title={t("actions.deleteDnsRecord")}
+                          aria-label={t("actions.deleteDnsRecord")}
                         >
-                          <Trash2 className="size-3" />
+                          <Trash2 className="size-3" aria-hidden="true" />
                         </Button>
                       </Can>
                     </div>

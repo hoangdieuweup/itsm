@@ -6,7 +6,7 @@ from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
 from app.modules.cloudflare.schemas import CloudflareAccountRead
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
-from app.modules.rbac.public import RbacApi
+from app.modules.rbac.public import RbacActions, RbacApi, RbacResources
 
 
 class ListVisibleCloudflareAccounts(AbstractUseCase):
@@ -23,13 +23,10 @@ class ListVisibleCloudflareAccounts(AbstractUseCase):
 
     @use_case
     async def execute(self, user_id: UUID) -> list[CloudflareAccountRead]:
-        if await self._rbac_api.has_permission(user_id, "cloudflare_account", "manage_all"):
-            # Phase 3 scope: a single generously-sized page. Real pagination
-            # for the manage_all view is deferred — the account count stays
-            # small through at least Phase 5 (one row per Cloudflare account,
-            # not per project/environment).
-            items, _total = await self._uow.accounts.list_page(limit=1000, offset=0)
-            return items
+        if await self._rbac_api.has_permission(
+            user_id, RbacResources.CLOUDFLARE_ACCOUNT, RbacActions.MANAGE_ALL
+        ):
+            return await self._uow.accounts.list_all()
 
         manager_rows = await self._uow.account_managers.list_for_user(user_id)
         account_ids = [row.cloudflare_account_id for row in manager_rows]

@@ -1,26 +1,34 @@
 import { apiFetch } from "@/shared/lib/api-client";
 import { API_CONFIG } from "@/shared/constants/api";
-import type { CloudflareAccount } from "@/entities/cloudflare-account";
+import type { AccessLevel } from "@/shared/constants/cloudflare";
+import { cloudflareAccountSchema, type CloudflareAccount } from "@/entities/cloudflare-account";
+import {
+  cloudflareAccountManagerSchema,
+  revealedTokenSchema,
+  type CloudflareAccountManager,
+} from "../model/schema";
 
 export async function createCloudflareAccount(data: {
   label: string;
   cfAccountId: string;
   apiToken: string;
 }): Promise<CloudflareAccount> {
-  return apiFetch<CloudflareAccount>(API_CONFIG.ENDPOINTS.CLOUDFLARE_ACCOUNTS.ROOT, {
+  const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_ACCOUNTS.ROOT, {
     method: "POST",
     data,
   });
+  return cloudflareAccountSchema.parse(raw);
 }
 
 export async function updateCloudflareAccount(
   id: string,
   data: { label?: string; apiToken?: string },
 ): Promise<CloudflareAccount> {
-  return apiFetch<CloudflareAccount>(API_CONFIG.ENDPOINTS.CLOUDFLARE_ACCOUNTS.DETAIL(id), {
+  const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_ACCOUNTS.DETAIL(id), {
     method: "PATCH",
     data,
   });
+  return cloudflareAccountSchema.parse(raw);
 }
 
 export async function deleteCloudflareAccount(id: string): Promise<void> {
@@ -32,30 +40,15 @@ export async function testCloudflareAccountConnection(id: string): Promise<void>
 }
 
 export async function revealCloudflareAccountToken(id: string): Promise<string> {
-  const result = await apiFetch<{ apiToken: string }>(
-    API_CONFIG.ENDPOINTS.CLOUDFLARE_ACCOUNTS.REVEAL_TOKEN(id),
-    { method: "POST" },
-  );
-  return result.apiToken;
-}
-
-export const ACCESS_LEVEL = {
-  OWNER: "owner",
-  EDITOR: "editor",
-  VIEWER: "viewer",
-} as const;
-export type AccessLevel = (typeof ACCESS_LEVEL)[keyof typeof ACCESS_LEVEL];
-
-export interface CloudflareAccountManager {
-  userId: string;
-  email: string;
-  name: string;
-  accessLevel: AccessLevel;
-  createdAt: string;
+  const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_ACCOUNTS.REVEAL_TOKEN(id), {
+    method: "POST",
+  });
+  return revealedTokenSchema.parse(raw).apiToken;
 }
 
 export async function fetchCloudflareAccountManagers(accountId: string): Promise<CloudflareAccountManager[]> {
-  return apiFetch<CloudflareAccountManager[]>(API_CONFIG.ENDPOINTS.CLOUDFLARE_ACCOUNTS.MANAGERS(accountId));
+  const raw = await apiFetch<unknown>(API_CONFIG.ENDPOINTS.CLOUDFLARE_ACCOUNTS.MANAGERS(accountId));
+  return cloudflareAccountManagerSchema.array().parse(raw);
 }
 
 export async function assignCloudflareAccountManager(

@@ -1,1 +1,20 @@
-export * from "./icons";
+export {
+  BrandLogo,
+  IconAuditLogs,
+  IconCloud,
+  IconCloudflare,
+  IconDashboard,
+  IconDns,
+  IconGit,
+  IconGmail,
+  IconGrafana,
+  IconJira,
+  IconNotification,
+  IconPermission,
+  IconProject,
+  IconServer,
+  IconStatus,
+  IconTelegram,
+  IconUsers,
+  type IconProps,
+} from "./icons";

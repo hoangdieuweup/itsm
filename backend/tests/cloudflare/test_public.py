@@ -10,6 +10,7 @@ import pytest
 from app.core.crypto import FernetCodec
 from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import DnsRecordType, ManagedBy, TunnelStatus
+from app.modules.cloudflare.exceptions import CloudflareAccountNotFound
 from app.modules.cloudflare.public import CloudflareApi
 from app.modules.cloudflare.schemas import CloudflareTunnelRead, DnsRecordRead, TunnelPublicHostnameRead
 
@@ -340,6 +341,12 @@ class TestEnsureWebhookDestination:
 
         assert destination_id == "wh-existing"
         assert client.create_calls == []
+
+    async def test_raises_account_not_found_for_unknown_account(self) -> None:
+        api = CloudflareApi(FakeUow(FakeAccountsRepo()), client=FakeCloudflareClient(), projects_api=object())
+
+        with pytest.raises(CloudflareAccountNotFound):
+            await api.ensure_webhook_destination(uuid4(), webhook_url="https://x")
 
 
 class TestGetWebhookSecret:

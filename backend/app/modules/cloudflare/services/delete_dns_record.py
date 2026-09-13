@@ -59,6 +59,7 @@ class DeleteDnsRecord(AbstractUseCase):
                 config.zone_id,
                 existing.cf_record_id,
                 environment_id,
+                exc_info=True,
             )
             raise DnsRecordSyncFailed() from None
 
