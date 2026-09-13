@@ -172,8 +172,8 @@ def require_project_permission_for_link(resource: str, action: str):
 def require_project_membership_for_project_role():
     """Resolves project_role_id (path) -> project_id, then the plain
     binary membership check — used by PATCH/DELETE /project-roles/{id},
-    which are also gated by the global project_role:manage atom (Layer 1)
-    since project_role.* is never project-assignable."""
+    which are also gated by require_project_permission(project_role, manage)
+    (Layer 1)."""
 
     async def check(
         project_role_id: UUID,

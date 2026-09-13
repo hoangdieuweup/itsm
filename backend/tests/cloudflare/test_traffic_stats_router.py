@@ -48,7 +48,11 @@ class TestGetCloudflareTrafficStatsRoute:
         await _login_with_permissions(
             client,
             engine,
-            permissions=[("cloudflare_account", "view"), ("project", "create"), ("environment", "create")],
+            permissions=[
+                ("environment_cloudflare_traffic", "read"),
+                ("project", "create"),
+                ("environment", "create"),
+            ],
             email="viewer@x.com",
         )
         project_resp = await client.post("/api/v1/projects", json={"name": "Unbound"})
@@ -96,7 +100,7 @@ class TestGetCloudflareTrafficStatsRoute:
                 ("cloudflare_account", "create"),
                 ("cloudflare_account", "read"),
                 ("cloudflare_config", "manage"),
-                ("cloudflare_traffic", "read"),
+                ("environment_cloudflare_traffic", "read"),
                 ("project", "create"),
                 ("environment", "create"),
                 ("environment", "read"),

@@ -6,6 +6,7 @@ Everything here is a pure decision: no I/O, no framework, no database.
 from app.core.base.markers import rule
 from app.modules.projects.config import projects_settings
 from app.modules.projects.constants import ProjectLinkType, ProjectScopedPermissionCatalog
+from app.modules.rbac.public import RbacScoping
 
 
 class ProjectsRules:
@@ -46,11 +47,20 @@ class ProjectRoleRules:
 
     @staticmethod
     @rule
-    def effective_permissions(global_keys: frozenset[str], project_keys: frozenset[str]) -> frozenset[str]:
+    def effective_permissions(
+        global_keys: frozenset[str],
+        project_keys: frozenset[str],
+        *,
+        manages_all_projects: bool = False,
+    ) -> frozenset[str]:
         """A project role GRANTS on top of the caller's global
         permissions — the union, never a narrowing. A member with no
         project role assigned has project_keys=frozenset(), so this
         returns exactly their global set — byte-for-byte today's
         pre-project-role behavior. Flipping to narrow semantics later is
-        a one-line change here (intersection instead of union)."""
-        return global_keys | project_keys
+        a one-line change here (intersection instead of union)"""
+
+        granted = global_keys | project_keys
+        if manages_all_projects:
+            return granted | RbacScoping.manage_all_permission_keys()
+        return granted

@@ -2,6 +2,7 @@
 
 from collections.abc import Awaitable, Callable
 from enum import StrEnum
+from functools import lru_cache
 from typing import Any
 from uuid import UUID
 
@@ -83,18 +84,8 @@ class RbacPermissionCatalog:
         ("cloudflare_dns", "create", "permissions.cloudflare_dns.create"),
         ("cloudflare_dns", "update", "permissions.cloudflare_dns.update"),
         ("cloudflare_dns", "delete", "permissions.cloudflare_dns.delete"),
-        # ── Cloudflare traffic stats (GraphQL Analytics, ACCOUNT-level;
-        # kept for symmetry — the account-level route this would gate
-        # doesn't exist yet, project_cloudflare_traffic is what's used) ──
-        ("cloudflare_traffic", "read", "permissions.cloudflare_traffic.read"),
-        # ── Notification channels ──────────────────────────────────
-        ("notification_channel", "create", "permissions.notification_channel.create"),
-        ("notification_channel", "read", "permissions.notification_channel.read"),
-        ("notification_channel", "update", "permissions.notification_channel.update"),
-        ("notification_channel", "delete", "permissions.notification_channel.delete"),
-        ("notification_channel", "test_send", "permissions.notification_channel.test_send"),
-        # ── Alert rules (ACCOUNT-level: available-alerts route only) ──
-        ("alert_rule", "read", "permissions.alert_rule.read"),
+        # ── Cloudflare traffic stats (ENVIRONMENT-level) ───────────
+        ("environment_cloudflare_traffic", "read", "permissions.environment_cloudflare_traffic.read"),
         # ── Incidents (GLOBAL: cross-project list route only) ───────
         ("incident", "read", "permissions.incident.read"),
         # ── PROJECT-SCOPED twins ───────────────────────────────────
@@ -115,7 +106,6 @@ class RbacPermissionCatalog:
         ("project_cloudflare_hostname", "create", "permissions.project_cloudflare_hostname.create"),
         ("project_cloudflare_hostname", "update", "permissions.project_cloudflare_hostname.update"),
         ("project_cloudflare_hostname", "delete", "permissions.project_cloudflare_hostname.delete"),
-        ("project_cloudflare_traffic", "read", "permissions.project_cloudflare_traffic.read"),
         ("project_loki_config", "read", "permissions.project_loki_config.read"),
         ("project_loki_config", "manage", "permissions.project_loki_config.manage"),
         ("project_alert_rule", "create", "permissions.project_alert_rule.create"),
@@ -126,6 +116,27 @@ class RbacPermissionCatalog:
         ("project_incident", "read", "permissions.project_incident.read"),
         ("project_incident", "acknowledge", "permissions.project_incident.acknowledge"),
         ("project_incident", "resolve", "permissions.project_incident.resolve"),
+        (
+            "project_notification_channel",
+            "create",
+            "permissions.project_notification_channel.create",
+        ),
+        ("project_notification_channel", "read", "permissions.project_notification_channel.read"),
+        (
+            "project_notification_channel",
+            "update",
+            "permissions.project_notification_channel.update",
+        ),
+        (
+            "project_notification_channel",
+            "delete",
+            "permissions.project_notification_channel.delete",
+        ),
+        (
+            "project_notification_channel",
+            "test_send",
+            "permissions.project_notification_channel.test_send",
+        ),
     ]
 
 
@@ -151,19 +162,17 @@ class RbacResources:
     CLOUDFLARE_TUNNEL = "cloudflare_tunnel"
     CLOUDFLARE_HOSTNAME = "cloudflare_hostname"
     CLOUDFLARE_DNS = "cloudflare_dns"
-    CLOUDFLARE_TRAFFIC = "cloudflare_traffic"
-    NOTIFICATION_CHANNEL = "notification_channel"
-    ALERT_RULE = "alert_rule"
+    ENVIRONMENT_CLOUDFLARE_TRAFFIC = "environment_cloudflare_traffic"
     INCIDENT = "incident"
     # Project-scoped twins — see ProjectScopedPermissionCatalog.ASSIGNABLE.
     PROJECT_CLOUDFLARE_CONFIG = "project_cloudflare_config"
     PROJECT_CLOUDFLARE_TUNNEL = "project_cloudflare_tunnel"
     PROJECT_CLOUDFLARE_HOSTNAME = "project_cloudflare_hostname"
     PROJECT_CLOUDFLARE_DNS = "project_cloudflare_dns"
-    PROJECT_CLOUDFLARE_TRAFFIC = "project_cloudflare_traffic"
     PROJECT_LOKI_CONFIG = "project_loki_config"
     PROJECT_ALERT_RULE = "project_alert_rule"
     PROJECT_INCIDENT = "project_incident"
+    PROJECT_NOTIFICATION_CHANNEL = "project_notification_channel"
 
 
 class RbacActions:
@@ -185,6 +194,56 @@ class RbacActions:
     TEST_SEND = "test_send"
     ACKNOWLEDGE = "acknowledge"
     RESOLVE = "resolve"
+
+
+class RbacScoping:
+    """Which half of the catalog a resource belongs to.
+
+    A scoped resource is satisfied only through a project role — a global
+    grant on one would reach every project, including ones the holder is
+    not a member of. The prefix test is fail-closed;
+    PROJECT_ADMINISTRATION_RESOURCES are the admin console's own surface,
+    which only shares the prefix and stays global.
+    """
+
+    SCOPED_PREFIXES = ("project_", "environment_")
+    PROJECT_ADMINISTRATION_RESOURCES = frozenset({"project_member", "project_link", "project_role"})
+    ACCOUNT_TIERED_PREFIXES = ("project_cloudflare_", "environment_cloudflare_")
+
+    @staticmethod
+    def is_scoped(resource: str) -> bool:
+        if resource in RbacScoping.PROJECT_ADMINISTRATION_RESOURCES:
+            return False
+        return resource.startswith(RbacScoping.SCOPED_PREFIXES)
+
+    @staticmethod
+    def is_account_tiered(resource: str) -> bool:
+        """True for a scoped resource cloudflare_account_managers also gates.
+        These objects belong to an ACCOUNT serving several projects."""
+        return resource.startswith(RbacScoping.ACCOUNT_TIERED_PREFIXES)
+
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def scoped_permission_keys() -> frozenset[str]:
+        """Every scoped 'resource.action' in the catalog."""
+        return frozenset(
+            f"{resource}.{action}"
+            for resource, action, _ in RbacPermissionCatalog.CATALOG
+            if RbacScoping.is_scoped(resource)
+        )
+
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def manage_all_permission_keys() -> frozenset[str]:
+        """What project:manage_all grants inside every project: every action
+        on a project-owned resource, but READ only on an account-tiered one —
+        writing there still needs a cloudflare_account_managers grant."""
+        return frozenset(
+            f"{resource}.{action}"
+            for resource, action, _ in RbacPermissionCatalog.CATALOG
+            if RbacScoping.is_scoped(resource)
+            and (not RbacScoping.is_account_tiered(resource) or action == RbacActions.READ)
+        )
 
 
 class RbacDefaults:

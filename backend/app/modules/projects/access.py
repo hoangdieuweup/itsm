@@ -16,28 +16,25 @@ from app.modules.users.public import UserRead
 
 async def resolve_project_membership(
     project_id: UUID, user: UserRead, rbac_api: RbacApi, uow: AbstractProjectsUnitOfWork
-) -> None:
+) -> bool:
     """Raise InsufficientProjectAccess unless user holds project:manage_all
-    or has a project_members row for project_id. No return value — binary
-    membership has nothing else to carry, unlike Cloudflare's
-    AccountAccessGrant (which also carries the resolved access_level)."""
+    or has a project_members row for project_id. Returns True when it was
+    manage_all that admitted them — resolve_project_permissions reuses that
+    bit instead of asking rbac_api a second time."""
     if await rbac_api.has_permission(user.id, RbacResources.PROJECT, RbacActions.MANAGE_ALL):
-        return
+        return True
     if not await uow.project_members.is_member(project_id, user.id):
         raise InsufficientProjectAccess()
+    return False
 
 
 async def resolve_project_permissions(
     project_id: UUID, user: UserRead, rbac_api: RbacApi, uow: AbstractProjectsUnitOfWork
 ) -> ProjectPermissionGrant:
-    """Membership (or project:manage_all) first — the same gate
-    resolve_project_membership already enforces — then compute the
-    effective permission set: the caller's global permissions UNIONed
-    with whatever their assigned ProjectRole grants inside this project.
-    manage_all bypasses MEMBERSHIP only, never adds to the permission set
-    itself — a manage_all holder's grant is still just their own global
-    permissions."""
-    await resolve_project_membership(project_id, user, rbac_api, uow)
+    """Membership first, then the effective permission set: global
+    permissions UNIONed with the caller's ProjectRole inside this project,
+    plus the scoped surface when they hold project:manage_all."""
+    manages_all = await resolve_project_membership(project_id, user, rbac_api, uow)
 
     summary = await rbac_api.role_summary_for_user(user.id)
     global_keys = frozenset(summary.permissions)
@@ -46,5 +43,7 @@ async def resolve_project_permissions(
     project_permissions = await rbac_api.get_permissions_by_ids(role_permission_ids)
     project_keys = frozenset(f"{p.resource}.{p.action}" for p in project_permissions)
 
-    effective = ProjectRoleRules.effective_permissions(global_keys, project_keys)
+    effective = ProjectRoleRules.effective_permissions(
+        global_keys, project_keys, manages_all_projects=manages_all
+    )
     return ProjectPermissionGrant(user=user, project_id=project_id, permissions=effective)

@@ -6,6 +6,7 @@ import pytest
 
 from app.modules.projects.access import resolve_project_permissions
 from app.modules.projects.exceptions import InsufficientProjectAccess
+from app.modules.rbac.public import RbacScoping
 from app.modules.users.public import UserRead
 from tests.projects.test_services import ACTOR_EMAIL, ACTOR_ID, FakeProjectsUnitOfWork, FakeRbacApi
 
@@ -51,7 +52,9 @@ class TestResolveProjectPermissions:
         with pytest.raises(InsufficientProjectAccess):
             await resolve_project_permissions(project.id, user, rbac_api, uow)
 
-    async def test_manage_all_bypasses_membership_but_grant_is_still_just_their_global_set(self) -> None:
+    async def test_manage_all_bypasses_membership_and_grants_the_scoped_surface(self) -> None:
+        """This used to return only the caller's global set, which holds no
+        scoped twin — membership passed, then every scoped route denied."""
         uow = FakeProjectsUnitOfWork()
         project = await uow.projects.create(name="A", description=None, created_by=None)
         user = UserRead.model_construct(id=uuid4(), email=ACTOR_EMAIL, name="Actor")
@@ -59,4 +62,21 @@ class TestResolveProjectPermissions:
 
         grant = await resolve_project_permissions(project.id, user, rbac_api, uow)
 
-        assert grant.permissions == frozenset({"project.manage_all"})
+        assert "project.manage_all" in grant.permissions
+        assert RbacScoping.manage_all_permission_keys() <= grant.permissions
+        assert "project_notification_channel.read" in grant.permissions
+        assert "project_cloudflare_tunnel.create" not in grant.permissions
+
+    async def test_plain_member_without_manage_all_gains_no_scoped_permission(self) -> None:
+        """The widening is keyed to manage_all alone — an ordinary member
+        still sees exactly global UNION their project role."""
+        uow = FakeProjectsUnitOfWork()
+        project = await uow.projects.create(name="A", description=None, created_by=None)
+        await uow.project_members.add(project.id, ACTOR_ID)
+        user = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL, name="Actor")
+        rbac_api = FakeRbacApi(manage_all=False, global_permissions=["project.read"])
+
+        grant = await resolve_project_permissions(project.id, user, rbac_api, uow)
+
+        assert grant.permissions == frozenset({"project.read"})
+        assert not (RbacScoping.scoped_permission_keys() & grant.permissions)

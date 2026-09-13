@@ -14,11 +14,12 @@ import asyncio
 import logging
 import uuid
 
+from sqlalchemy import or_ as sa_or
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.config import settings
-from app.modules.rbac.constants import RbacDefaults, RbacPermissionCatalog
+from app.modules.rbac.constants import RbacDefaults, RbacPermissionCatalog, RbacScoping
 from app.modules.rbac.models import Permission, Role, RolePermission
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,28 @@ async def _remove_stale_permissions(session, catalog_keys: set[tuple[str, str]])
     await session.flush()
 
 
+async def _revoke_globally_held_project_permissions(session) -> None:
+    """A project-scoped permission held by a GLOBAL role applies to every
+    project through the effective-permissions union. Strip those links so the
+    seed is self-healing after a role was granted one by hand. The prefix in
+    the WHERE is a DB-side narrowing only; is_scoped is the authority, and
+    filtering through it keeps PROJECT_ADMINISTRATION_RESOURCES out."""
+    rows = [
+        (link, permission)
+        for link, permission in await session.execute(
+            select(RolePermission, Permission)
+            .join(Permission, Permission.id == RolePermission.permission_id)
+            .where(sa_or(*[Permission.resource.startswith(pfx) for pfx in RbacScoping.SCOPED_PREFIXES]))
+        )
+        if RbacScoping.is_scoped(permission.resource)
+    ]
+    for link, permission in rows:
+        logger.info("revoking globally-held project permission %s.%s", permission.resource, permission.action)
+        await session.delete(link)
+    if rows:
+        await session.flush()
+
+
 async def run() -> None:
     """Upsert the permission catalog, then the admin/member default roles.
 
@@ -81,7 +104,7 @@ async def run() -> None:
     async with session_factory() as session:
         # ── 1. Upsert every CATALOG permission ─────────────────────
         catalog_keys: set[tuple[str, str]] = set()
-        permission_ids: list[uuid.UUID] = []
+        globally_grantable_ids: list[uuid.UUID] = []
         for resource, action, description_key in RbacPermissionCatalog.CATALOG:
             catalog_keys.add((resource, action))
             row = await session.scalar(
@@ -96,10 +119,12 @@ async def run() -> None:
                 row.description_key = description_key
                 await session.flush()
                 logger.info("updated description_key for %s.%s", resource, action)
-            permission_ids.append(row.id)
+            if not RbacScoping.is_scoped(resource):
+                globally_grantable_ids.append(row.id)
 
         # ── 2. Clean up stale permissions no longer in CATALOG ──────
         await _remove_stale_permissions(session, catalog_keys)
+        await _revoke_globally_held_project_permissions(session)
         await session.commit()
 
         # ── 3. Upsert default roles ─────────────────────────────────
@@ -120,7 +145,7 @@ async def run() -> None:
                         select(RolePermission.permission_id).where(RolePermission.role_id == role.id)
                     )
                 )
-                for permission_id in permission_ids:
+                for permission_id in globally_grantable_ids:
                     if permission_id not in existing_perms:
                         session.add(RolePermission(role_id=role.id, permission_id=permission_id))
                 await session.flush()

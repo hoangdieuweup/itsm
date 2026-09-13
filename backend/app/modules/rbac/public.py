@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import Depends
 
 from app.core.base.markers import facade
-from app.modules.rbac.constants import RbacActions, RbacDefaults, RbacResources
+from app.modules.rbac.constants import RbacActions, RbacDefaults, RbacResources, RbacScoping
 from app.modules.rbac.dependencies import get_uow, require_any_permission, require_permission
 from app.modules.rbac.models import Permission, Role, UserRole
 from app.modules.rbac.rules import RbacRules
@@ -23,6 +23,7 @@ __all__ = [
     "RbacDefaults",
     "RbacResources",
     "RbacActions",
+    "RbacScoping",
     "RbacApi",
     "get_rbac_api",
     "require_permission",
