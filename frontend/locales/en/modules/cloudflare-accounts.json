@@ -21,7 +21,11 @@
     "revealToken": "Reveal Token",
     "hideToken": "Hide Token",
     "copyToken": "Copy",
-    "manageAccess": "Manage Access"
+    "manageAccess": "Manage Access",
+    "copyAccountId": "Copy account ID",
+    "copyApiToken": "Copy API token",
+    "editDnsRecord": "Edit DNS record",
+    "deleteDnsRecord": "Delete DNS record"
   },
   "form": {
     "createTitle": "New Cloudflare Account",
@@ -54,7 +58,8 @@
     "removeConfirm": {
       "title": "Remove this manager?",
       "description": "They will lose all access to this account."
-    }
+    },
+    "remove": "Remove manager"
   },
   "tabs": {
     "tunnels": "Tunnels",

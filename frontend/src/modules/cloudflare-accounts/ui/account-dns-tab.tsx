@@ -123,9 +123,10 @@ function DnsRecordsTable({ accountId, zoneId }: { accountId: string; zoneId: str
                           size="sm"
                           onClick={() => setEditTarget(record)}
                           className="size-7 p-0 rounded-lg text-blue-600 hover:bg-blue-500/10 cursor-pointer"
-                          title="Edit"
+                          title={t("actions.editDnsRecord")}
+                          aria-label={t("actions.editDnsRecord")}
                         >
-                          <Pencil className="size-3" />
+                          <Pencil className="size-3" aria-hidden="true" />
                         </Button>
                       </Can>
                       <Can I={ACTIONS.DELETE} a={PERMISSIONS.CLOUDFLARE_DNS.RESOURCE}>
@@ -134,9 +135,10 @@ function DnsRecordsTable({ accountId, zoneId }: { accountId: string; zoneId: str
                           size="sm"
                           onClick={() => setDeleteTarget(record.id)}
                           className="size-7 p-0 rounded-lg text-rose-600 hover:bg-rose-500/10 cursor-pointer"
-                          title="Delete"
+                          title={t("actions.deleteDnsRecord")}
+                          aria-label={t("actions.deleteDnsRecord")}
                         >
-                          <Trash2 className="size-3" />
+                          <Trash2 className="size-3" aria-hidden="true" />
                         </Button>
                       </Can>
                     </div>
