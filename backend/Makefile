@@ -23,8 +23,8 @@ logs: ## Tail the API's logs
 migrate: ## Run Alembic migrations
 	docker compose -f $(COMPOSE_FILE) exec api alembic upgrade head
 
-seed: ## Run every seed script under app/seeds/
-	docker compose -f $(COMPOSE_FILE) exec api sh -c "for m in app/seeds/seed_*.py; do python -m $$(echo $$m | sed 's#/#.#g; s#\.py##'); done"
+seed: ## Run every seed script under app/seeds/, seed_rbac first
+	docker compose -f $(COMPOSE_FILE) exec api sh -c 'set -e; python -m app.seeds.seed_rbac; for f in app/seeds/seed_*.py; do name=$$(basename "$$f" .py); [ "$$name" = seed_rbac ] || python -m "app.seeds.$$name"; done'
 
 worker-logs: ## Tail the worker's logs
 	docker compose -f $(COMPOSE_FILE) logs -f worker
