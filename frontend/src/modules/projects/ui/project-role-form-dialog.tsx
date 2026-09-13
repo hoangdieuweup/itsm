@@ -51,7 +51,7 @@ function ProjectRoleFormInner({
   const t = useTranslations("projects");
   const tRoles = useTranslations("roles");
   const getErrorMessage = useApiErrorMessage("projects");
-  const { data: assignablePermissions = [] } = useQuery({
+  const { data: assignablePermissions = [], isPending: permissionsLoading } = useQuery({
     queryKey: assignablePermissionsKeys.all,
     queryFn: fetchAssignablePermissions,
   });
@@ -75,6 +75,11 @@ function ProjectRoleFormInner({
     return groups;
   }, [assignablePermissions]);
 
+  const assignableIds = useMemo(
+    () => new Set(assignablePermissions.map((perm) => perm.id)),
+    [assignablePermissions],
+  );
+
   const togglePermission = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -84,12 +89,12 @@ function ProjectRoleFormInner({
     });
   };
 
-  const isPending = createRole.isPending || updateRole.isPending;
+  const isPending = createRole.isPending || updateRole.isPending || permissionsLoading;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    const permissionIds = Array.from(selectedIds);
+    const permissionIds = Array.from(selectedIds).filter((id) => assignableIds.has(id));
     const callbacks = {
       onSuccess: () => onClose(),
       onError: (err: unknown) => setErrorMessage(getErrorMessage(err)),
