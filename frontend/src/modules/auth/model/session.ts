@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { userSchema } from "@/entities/user";
-import { AUTH_STATUS, type AuthStatus } from "@/shared/constants/auth";
+import { AUTH_STATUS } from "@/shared/constants/auth";
 
 /**
  * Mirrors the backend's MeResponse: user profile + resolved role/permissions.
@@ -45,6 +45,3 @@ export function isAuthenticated(
 ): session is AuthenticatedAuthSession {
   return session?.status === AUTH_STATUS.AUTHENTICATED;
 }
-
-export { AUTH_STATUS, type AuthStatus };
-
