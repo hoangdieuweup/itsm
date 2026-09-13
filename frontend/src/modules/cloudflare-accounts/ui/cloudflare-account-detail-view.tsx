@@ -25,7 +25,8 @@ import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useCloudflareAccountQuery } from "@/entities/cloudflare-account";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
-import { ACCESS_LEVEL, type AccessLevel, type CloudflareAccountManager } from "../api/fetchers";
+import { ACCESS_LEVEL, type AccessLevel } from "@/shared/constants/cloudflare";
+import type { CloudflareAccountManager } from "../model/schema";
 import { useTestCloudflareAccountConnection } from "../hooks/use-test-cloudflare-account-connection";
 import { useRevealCloudflareAccountToken } from "../hooks/use-reveal-cloudflare-account-token";
 import { useCloudflareAccountManagersQuery } from "../hooks/use-cloudflare-account-managers";
@@ -64,11 +65,11 @@ function ManagerAccessLevelControl({
 }) {
   const t = useTranslations("cloudflareAccounts");
 
-  const getLevelBadgeStyle = (level: string) => {
-    switch (level.toLowerCase()) {
-      case "owner":
+  const getLevelBadgeStyle = (level: AccessLevel) => {
+    switch (level) {
+      case ACCESS_LEVEL.OWNER:
         return "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300";
-      case "admin":
+      case ACCESS_LEVEL.EDITOR:
         return "border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300";
       default:
         return "border-border/70 bg-muted/60 text-foreground";

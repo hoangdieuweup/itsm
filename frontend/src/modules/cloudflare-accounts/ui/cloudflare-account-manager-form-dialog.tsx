@@ -10,7 +10,7 @@ import { apiFetch } from "@/shared/lib/api-client";
 import { API_CONFIG } from "@/shared/constants/api";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useAssignCloudflareAccountManager } from "../hooks/use-assign-cloudflare-account-manager";
-import { ACCESS_LEVEL, type AccessLevel } from "../api/fetchers";
+import { ACCESS_LEVEL, type AccessLevel } from "@/shared/constants/cloudflare";
 import { IconUsers } from "@/shared/ui/icons";
 
 interface CloudflareAccountManagerFormDialogProps {
