@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Play, RefreshCw, AlertTriangle, Radio, Pause } from "lucide-react";
 import { Button } from "@/shared/ui/button";
@@ -11,7 +11,7 @@ import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { formatDatetime, defaultRange } from "@/shared/lib/datetime";
 import { useLokiConfigQuery, type LokiConfig } from "@/entities/loki-config";
 import { useCloudflareConfigQuery } from "@/entities/cloudflare-config";
-import { useRunLogQuery } from "../hooks/use-log-query";
+import { useLogQuery } from "../hooks/use-log-query";
 import { useLogTail } from "../hooks/use-log-tail";
 import { useCloudflareTrafficStatsQuery } from "../hooks/use-cloudflare-traffic-stats";
 import type { LogEntry } from "../model/schema";
@@ -132,23 +132,32 @@ function LokiQueryTab({ environmentId, defaultQuery, defaultRangeMinutes }: {
   const t = useTranslations("logViewer");
   const getErrorMessage = useApiErrorMessage("logViewer");
   const initialRange = defaultRange(defaultRangeMinutes);
+
   const [query, setQuery] = useState(defaultQuery);
   const [start, setStart] = useState(initialRange.start);
   const [end, setEnd] = useState(initialRange.end);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const runQuery = useRunLogQuery(environmentId);
+
+  const [queryParams, setQueryParams] = useState({
+    query: defaultQuery,
+    start: new Date(initialRange.start).toISOString(),
+    end: new Date(initialRange.end).toISOString(),
+    limit: 200,
+  });
+
+  const logQuery = useLogQuery(environmentId, queryParams);
   const tail = useLogTail(environmentId, query);
 
   const handleRun = (event: React.FormEvent) => {
     event.preventDefault();
-    setErrorMessage(null);
-    runQuery.mutate(
-      { query, start: new Date(start).toISOString(), end: new Date(end).toISOString(), limit: 200 },
-      { onError: (err) => setErrorMessage(getErrorMessage(err)) },
-    );
+    setQueryParams({
+      query,
+      start: new Date(start).toISOString(),
+      end: new Date(end).toISOString(),
+      limit: 200,
+    });
   };
 
-  const displayedEntries = tail.isLive ? tail.entries : runQuery.data;
+  const displayedEntries = tail.isLive ? tail.entries : logQuery.data;
 
   return (
     <div className="flex flex-col gap-4">
@@ -171,9 +180,9 @@ function LokiQueryTab({ environmentId, defaultQuery, defaultRangeMinutes }: {
             onEndChange={setEnd}
             disabled={tail.isLive}
           />
-          <Button type="submit" disabled={runQuery.isPending || tail.isLive}>
+          <Button type="submit" disabled={logQuery.isFetching || tail.isLive}>
             <Play className="mr-1.5 size-3.5" aria-hidden="true" />
-            {runQuery.isPending ? t("query.running") : t("query.run")}
+            {logQuery.isFetching ? t("query.running") : t("query.run")}
           </Button>
           <LiveToggleButton isLive={tail.isLive} onStart={tail.start} onStop={tail.stop} />
         </div>
@@ -190,14 +199,14 @@ function LokiQueryTab({ environmentId, defaultQuery, defaultRangeMinutes }: {
         </p>
       )}
 
-      {(errorMessage ?? tail.error) && (
+      {(logQuery.isError || tail.error) && (
         <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
-          <AlertTriangle className="size-3.5" aria-hidden="true" /> {errorMessage ?? tail.error}
+          <AlertTriangle className="size-3.5" aria-hidden="true" /> {logQuery.error ? getErrorMessage(logQuery.error) : tail.error}
         </p>
       )}
 
-      {!tail.isLive && runQuery.isPending && <Skeleton className="h-32 w-full" />}
-      {displayedEntries && <LogResultsTable entries={displayedEntries} />}
+      {!tail.isLive && (logQuery.isLoading || logQuery.isFetching) && <Skeleton className="h-32 w-full rounded-2xl" />}
+      {displayedEntries && !logQuery.isLoading && <LogResultsTable entries={displayedEntries} />}
     </div>
   );
 }
