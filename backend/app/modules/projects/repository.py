@@ -522,26 +522,55 @@ class ProjectRoleRepository(AbstractProjectRoleRepository):
             updated_at=row.updated_at,
         )
 
+    @helper
+    async def _load_many(self, rows: list[ProjectRole]) -> list[ProjectRoleRow]:
+        """Batch counterpart of _load_by_id: one permission query for every
+        row instead of one per row."""
+        if not rows:
+            return []
+        links = await self._session.execute(
+            select(ProjectRolePermission.project_role_id, ProjectRolePermission.permission_id).where(
+                ProjectRolePermission.project_role_id.in_([row.id for row in rows])
+            )
+        )
+        permission_ids: dict[UUID, list[UUID]] = {row.id: [] for row in rows}
+        for project_role_id, permission_id in links:
+            permission_ids[project_role_id].append(permission_id)
+        return [
+            ProjectRoleRow(
+                id=row.id,
+                project_id=row.project_id,
+                name=row.name,
+                permission_ids=permission_ids[row.id],
+                created_at=row.created_at,
+                updated_at=row.updated_at,
+            )
+            for row in rows
+        ]
+
     @database
     async def get_by_id(self, entity_id: UUID) -> ProjectRoleRow | None:
         return await self._load_by_id(entity_id)
 
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[ProjectRoleRow], int]:
-        rows = await self._session.scalars(
-            select(ProjectRole).order_by(ProjectRole.id).limit(limit).offset(offset)
+        rows = list(
+            await self._session.scalars(
+                select(ProjectRole).order_by(ProjectRole.id).limit(limit).offset(offset)
+            )
         )
-        items = [await self._load_by_id(row.id) for row in rows]
+        items = await self._load_many(rows)
         total = await self._session.scalar(select(func.count()).select_from(ProjectRole))
-        return [i for i in items if i is not None], total or 0
+        return items, total or 0
 
     @database
     async def list_for_project(self, project_id: UUID) -> list[ProjectRoleRow]:
-        rows = await self._session.scalars(
-            select(ProjectRole).where(ProjectRole.project_id == project_id).order_by(ProjectRole.name)
+        rows = list(
+            await self._session.scalars(
+                select(ProjectRole).where(ProjectRole.project_id == project_id).order_by(ProjectRole.name)
+            )
         )
-        results = [await self._load_by_id(row.id) for row in rows]
-        return [r for r in results if r is not None]
+        return await self._load_many(rows)
 
     @database
     async def find_by_name(self, project_id: UUID, name: str) -> ProjectRoleRow | None:
