@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Eye, EyeOff, Plus } from "lucide-react";
+import { Eye, EyeOff, Plus, Search } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -13,6 +13,7 @@ import {
   type NotificationChannel,
   type NotificationChannelType,
 } from "@/entities/notification-channel";
+import { useUsers, USER_STATUS } from "@/entities/user";
 import { IconGmail, IconTelegram, IconNotification } from "@/shared/ui/icons";
 import { useCreateNotificationChannel } from "../hooks/use-create-channel";
 import { useUpdateNotificationChannel } from "../hooks/use-update-channel";
@@ -82,22 +83,98 @@ function SecretField({
   );
 }
 
-function EmailFields({ recipients, onChange }: { recipients: string; onChange: (value: string) => void }) {
+function EmailRecipientsPickerList({
+  selectedEmails,
+  onChange,
+}: {
+  selectedEmails: string[];
+  onChange: (emails: string[]) => void;
+}) {
+  const t = useTranslations("notifications");
+  const { data } = useUsers(200, 0);
+  const [search, setSearch] = useState("");
+
+  const activeUsers = useMemo(
+    () => data.items.filter((u) => u.status === USER_STATUS.ACTIVE),
+    [data.items],
+  );
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return activeUsers;
+    const q = search.toLowerCase();
+    return activeUsers.filter(
+      (u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q),
+    );
+  }, [activeUsers, search]);
+
+  function toggle(email: string) {
+    onChange(
+      selectedEmails.includes(email)
+        ? selectedEmails.filter((e) => e !== email)
+        : [...selectedEmails, email],
+    );
+  }
+
+  return (
+    <>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={t("fields.recipientsSearch")}
+          className="h-7 w-full rounded-md border border-input bg-transparent pl-7 pr-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50"
+          aria-label={t("fields.recipientsSearch")}
+        />
+      </div>
+
+      <div className="flex max-h-40 flex-col overflow-y-auto">
+        {filtered.length === 0 && (
+          <p className="py-2 text-center text-xs text-muted-foreground">{t("fields.recipientsEmpty")}</p>
+        )}
+        {filtered.map((user) => (
+          <label
+            key={user.id}
+            className="flex min-w-0 cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm transition-colors hover:bg-accent"
+          >
+            <input
+              type="checkbox"
+              checked={selectedEmails.includes(user.email)}
+              onChange={() => toggle(user.email)}
+              className="size-3.5 shrink-0 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            />
+            <span className="truncate">{user.name}</span>
+            <span className="ml-auto shrink-0 text-xs text-muted-foreground">{user.email}</span>
+          </label>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/**
+ * useUsers is a suspense query — needs its own Suspense boundary inside the
+ * dialog to avoid suspending the entire page when the dialog opens.
+ * Same pattern as ChannelMultiselect in modules/alerting.
+ */
+function EmailFields({
+  selectedEmails,
+  onChange,
+}: {
+  selectedEmails: string[];
+  onChange: (emails: string[]) => void;
+}) {
   const t = useTranslations("notifications");
   return (
-    <div className="space-y-1.5">
-      <Label htmlFor="channel-recipients">{t("fields.recipients")}</Label>
-      <Input
-        id="channel-recipients"
-        value={recipients}
-        onChange={(event) => onChange(event.target.value)}
-        aria-describedby="channel-recipients-hint"
-        required
-      />
-      <p id="channel-recipients-hint" className="text-xs text-muted-foreground">
-        {t("fields.recipientsHint")}
-      </p>
-    </div>
+    <fieldset className="space-y-1.5">
+      <legend className="text-sm font-medium text-foreground">{t("fields.recipients")}</legend>
+      <p className="text-xs text-muted-foreground">{t("fields.recipientsHint")}</p>
+      <div className="flex flex-col gap-1.5 rounded-md border border-input p-2">
+        <Suspense fallback={<div className="h-5 w-32 animate-pulse rounded bg-muted" />}>
+          <EmailRecipientsPickerList selectedEmails={selectedEmails} onChange={onChange} />
+        </Suspense>
+      </div>
+    </fieldset>
   );
 }
 
@@ -197,7 +274,7 @@ function OtherFields({ json, onChange }: { json: string; onChange: (value: strin
 
 function computeInitialFields(channel: NotificationChannel | null, type: NotificationChannelType) {
   return {
-    recipients: Array.isArray(channel?.config.recipients) ? (channel.config.recipients as string[]).join(", ") : "",
+    recipients: Array.isArray(channel?.config.recipients) ? (channel.config.recipients as string[]) : [],
     chatId: typeof channel?.config.chat_id === "string" ? channel.config.chat_id : "",
     botName: typeof channel?.config.bot_name === "string" ? channel.config.bot_name : "",
     messageTemplate: typeof channel?.config.message_template === "string" ? channel.config.message_template : "",
@@ -225,8 +302,8 @@ function ChannelTypeFields({
 }: {
   type: NotificationChannelType;
   isEditing: boolean;
-  recipients: string;
-  onRecipientsChange: (value: string) => void;
+  recipients: string[];
+  onRecipientsChange: (emails: string[]) => void;
   botToken: string;
   onBotTokenChange: (value: string) => void;
   chatId: string;
@@ -241,7 +318,7 @@ function ChannelTypeFields({
   onOtherJsonChange: (value: string) => void;
 }) {
   if (type === NOTIFICATION_CHANNEL_TYPE.EMAIL) {
-    return <EmailFields recipients={recipients} onChange={onRecipientsChange} />;
+    return <EmailFields selectedEmails={recipients} onChange={onRecipientsChange} />;
   }
   if (type === NOTIFICATION_CHANNEL_TYPE.TELEGRAM) {
     return (
@@ -273,7 +350,7 @@ function ChannelTypeFields({
 function buildConfig(
   type: NotificationChannelType,
   fields: {
-    recipients: string;
+    recipients: string[];
     botToken: string;
     chatId: string;
     webhookUrl: string;
@@ -284,11 +361,7 @@ function buildConfig(
   isEditing: boolean,
 ): { config: Record<string, unknown>; error: string | null } {
   if (type === NOTIFICATION_CHANNEL_TYPE.EMAIL) {
-    const recipients = fields.recipients
-      .split(",")
-      .map((r) => r.trim())
-      .filter(Boolean);
-    return { config: { recipients }, error: null };
+    return { config: { recipients: fields.recipients }, error: null };
   }
   if (type === NOTIFICATION_CHANNEL_TYPE.TELEGRAM) {
     const config: Record<string, unknown> = { chat_id: fields.chatId };
@@ -322,7 +395,7 @@ export function NotificationChannelFormDialog({
   const [type, setType] = useState<NotificationChannelType>(channel?.type ?? NOTIFICATION_CHANNEL_TYPE.EMAIL);
   const [name, setName] = useState(channel?.name ?? "");
   const initialFields = computeInitialFields(channel, type);
-  const [recipients, setRecipients] = useState(initialFields.recipients);
+  const [recipients, setRecipients] = useState<string[]>(initialFields.recipients);
   const [botToken, setBotToken] = useState("");
   const [chatId, setChatId] = useState(initialFields.chatId);
   const [webhookUrl, setWebhookUrl] = useState("");
