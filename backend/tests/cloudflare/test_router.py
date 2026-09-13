@@ -540,6 +540,7 @@ class TestDnsRecordFullDemoScript:
             json={"recordType": "A", "name": "blocked", "content": "9.9.9.9", "proxied": False, "ttl": 1},
         )
         assert blocked_resp.status_code == 403
+        assert blocked_resp.json()["error"]["code"] == "cloudflare_insufficient_account_access"
 
         remaining_resp = await client.get(f"/api/v1/environments/{environment_id}/dns-records")
         assert remaining_resp.status_code == 200
@@ -688,6 +689,7 @@ class TestTunnelRouterFullDemoScript:
             json={"hostname": "a.example.com", "service": "http://x"},
         )
         assert response.status_code == 403
+        assert response.json()["error"]["code"] == "cloudflare_insufficient_account_access"
 
         del app.dependency_overrides[get_cloudflare_client]
 
@@ -728,6 +730,7 @@ class TestSyncTunnelsRouter:
 
         response = await client.post(f"/api/v1/environments/{environment_id}/cloudflare-tunnels/sync")
         assert response.status_code == 403
+        assert response.json()["error"]["code"] == "cloudflare_insufficient_account_access"
 
         del app.dependency_overrides[get_cloudflare_client]
 

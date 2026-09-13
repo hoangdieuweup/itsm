@@ -59,7 +59,7 @@ from app.modules.cloudflare.services.tunnels.refresh_tunnel_status import Refres
 from app.modules.cloudflare.services.tunnels.reveal_tunnel_token import RevealCloudflareTunnelToken
 from app.modules.cloudflare.services.tunnels.sync_tunnels import SyncTunnels
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork, CloudflareUnitOfWork
-from app.modules.projects.public import ProjectsApi, get_projects_api
+from app.modules.projects.public import InsufficientProjectAccess, ProjectsApi, get_projects_api
 from app.modules.rbac.public import RbacApi, get_rbac_api
 from app.modules.users.public import UserRead, UsersApi, get_users_api
 
@@ -153,7 +153,9 @@ def require_cloudflare_environment_access(
     `account_resource` unchanged from before; the project-role fallback
     checks `project_resource`, and is skipped entirely when None (tunnel
     delete/reveal-token have no project-scoped equivalent — a Cloudflare
-    Tunnel is account-wide, so those stay account-only)."""
+    Tunnel is account-wide, so those stay account-only). A caller who is not
+    a member of the environment's project has no project-role path at all, so
+    they get the same InsufficientAccountAccess as any other failed check."""
 
     async def check(
         environment_id: UUID,
@@ -178,9 +180,12 @@ def require_cloudflare_environment_access(
         if project_resource is not None:
             environment = await projects_api.get_environment_by_id(environment_id)
             if environment is not None:
-                permissions = await projects_api.resolve_effective_permissions(
-                    environment.project_id, user, rbac_api
-                )
+                try:
+                    permissions = await projects_api.resolve_effective_permissions(
+                        environment.project_id, user, rbac_api
+                    )
+                except InsufficientProjectAccess:
+                    permissions = frozenset()
                 if f"{project_resource}.{action}" in permissions:
                     return AccountAccessGrant(user=user, held_level=None)
 

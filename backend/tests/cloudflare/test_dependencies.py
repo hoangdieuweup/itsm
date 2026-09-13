@@ -15,6 +15,7 @@ from app.modules.cloudflare.dependencies import (
 )
 from app.modules.cloudflare.exceptions import CloudflareConfigNotFound, InsufficientAccountAccess
 from app.modules.cloudflare.repository import CloudflareAccountManagerRow
+from app.modules.projects.exceptions import InsufficientProjectAccess
 from app.modules.users.public import UserRead
 
 # UserRead.model_construct bypasses field validation/required-field checks —
@@ -306,5 +307,41 @@ async def test_require_cloudflare_environment_access_raises_when_both_paths_fail
             projects_api=FakeProjectsApi(
                 environment=_FakeEnvironment(id=environment_id, project_id=uuid4()),
                 permissions=frozenset(),
+            ),
+        )
+
+
+class NonMemberProjectsApi(FakeProjectsApi):
+    """The real facade raises instead of returning an empty set when the caller
+    is neither a member of the project nor holds project:manage_all."""
+
+    async def resolve_effective_permissions(self, project_id, user, rbac_api):
+        raise InsufficientProjectAccess()
+
+
+async def test_non_member_of_the_project_gets_the_cloudflare_denial() -> None:
+    """A VIEWER-level account manager outside the environment's project fails
+    both paths. The answer must be the Cloudflare denial, not the project
+    module's membership error leaking out of the project-role fallback."""
+    environment_id = uuid4()
+    account_id = uuid4()
+    row = CloudflareAccountManagerRow(
+        cloudflare_account_id=account_id,
+        user_id=_FAKE_USER.id,
+        access_level=AccessLevel.VIEWER,
+        created_at=datetime.now(UTC),
+    )
+    check = require_cloudflare_environment_access(
+        "cloudflare_dns", "project_cloudflare_dns", "create", AccessLevel.EDITOR
+    )
+
+    with pytest.raises(InsufficientAccountAccess):
+        await check(
+            environment_id=environment_id,
+            auth_api=FakeAuthApi(_FAKE_USER),
+            rbac_api=FakeRbacApi(manage_all=False, global_permissions=["cloudflare_dns.create"]),
+            uow=FakeUowWithConfigs(row, account_id),
+            projects_api=NonMemberProjectsApi(
+                environment=_FakeEnvironment(id=environment_id, project_id=uuid4())
             ),
         )
