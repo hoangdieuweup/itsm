@@ -13,7 +13,7 @@ COPY pyproject.toml ./
 RUN uv sync --no-dev --no-install-project
 
 COPY app ./app
-COPY migrations ./migrations
+COPY alembic ./alembic
 COPY alembic.ini ./
 COPY scripts ./scripts
 RUN uv sync --no-dev && chmod +x scripts/*.sh
