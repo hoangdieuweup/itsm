@@ -1,4 +1,10 @@
 {
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(node .gitnexus/run.cjs impact --target resolve_project_permissions --direction upstream)"
+    ]
+  },
   "enabledPlugins": {
     "ui-ux-pro-max@ui-ux-pro-max-skill": true
   }
