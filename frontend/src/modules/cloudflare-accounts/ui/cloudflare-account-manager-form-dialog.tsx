@@ -6,8 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/shared/ui/button";
 import { Label } from "@/shared/ui/label";
 import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
-import { apiFetch } from "@/shared/lib/api-client";
-import { API_CONFIG } from "@/shared/constants/api";
+import { PAGINATION } from "@/shared/constants/pagination";
+import { fetchUsers } from "@/entities/user";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useAssignCloudflareAccountManager } from "../hooks/use-assign-cloudflare-account-manager";
 import { ACCESS_LEVEL, type AccessLevel } from "@/shared/constants/cloudflare";
@@ -16,12 +16,6 @@ import { IconUsers } from "@/shared/ui/icons";
 interface CloudflareAccountManagerFormDialogProps {
   accountId: string;
   onClose: () => void;
-}
-
-interface UserOption {
-  id: string;
-  email: string;
-  name: string;
 }
 
 /**
@@ -44,12 +38,12 @@ export function CloudflareAccountManagerFormDialog({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const getErrorMessage = useApiErrorMessage("cloudflareAccounts");
 
-  // Reuses the existing GET /users list — no dedicated user-picker component
-  // exists in shared/ui yet, so this is a small inline query rather than a
-  // new shared primitive (out of scope to build one for this phase).
+  // Reuses GET /users through the user entity's fetcher — no dedicated
+  // user-picker component exists in shared/ui yet. Lists at most one full
+  // page (PAGINATION.MAX_PAGE_SIZE users).
   const { data: users } = useQuery({
-    queryKey: userPickerKeys.list(100),
-    queryFn: () => apiFetch<{ items: UserOption[] }>(`${API_CONFIG.ENDPOINTS.USERS.ROOT}?limit=100`),
+    queryKey: userPickerKeys.list(PAGINATION.MAX_PAGE_SIZE),
+    queryFn: () => fetchUsers(PAGINATION.MAX_PAGE_SIZE, 0),
   });
 
   const assign = useAssignCloudflareAccountManager(accountId);

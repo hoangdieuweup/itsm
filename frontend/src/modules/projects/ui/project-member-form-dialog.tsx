@@ -8,6 +8,7 @@ import { Label } from "@/shared/ui/label";
 import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useUsers } from "@/entities/user";
+import { PAGINATION } from "@/shared/constants/pagination";
 import { fetchProjectRoles } from "../api/fetchers";
 import { projectRolesKeys } from "../api/query-keys";
 import { useAddProjectMember } from "../hooks/use-add-project-member";
@@ -65,7 +66,7 @@ function UserPicker({
   excludeUserIds: Set<string>;
 }) {
   const t = useTranslations("projects");
-  const { data: usersPage } = useUsers(100, 0);
+  const { data: usersPage } = useUsers(PAGINATION.MAX_PAGE_SIZE, 0);
   const options = usersPage.items.filter((user) => !excludeUserIds.has(user.id));
 
   return (
