@@ -76,7 +76,7 @@ class AccountAccessGrant(FrozenModel):
     CloudflareAccountRules.satisfies_level treats as always-sufficient.
 
     Lives here (not in dependencies.py, where it's constructed) so both
-    dependencies.py AND services/update_account.py can import it without a
+    dependencies.py AND services/accounts/update_account.py can import it without a
     cycle — dependencies.py imports service classes to build its provider
     functions, so a service can never import dependencies.py back."""
 

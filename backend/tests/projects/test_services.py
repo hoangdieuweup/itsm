@@ -29,21 +29,21 @@ from app.modules.projects.repository import (
     ProjectRoleRow,
 )
 from app.modules.projects.schemas import EnvironmentRead, ProjectLinkRead, ProjectRead
-from app.modules.projects.services.add_project_member import AddProjectMember
-from app.modules.projects.services.assign_member_project_role import AssignMemberProjectRole
-from app.modules.projects.services.create_environment import CreateEnvironment
-from app.modules.projects.services.create_project import CreateProject
-from app.modules.projects.services.create_project_link import CreateProjectLink
-from app.modules.projects.services.create_project_role import CreateProjectRole
-from app.modules.projects.services.delete_environment import DeleteEnvironment
-from app.modules.projects.services.delete_project import DeleteProject
-from app.modules.projects.services.delete_project_link import DeleteProjectLink
-from app.modules.projects.services.list_project_members import ListProjectMembers
-from app.modules.projects.services.list_visible_projects import ListVisibleProjects
-from app.modules.projects.services.remove_project_member import RemoveProjectMember
-from app.modules.projects.services.update_environment import UpdateEnvironment
-from app.modules.projects.services.update_project import UpdateProject
-from app.modules.projects.services.update_project_link import UpdateProjectLink
+from app.modules.projects.services.environments.create_environment import CreateEnvironment
+from app.modules.projects.services.environments.delete_environment import DeleteEnvironment
+from app.modules.projects.services.environments.update_environment import UpdateEnvironment
+from app.modules.projects.services.links.create_project_link import CreateProjectLink
+from app.modules.projects.services.links.delete_project_link import DeleteProjectLink
+from app.modules.projects.services.links.update_project_link import UpdateProjectLink
+from app.modules.projects.services.members.add_project_member import AddProjectMember
+from app.modules.projects.services.members.assign_member_project_role import AssignMemberProjectRole
+from app.modules.projects.services.members.list_project_members import ListProjectMembers
+from app.modules.projects.services.members.remove_project_member import RemoveProjectMember
+from app.modules.projects.services.projects.create_project import CreateProject
+from app.modules.projects.services.projects.delete_project import DeleteProject
+from app.modules.projects.services.projects.list_visible_projects import ListVisibleProjects
+from app.modules.projects.services.projects.update_project import UpdateProject
+from app.modules.projects.services.roles.create_project_role import CreateProjectRole
 from app.modules.projects.uow import AbstractProjectsUnitOfWork
 from app.modules.rbac.schemas import PermissionRead, RoleSummary
 from app.modules.users.public import UserRead
