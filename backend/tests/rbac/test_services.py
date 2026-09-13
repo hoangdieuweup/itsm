@@ -94,13 +94,9 @@ class FakeRoleRepository(AbstractRoleRepository):
             return None
         new_name = current.name if name is None else name
         new_perms = (
-            current.permissions
-            if permission_ids is None
-            else [p for p in _CATALOG if p.id in permission_ids]
+            current.permissions if permission_ids is None else [p for p in _CATALOG if p.id in permission_ids]
         )
-        updated = RoleRead(
-            id=current.id, name=new_name, is_system=current.is_system, permissions=new_perms
-        )
+        updated = RoleRead(id=current.id, name=new_name, is_system=current.is_system, permissions=new_perms)
         self.roles[id] = updated
         return updated
 

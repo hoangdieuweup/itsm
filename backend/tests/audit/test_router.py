@@ -53,9 +53,7 @@ async def _login_with_permissions(
 
 
 class TestListAuditLogs:
-    async def test_requires_audit_log_read_permission(
-        self, client: AsyncClient, engine: AsyncEngine
-    ) -> None:
+    async def test_requires_audit_log_read_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
         await _login_with_permissions(client, engine, permissions=[])
 
         response = await client.get("/api/v1/audit-logs")

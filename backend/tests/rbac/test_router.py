@@ -161,9 +161,7 @@ class TestAssignUserRoles:
 
         assert response.status_code == 200
         async with engine.begin() as conn:
-            result = await conn.execute(
-                select(UserRole.role_id).where(UserRole.user_id == target_user_id)
-            )
+            result = await conn.execute(select(UserRole.role_id).where(UserRole.user_id == target_user_id))
             assert set(result.scalars().all()) == {role1_id, role2_id}
 
         # Test GET /users/{user_id}/roles
