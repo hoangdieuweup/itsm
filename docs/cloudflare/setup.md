@@ -16,13 +16,14 @@ Click **+ Add more** to add each row, matching the features already built in the
 
 | Resource | Permission | Required for |
 |---|---|---|
-| Account | Cloudflare Tunnel — **Edit** | Creating/deleting Tunnels, managing hostnames (Phase 5) |
-| Account | Notifications — **Edit** | Cloudflare-native alert rules, webhook destination, test policy (Phase 9) |
-| Account | Audit Logs — **Read** | The "Cloudflare Audit Logs" tab in the Log Viewer (Phase 6) |
-| Zone | Zone — **Read** | Listing zones when binding an account to an environment (Phase 4) |
-| Zone | DNS — **Edit** | Creating/editing/deleting DNS records (Phase 4) |
+| Account | Notifications — **Edit** | Cloudflare-native alert rules, webhook destination, test policy |
+| Account | Cloudflare Tunnel — **Edit** | Creating/deleting Tunnels, managing hostnames |
+| Account | Account Settings — **Read** | Reading account-level audit logs |
+| Zone | Zone — **Read** | Listing zones when binding an account to an environment |
+| Zone | DNS — **Edit** | Creating/editing/deleting DNS records |
+| Zone | Analytics — **Read** | Traffic stats (requests, bandwidth, status codes) per zone |
 
-If you only want to test the Alerting feature, the minimum needed is: Account → Notifications Edit + Zone → Zone Read + Zone → DNS Edit (an account/zone binding is required before an alert rule can be created) — Cloudflare Tunnel Edit is not needed.
+> **Note:** Don't use Global API Key — create a scoped Custom Token with exactly these permissions.
 
 ## 4. Choose Account Resources
 
