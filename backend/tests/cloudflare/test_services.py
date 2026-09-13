@@ -106,6 +106,9 @@ class FakeCloudflareAccountRepository(AbstractCloudflareAccountRepository):
     async def list_for_ids(self, account_ids: list[UUID]) -> list[CloudflareAccountRead]:
         return [self._rows[i] for i in account_ids if i in self._rows]
 
+    async def list_all(self) -> list[CloudflareAccountRead]:
+        return sorted(self._rows.values(), key=lambda row: row.label)
+
     async def create(
         self, *, label: str, cf_account_id: str, api_token: str, created_by: UUID | None
     ) -> CloudflareAccountRead:
@@ -1135,6 +1138,17 @@ class TestListVisibleCloudflareAccounts:
         accounts = await ListVisibleCloudflareAccounts(uow, FakeRbacApi(manage_all=False)).execute(uuid4())
 
         assert accounts == []
+
+    async def test_manage_all_sees_accounts_beyond_a_single_page(self) -> None:
+        uow = FakeCloudflareUnitOfWork()
+        for index in range(1001):
+            await uow.accounts.create(
+                label=f"A{index}", cf_account_id=f"cf-{index}", api_token="x", created_by=ACTOR_ID
+            )
+
+        accounts = await ListVisibleCloudflareAccounts(uow, FakeRbacApi(manage_all=True)).execute(uuid4())
+
+        assert len(accounts) == 1001
 
 
 class TestCreateCloudflareConfig:

@@ -91,6 +91,12 @@ class AbstractCloudflareAccountRepository(AbstractRepository[CloudflareAccountRe
         raise NotImplementedError
 
     @abstractmethod
+    async def list_all(self) -> list[CloudflareAccountRead]:
+        """Return every account ordered by label — backs the manage_all view
+        of GET /cloudflare-accounts, which is not paginated."""
+        raise NotImplementedError
+
+    @abstractmethod
     async def get_webhook_destination_ciphertext(self, account_id: UUID) -> tuple[str | None, str | None]:
         """Return (cf_webhook_destination_id, webhook_secret_ciphertext), both
         None if a webhook destination was never registered for this account."""
@@ -137,6 +143,12 @@ class CloudflareAccountRepository(AbstractCloudflareAccountRepository):
         items = [CloudflareAccountRead.model_validate(row) for row in rows]
         total = await self._session.scalar(select(func.count()).select_from(CloudflareAccount))
         return items, total or 0
+
+    @database
+    async def list_all(self) -> list[CloudflareAccountRead]:
+        """Return every account ordered by label."""
+        rows = await self._session.scalars(select(CloudflareAccount).order_by(CloudflareAccount.label))
+        return [CloudflareAccountRead.model_validate(row) for row in rows]
 
     @database
     async def list_for_ids(self, account_ids: list[UUID]) -> list[CloudflareAccountRead]:

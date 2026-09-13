@@ -507,3 +507,14 @@ class TestUpdatesRaiseNotFoundForMissingRows:
     async def test_tunnel_hostname(self, _session: AsyncSession) -> None:
         with pytest.raises(TunnelPublicHostnameNotFound):
             await TunnelHostnameRepository(_session).update_service(uuid4(), service="http://x")
+
+
+class TestCloudflareAccountRepositoryListAll:
+    async def test_returns_every_account_ordered_by_label(self, _session: AsyncSession) -> None:
+        repo = CloudflareAccountRepository(_session, CacheClient.__new__(CacheClient))
+        for label in ("B", "A", "C"):
+            await repo.create(label=label, cf_account_id=f"cf-{label}", api_token="c", created_by=None)
+
+        accounts = await repo.list_all()
+
+        assert [account.label for account in accounts] == ["A", "B", "C"]
