@@ -7,7 +7,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
-import type { ProjectLink } from "../api/fetchers";
+import { PROJECT_LINK_TYPE, type ProjectLink, type ProjectLinkType } from "../model/schema";
 import { useCreateProjectLink } from "../hooks/use-create-project-link";
 import { useUpdateProjectLink } from "../hooks/use-update-project-link";
 import { IconProject } from "@/shared/ui/icons";
@@ -26,7 +26,7 @@ export function ProjectLinkFormDialog({ isOpen, onClose, projectId, link }: Proj
   const updateLink = useUpdateProjectLink(projectId);
 
   const isEditing = Boolean(link);
-  const [type, setType] = useState<"jira" | "git" | "other">(link?.type ?? "other");
+  const [type, setType] = useState<ProjectLinkType>(link?.type ?? PROJECT_LINK_TYPE.OTHER);
   const [name, setName] = useState(() => link?.name ?? "");
   const [url, setUrl] = useState(() => link?.url ?? "");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -66,7 +66,7 @@ export function ProjectLinkFormDialog({ isOpen, onClose, projectId, link }: Proj
           <select
             id="link-type"
             value={type}
-            onChange={(e) => setType(e.target.value as "jira" | "git" | "other")}
+            onChange={(e) => setType(e.target.value as ProjectLinkType)}
             disabled={isEditing}
             className="h-10 w-full rounded-md border bg-background px-3 text-sm disabled:opacity-60"
           >
