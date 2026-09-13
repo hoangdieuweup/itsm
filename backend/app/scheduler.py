@@ -32,7 +32,7 @@ from app.modules.audit.repository import MongoAuditLogRepository
 from app.modules.cloudflare.public import CloudflareApi
 from app.modules.cloudflare.uow import CloudflareUnitOfWork
 from app.modules.observability.config import observability_settings
-from app.modules.observability.services.run_drift_reconciliation import RunDriftReconciliation
+from app.modules.observability.services.reconciliation.run_drift_reconciliation import RunDriftReconciliation
 from app.modules.observability.uow import ObservabilityUnitOfWork
 from app.modules.projects.public import ProjectsApi
 from app.modules.projects.uow import ProjectsUnitOfWork

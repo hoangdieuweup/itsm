@@ -38,25 +38,25 @@ from app.modules.observability.repository import (
     AbstractLokiConfigRepository,
 )
 from app.modules.observability.schemas import AlertRuleRead, IncidentRead, LokiConfigRead
-from app.modules.observability.services.acknowledge_incident import AcknowledgeIncident
-from app.modules.observability.services.create_alert_rule import CreateAlertRule
-from app.modules.observability.services.create_loki_config import CreateLokiConfig
-from app.modules.observability.services.create_manual_incident import CreateManualIncident
-from app.modules.observability.services.delete_alert_rule import DeleteAlertRule
-from app.modules.observability.services.delete_loki_config import DeleteLokiConfig
-from app.modules.observability.services.get_incident import GetIncident
-from app.modules.observability.services.get_loki_config import GetLokiConfig
-from app.modules.observability.services.handle_cloudflare_webhook import HandleCloudflareWebhook
-from app.modules.observability.services.handle_loki_webhook import HandleLokiWebhook
-from app.modules.observability.services.list_alert_rules import ListAlertRules
-from app.modules.observability.services.list_available_alerts import ListAvailableAlerts
-from app.modules.observability.services.list_incidents import ListIncidents
-from app.modules.observability.services.resolve_incident import ResolveIncident
-from app.modules.observability.services.run_drift_reconciliation import RunDriftReconciliation
-from app.modules.observability.services.run_log_query import RunLogQuery
-from app.modules.observability.services.stream_log_tail import StreamLogTail
-from app.modules.observability.services.update_alert_rule import UpdateAlertRule
-from app.modules.observability.services.update_loki_config import UpdateLokiConfig
+from app.modules.observability.services.alert_rules.create_alert_rule import CreateAlertRule
+from app.modules.observability.services.alert_rules.delete_alert_rule import DeleteAlertRule
+from app.modules.observability.services.alert_rules.list_alert_rules import ListAlertRules
+from app.modules.observability.services.alert_rules.list_available_alerts import ListAvailableAlerts
+from app.modules.observability.services.alert_rules.update_alert_rule import UpdateAlertRule
+from app.modules.observability.services.incidents.acknowledge_incident import AcknowledgeIncident
+from app.modules.observability.services.incidents.create_manual_incident import CreateManualIncident
+from app.modules.observability.services.incidents.get_incident import GetIncident
+from app.modules.observability.services.incidents.list_incidents import ListIncidents
+from app.modules.observability.services.incidents.resolve_incident import ResolveIncident
+from app.modules.observability.services.loki.create_loki_config import CreateLokiConfig
+from app.modules.observability.services.loki.delete_loki_config import DeleteLokiConfig
+from app.modules.observability.services.loki.get_loki_config import GetLokiConfig
+from app.modules.observability.services.loki.run_log_query import RunLogQuery
+from app.modules.observability.services.loki.stream_log_tail import StreamLogTail
+from app.modules.observability.services.loki.update_loki_config import UpdateLokiConfig
+from app.modules.observability.services.reconciliation.run_drift_reconciliation import RunDriftReconciliation
+from app.modules.observability.services.webhooks.handle_cloudflare_webhook import HandleCloudflareWebhook
+from app.modules.observability.services.webhooks.handle_loki_webhook import HandleLokiWebhook
 from app.modules.observability.uow import AbstractObservabilityUnitOfWork
 from app.modules.observability.utils import LokiAuthHelper
 from app.modules.users.public import UserRead
