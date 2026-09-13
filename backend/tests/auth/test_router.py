@@ -220,4 +220,3 @@ class TestRefreshEndpoint:
         response = await client.post("/api/v1/auth/refresh")
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "auth_not_authenticated"
-

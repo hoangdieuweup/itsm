@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Play, RefreshCw, AlertTriangle, Radio, Pause } from "lucide-react";
 import { Button } from "@/shared/ui/button";

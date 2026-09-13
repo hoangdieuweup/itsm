@@ -40,4 +40,3 @@ class NotificationChannelSecrets:
 
 class NotificationsDefaults:
     TEST_MESSAGE = "Test notification from ITSM"
-

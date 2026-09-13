@@ -9,12 +9,13 @@ from fastapi import Depends
 from app.core.base.markers import facade
 from app.modules.projects.access import resolve_project_permissions
 from app.modules.projects.dependencies import get_uow
+from app.modules.projects.exceptions import InsufficientProjectAccess
 from app.modules.projects.schemas import EnvironmentRead, ProjectRead
 from app.modules.projects.uow import AbstractProjectsUnitOfWork
 from app.modules.rbac.public import RbacApi
 from app.modules.users.public import UserRead
 
-__all__ = ["ProjectRead", "EnvironmentRead", "ProjectsApi", "get_projects_api"]
+__all__ = ["ProjectRead", "EnvironmentRead", "InsufficientProjectAccess", "ProjectsApi", "get_projects_api"]
 
 
 class ProjectsApi:

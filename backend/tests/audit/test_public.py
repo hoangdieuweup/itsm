@@ -32,9 +32,7 @@ class TestLogEvent:
         assert items[0].actor.email == "actor@example.com"
 
     async def test_never_raises_when_mongo_unreachable(self) -> None:
-        unreachable_client = AsyncIOMotorClient(
-            "mongodb://localhost:1/", serverSelectionTimeoutMS=200
-        )
+        unreachable_client = AsyncIOMotorClient("mongodb://localhost:1/", serverSelectionTimeoutMS=200)
         api = AuditApi(MongoAuditLogRepository(unreachable_client["itsm_test_unreachable"]))
 
         await api.log_event(
@@ -70,9 +68,7 @@ class TestListLogs:
         assert items[0].action == "A_EVENT"
 
     async def test_raises_mongo_unavailable_when_unreachable(self) -> None:
-        unreachable_client = AsyncIOMotorClient(
-            "mongodb://localhost:1/", serverSelectionTimeoutMS=200
-        )
+        unreachable_client = AsyncIOMotorClient("mongodb://localhost:1/", serverSelectionTimeoutMS=200)
         api = AuditApi(MongoAuditLogRepository(unreachable_client["itsm_test_unreachable"]))
 
         with pytest.raises(MongoUnavailable):
