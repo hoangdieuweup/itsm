@@ -16,12 +16,12 @@ import { Skeleton } from "@/shared/ui/skeleton";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
-import { DNS_TYPE_COLORS } from "../model/dns";
+import { DNS_TYPE_COLORS, isDnsType } from "../model/dns";
 import { DnsRecordFormDialog } from "./dns-record-form-dialog";
 import { useDeleteAccountDnsRecord } from "../hooks/use-account-mutations";
 
 function DnsTypeBadge({ type }: { type: string }) {
-  const color = DNS_TYPE_COLORS[type] ?? "border-border/70 bg-muted/40 text-muted-foreground";
+  const color = isDnsType(type) ? DNS_TYPE_COLORS[type] : "border-border/70 bg-muted/40 text-muted-foreground";
   return (
     <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 font-mono text-[11px] font-bold ${color}`}>
       {type}

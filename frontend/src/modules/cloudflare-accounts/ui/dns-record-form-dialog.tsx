@@ -119,7 +119,7 @@ function DnsTypeSelector({
             disabled={disabled}
             className={`rounded-xl border px-3 py-1.5 font-mono text-xs font-bold transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
               value === type
-                ? DNS_TYPE_COLORS[type] ?? "border-primary/50 bg-primary/10 text-primary"
+                ? DNS_TYPE_COLORS[type]
                 : "border-border/60 bg-card/80 text-muted-foreground hover:border-primary/30"
             }`}
           >
