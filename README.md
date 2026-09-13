@@ -105,12 +105,9 @@ uv sync
 cp .env.example .env
 ```
 
-`.env.example` is written for an API running inside Compose. Change two things:
+`.env.example` is written for an API running inside Compose. When the API runs on your machine, replace the hostnames `postgres`, `redis`, `rabbitmq`, `mongo` and `minio` with `localhost`.
 
-- Set the database name in `DATABASE_URL` to `itsm`, the database `docker-compose.yml` creates. Do this however you run the API.
-- When the API runs on your machine, replace the hostnames `postgres`, `redis`, `rabbitmq` and `minio` with `localhost`.
-
-Then fill in the settings for the features you use. Settings marked \* aren't in `.env.example` yet, so add them yourself.
+Then fill in the settings for the features you use:
 
 | Setting | Used for |
 |---|---|
@@ -119,12 +116,12 @@ Then fill in the settings for the features you use. Settings marked \* aren't in
 | `DX_CORE__CLIENT_ID`, `DX_CORE__CLIENT_SECRET`, `DX_CORE__SCOPES` | SSO sign-in. Register `<BACKEND_BASE_URL>/api/v1/auth/oauth/dx/callback` as the redirect URI. |
 | `DX_CORE__FERNET_KEY` | Encrypting stored DX tokens |
 | `USERS__ADMIN_EMAIL` | Optional break-glass admin, created by `seed_admin` |
-| `CLOUDFLARE__FERNET_KEY` \* | Encrypting Cloudflare API tokens |
-| `OBSERVABILITY__FERNET_KEY` \* | Encrypting Loki credentials |
-| `OBSERVABILITY__LOKI_WEBHOOK_SECRET` \* | The bearer token Alertmanager sends to the Loki alert webhook |
-| `NOTIFICATIONS__FERNET_KEY` \* | Encrypting Telegram bot tokens and Base.vn webhook URLs |
-| `EMAIL__SMTP_HOST`, `EMAIL__SMTP_PORT`, `EMAIL__SMTP_USERNAME`, `EMAIL__SMTP_PASSWORD`, `EMAIL__SMTP_FROM_ADDRESS` \* | Email notifications |
-| `MONGO__URL` \* | Audit log database. Defaults to `mongodb://localhost:27017`. |
+| `CLOUDFLARE__FERNET_KEY` | Encrypting Cloudflare API tokens |
+| `OBSERVABILITY__FERNET_KEY` | Encrypting Loki credentials |
+| `OBSERVABILITY__LOKI_WEBHOOK_SECRET` | The bearer token Alertmanager sends to the Loki alert webhook |
+| `NOTIFICATIONS__FERNET_KEY` | Encrypting Telegram bot tokens and Base.vn webhook URLs |
+| `EMAIL__SMTP_HOST`, `EMAIL__SMTP_PORT`, `EMAIL__SMTP_USERNAME`, `EMAIL__SMTP_PASSWORD`, `EMAIL__SMTP_FROM_ADDRESS` | Email notifications |
+| `MONGO__URL` | Audit log database |
 
 Generate a Fernet key with:
 
@@ -180,17 +177,12 @@ Open http://localhost:3000 and sign in with DX SSO. If you seeded a break-glass 
 | `make up` | Build and start the stack. `make up ENV=prod` uses `docker-compose.prod.yml` and `.env.prod`. |
 | `make down` | Stop and remove the containers |
 | `make migrate` | Run `alembic upgrade head` in the `api` container |
-| `make seed` | Run every script in `app/seeds/` in the `api` container |
+| `make seed` | Run every script in `app/seeds/` in the `api` container, `seed_rbac` first |
 | `make logs`, `make worker-logs` | Follow the API or worker logs |
 
-Things to know:
+A first run is `make up`, `make migrate`, then `make seed`. The hostnames in `.env.example` already match the Compose services.
 
-- Inside Compose, the hostnames in `.env.example` are already correct. Add `MONGO__URL=mongodb://mongo:27017`, or the API can't reach MongoDB.
-- `make seed` runs the scripts in alphabetical order. With `USERS__ADMIN_EMAIL` set on an empty database, `seed_admin` fails because `seed_rbac` hasn't created the admin role yet. Run `make seed` a second time.
-- Neither Compose file runs the scheduler, and `docker-compose.prod.yml` has no MongoDB. The production stack publishes the API on port 8001.
-
-> [!WARNING]
-> The image build currently fails at `COPY migrations ./migrations` in `backend/Dockerfile`, because the migrations folder is `alembic/`. Use the local setup above until the Dockerfile is fixed.
+Neither Compose file runs the scheduler. `docker-compose.prod.yml` has no MongoDB, so point `MONGO__URL` in `.env.prod` at an existing instance. The production stack publishes the API on port 8001.
 
 ## Alert webhooks
 
