@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.integrations.email.config import email_settings
 from app.modules.notifications.constants import NotificationChannelType
 from app.modules.notifications.exceptions import NotificationChannelNotFound
 from app.modules.notifications.public import NotificationsApi
@@ -49,6 +50,13 @@ def _email_channel(channel_id) -> NotificationChannelRead:
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
     )
+
+
+@pytest.fixture(autouse=True)
+def _smtp_configured(monkeypatch) -> None:
+    """dispatch() refuses an EMAIL channel when no relay is configured;
+    these tests exercise the dispatch path itself, not that guard."""
+    monkeypatch.setattr(email_settings, "SMTP_HOST", "smtp.test.local")
 
 
 class TestDispatch:

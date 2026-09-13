@@ -29,3 +29,8 @@ class InvalidChannelConfig(ValidationFailedError):
 class UnsupportedChannelType(ValidationFailedError):
     code = ErrorCode.UNSUPPORTED_TYPE
     message = "This channel type does not support sending yet"
+
+
+class SmtpNotConfigured(ValidationFailedError):
+    code = ErrorCode.SMTP_NOT_CONFIGURED
+    message = "SMTP relay is not configured — set EMAIL__SMTP_HOST and related env vars"
