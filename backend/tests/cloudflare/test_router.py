@@ -118,7 +118,7 @@ async def _login_with_permissions(
     helper of the same name and shape — extended to be idempotent on the
     Permission row itself, since Layer-2 ACL tests routinely log in more
     than one user per test with an overlapping permission set (e.g. an
-    OWNER and a VIEWER both needing `cloudflare_account:view`), which would
+    OWNER and a VIEWER both needing `cloudflare_account.read`), which would
     otherwise violate the (resource, action) unique constraint on a second
     insert of the same tuple within one test."""
     async with engine.begin() as conn:
@@ -168,7 +168,10 @@ async def _switch_to(client: AsyncClient, user_id: UUID, *, email: str) -> None:
     client.cookies.set(AuthCookies.ACCESS_TOKEN, token)
 
 
-MANAGE_AND_VIEW = [("cloudflare_account", "manage"), ("cloudflare_account", "view")]
+# Layer-1 atoms the account routes check: create/list accounts, plus manager
+# administration for tests that assign or remove managers.
+ACCOUNT_CREATOR = [("cloudflare_account", "create"), ("cloudflare_account", "read")]
+ACCOUNT_OWNER = [*ACCOUNT_CREATOR, ("cloudflare_manager", "read"), ("cloudflare_manager", "manage")]
 
 
 class TestCreateCloudflareAccount:
@@ -176,7 +179,7 @@ class TestCreateCloudflareAccount:
         self, client: AsyncClient, engine: AsyncEngine
     ) -> None:
         app.dependency_overrides[get_cloudflare_client] = lambda: FakeCloudflareClient()
-        await _login_with_permissions(client, engine, permissions=MANAGE_AND_VIEW)
+        await _login_with_permissions(client, engine, permissions=ACCOUNT_CREATOR)
 
         response = await client.post(
             "/api/v1/cloudflare-accounts",
@@ -197,7 +200,7 @@ class TestCreateCloudflareAccount:
         app.dependency_overrides[get_cloudflare_client] = lambda: FakeCloudflareClient(
             raises=InvalidCloudflareToken()
         )
-        await _login_with_permissions(client, engine, permissions=[("cloudflare_account", "manage")])
+        await _login_with_permissions(client, engine, permissions=[("cloudflare_account", "create")])
 
         response = await client.post(
             "/api/v1/cloudflare-accounts",
@@ -209,7 +212,7 @@ class TestCreateCloudflareAccount:
 
         del app.dependency_overrides[get_cloudflare_client]
 
-    async def test_requires_manage_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
+    async def test_requires_create_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
         await _login_with_permissions(client, engine, permissions=[])
 
         response = await client.post(
@@ -226,14 +229,14 @@ class TestListCloudflareAccountsFiltering:
         self, client: AsyncClient, engine: AsyncEngine
     ) -> None:
         app.dependency_overrides[get_cloudflare_client] = lambda: FakeCloudflareClient()
-        await _login_with_permissions(client, engine, permissions=MANAGE_AND_VIEW, email="owner@example.com")
+        await _login_with_permissions(client, engine, permissions=ACCOUNT_CREATOR, email="owner@example.com")
         await client.post(
             "/api/v1/cloudflare-accounts",
             json={"label": "CF - Owner's", "cfAccountId": "cf-1", "apiToken": "x"},
         )
 
         await _login_with_permissions(
-            client, engine, permissions=[("cloudflare_account", "view")], email="outsider@example.com"
+            client, engine, permissions=[("cloudflare_account", "read")], email="outsider@example.com"
         )
         response = await client.get("/api/v1/cloudflare-accounts")
 
@@ -247,7 +250,7 @@ class TestRevealTokenAccessLevel:
     async def test_viewer_manager_cannot_reveal_token(self, client: AsyncClient, engine: AsyncEngine) -> None:
         app.dependency_overrides[get_cloudflare_client] = lambda: FakeCloudflareClient()
         owner_id = await _login_with_permissions(
-            client, engine, permissions=MANAGE_AND_VIEW, email="owner@example.com"
+            client, engine, permissions=ACCOUNT_OWNER, email="owner@example.com"
         )
         create_response = await client.post(
             "/api/v1/cloudflare-accounts",
@@ -255,12 +258,12 @@ class TestRevealTokenAccessLevel:
         )
         account_id = create_response.json()["data"]["id"]
 
-        # The viewer needs Layer-1 `manage` too, or reveal-token's Layer-1
-        # require_permission("manage") check blocks them before Layer-2
+        # The viewer needs Layer-1 `cloudflare_account.reveal_token` too, or
+        # reveal-token's require_permission check blocks them before Layer-2
         # (require_account_access(OWNER)) is ever reached — this test is
         # specifically about the Layer-2 block, so Layer-1 must pass first.
         viewer_id = await _login_with_permissions(
-            client, engine, permissions=MANAGE_AND_VIEW, email="viewer@example.com"
+            client, engine, permissions=[("cloudflare_account", "reveal_token")], email="viewer@example.com"
         )
         # Re-authenticate as the owner (their own cookie was overwritten
         # above) so they, not the viewer, perform the assignment.
@@ -297,7 +300,7 @@ class TestLastOwnerGuardViaRouter:
         self, client: AsyncClient, engine: AsyncEngine
     ) -> None:
         app.dependency_overrides[get_cloudflare_client] = lambda: FakeCloudflareClient()
-        owner_id = await _login_with_permissions(client, engine, permissions=MANAGE_AND_VIEW)
+        owner_id = await _login_with_permissions(client, engine, permissions=ACCOUNT_OWNER)
         create_response = await client.post(
             "/api/v1/cloudflare-accounts",
             json={"label": "CF - A", "cfAccountId": "cf-1", "apiToken": "x"},
@@ -315,7 +318,7 @@ class TestLastOwnerGuardViaRouter:
         self, client: AsyncClient, engine: AsyncEngine
     ) -> None:
         app.dependency_overrides[get_cloudflare_client] = lambda: FakeCloudflareClient()
-        owner_id = await _login_with_permissions(client, engine, permissions=MANAGE_AND_VIEW)
+        owner_id = await _login_with_permissions(client, engine, permissions=ACCOUNT_OWNER)
         create_response = await client.post(
             "/api/v1/cloudflare-accounts",
             json={"label": "CF - A", "cfAccountId": "cf-1", "apiToken": "x"},
@@ -336,7 +339,8 @@ class TestLastOwnerGuardViaRouter:
 async def _bind_environment(
     client: AsyncClient, engine: AsyncEngine, *, cf_client: FakeCloudflareClient
 ) -> tuple[str, str, UUID]:
-    """Full setup: login with manage+view, create an account (creator becomes
+    """Full setup: login with the account, manager and DNS/tunnel/hostname
+    atoms the routes check, create an account (creator becomes
     its OWNER), create a project + environment, bind them.
     Returns (environment_id, account_id, owner_user_id)."""
     app.dependency_overrides[get_cloudflare_client] = lambda: cf_client
@@ -347,6 +351,16 @@ async def _bind_environment(
             ("cloudflare_account", "create"),
             ("cloudflare_account", "read"),
             ("cloudflare_config", "manage"),
+            ("cloudflare_manager", "manage"),
+            ("cloudflare_dns", "read"),
+            ("cloudflare_dns", "create"),
+            ("cloudflare_dns", "delete"),
+            ("cloudflare_tunnel", "create"),
+            ("cloudflare_tunnel", "delete"),
+            ("cloudflare_tunnel", "reveal_token"),
+            ("cloudflare_tunnel", "sync"),
+            ("cloudflare_hostname", "read"),
+            ("cloudflare_hostname", "create"),
             ("environment_cloudflare_traffic", "read"),
             ("project", "create"),
             ("environment", "create"),
@@ -389,8 +403,9 @@ class TestCreateCloudflareConfig:
             client,
             engine,
             permissions=[
-                ("cloudflare_account", "manage"),
-                ("cloudflare_account", "view"),
+                ("cloudflare_account", "create"),
+                ("cloudflare_account", "read"),
+                ("cloudflare_config", "manage"),
                 ("project", "create"),
                 ("environment", "create"),
             ],
@@ -430,8 +445,9 @@ class TestCreateCloudflareConfig:
             client,
             engine,
             permissions=[
-                ("cloudflare_account", "manage"),
-                ("cloudflare_account", "view"),
+                ("cloudflare_account", "create"),
+                ("cloudflare_account", "read"),
+                ("cloudflare_config", "manage"),
                 ("project", "create"),
                 ("environment", "create"),
             ],
@@ -496,7 +512,7 @@ class TestDnsRecordFullDemoScript:
         viewer_id = await _login_with_permissions(
             client,
             engine,
-            permissions=[("cloudflare_account", "manage"), ("cloudflare_account", "view")],
+            permissions=[("cloudflare_dns", "create"), ("cloudflare_dns", "read")],
             email="viewer@example.com",
         )
         # Switch back to the account's OWNER (its creator) to assign the viewer.
@@ -645,7 +661,7 @@ class TestTunnelRouterFullDemoScript:
         viewer_id = await _login_with_permissions(
             client,
             engine,
-            permissions=[("cloudflare_account", "manage"), ("cloudflare_account", "view")],
+            permissions=[("cloudflare_hostname", "create")],
             email="viewer@example.com",
         )
         owner_token = JwtCodec.encode(
@@ -679,7 +695,7 @@ class TestTunnelRouterFullDemoScript:
 class TestSyncTunnelsRouter:
     """Decision #7: sync is a real write action (previously account-wide,
     now narrower per Decision #3 — but still a write), so it's gated at
-    manage/EDITOR now, not view/VIEWER like a plain read endpoint."""
+    cloudflare_tunnel.sync + EDITOR, not a VIEWER-level read."""
 
     async def test_viewer_manager_gets_403_on_sync(self, client: AsyncClient, engine: AsyncEngine) -> None:
         cf_client = FakeCloudflareClient(zones=[ZoneOption(id="z1", name="example.com")])
@@ -688,7 +704,7 @@ class TestSyncTunnelsRouter:
         viewer_id = await _login_with_permissions(
             client,
             engine,
-            permissions=[("cloudflare_account", "manage"), ("cloudflare_account", "view")],
+            permissions=[("cloudflare_tunnel", "sync")],
             email="viewer-sync@example.com",
         )
         owner_token = JwtCodec.encode(
