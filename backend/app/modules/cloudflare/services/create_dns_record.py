@@ -86,6 +86,7 @@ class CreateDnsRecord(AbstractUseCase):
                 "compensating delete (zone_id=%s, cf_record_id=%s)",
                 config.zone_id,
                 cf_record_id,
+                exc_info=True,
             )
             try:
                 await self._client.delete_dns_record(
@@ -100,6 +101,7 @@ class CreateDnsRecord(AbstractUseCase):
                     "cleanup required (zone_id=%s, cf_record_id=%s)",
                     config.zone_id,
                     cf_record_id,
+                    exc_info=True,
                 )
             raise DnsRecordSyncFailed() from None
 

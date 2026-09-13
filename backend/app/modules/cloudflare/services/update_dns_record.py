@@ -79,6 +79,7 @@ class UpdateDnsRecord(AbstractUseCase):
                 "compensating revert (zone_id=%s, cf_record_id=%s)",
                 config.zone_id,
                 existing.cf_record_id,
+                exc_info=True,
             )
             try:
                 await self._client.update_dns_record(
@@ -99,6 +100,7 @@ class UpdateDnsRecord(AbstractUseCase):
                     "reconciliation required (zone_id=%s, cf_record_id=%s)",
                     config.zone_id,
                     existing.cf_record_id,
+                    exc_info=True,
                 )
             raise DnsRecordSyncFailed() from None
 
