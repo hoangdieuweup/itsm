@@ -10,12 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.base.markers import database
 from app.core.base.repository import AbstractRepository
 from app.core.models import FrozenModel
-from app.modules.cloudflare.constants import (
-    AccessLevel,
-)
-from app.modules.cloudflare.models import (
-    CloudflareAccountManager,
-)
+from app.modules.cloudflare.constants import AccessLevel
+from app.modules.cloudflare.models import CloudflareAccountManager
 
 
 class CloudflareAccountManagerRow(FrozenModel):

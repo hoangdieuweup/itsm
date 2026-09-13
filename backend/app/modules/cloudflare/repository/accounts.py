@@ -9,18 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
 from app.integrations.cache.client import CacheClient
-from app.modules.cloudflare.constants import (
-    CloudflareAccountsCacheKeys,
-)
-from app.modules.cloudflare.exceptions import (
-    CloudflareAccountNotFound,
-)
-from app.modules.cloudflare.models import (
-    CloudflareAccount,
-)
-from app.modules.cloudflare.schemas import (
-    CloudflareAccountRead,
-)
+from app.modules.cloudflare.constants import CloudflareAccountsCacheKeys
+from app.modules.cloudflare.exceptions import CloudflareAccountNotFound
+from app.modules.cloudflare.models import CloudflareAccount
+from app.modules.cloudflare.schemas import CloudflareAccountRead
 
 
 class AbstractCloudflareAccountRepository(AbstractRepository[CloudflareAccountRead, UUID]):

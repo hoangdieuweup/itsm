@@ -10,12 +10,8 @@ from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
 from app.integrations.cache.client import CacheClient
 from app.modules.projects.constants import EnvironmentType, ProjectsCacheKeys
-from app.modules.projects.exceptions import (
-    EnvironmentNotFound,
-)
-from app.modules.projects.models import (
-    Environment,
-)
+from app.modules.projects.exceptions import EnvironmentNotFound
+from app.modules.projects.models import Environment
 from app.modules.projects.schemas import EnvironmentRead
 
 

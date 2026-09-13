@@ -10,18 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database
 from app.core.base.repository import AbstractRepository
-from app.modules.cloudflare.constants import (
-    ManagedBy,
-)
-from app.modules.cloudflare.exceptions import (
-    TunnelPublicHostnameNotFound,
-)
-from app.modules.cloudflare.models import (
-    TunnelPublicHostname,
-)
-from app.modules.cloudflare.schemas import (
-    TunnelPublicHostnameRead,
-)
+from app.modules.cloudflare.constants import ManagedBy
+from app.modules.cloudflare.exceptions import TunnelPublicHostnameNotFound
+from app.modules.cloudflare.models import TunnelPublicHostname
+from app.modules.cloudflare.schemas import TunnelPublicHostnameRead
 
 
 class AbstractTunnelHostnameRepository(AbstractRepository[TunnelPublicHostnameRead, UUID]):

@@ -14,15 +14,9 @@ from app.modules.cloudflare.constants import (
     DnsRecordType,
     ManagedBy,
 )
-from app.modules.cloudflare.exceptions import (
-    DnsRecordNotFound,
-)
-from app.modules.cloudflare.models import (
-    DnsRecord,
-)
-from app.modules.cloudflare.schemas import (
-    DnsRecordRead,
-)
+from app.modules.cloudflare.exceptions import DnsRecordNotFound
+from app.modules.cloudflare.models import DnsRecord
+from app.modules.cloudflare.schemas import DnsRecordRead
 
 
 class AbstractDnsRecordRepository(AbstractRepository[DnsRecordRead, UUID]):

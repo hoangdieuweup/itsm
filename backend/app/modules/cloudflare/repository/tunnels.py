@@ -11,19 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database
 from app.core.base.repository import AbstractRepository
-from app.modules.cloudflare.constants import (
-    TunnelStatus,
-)
-from app.modules.cloudflare.exceptions import (
-    CloudflareTunnelNotFound,
-)
+from app.modules.cloudflare.constants import TunnelStatus
+from app.modules.cloudflare.exceptions import CloudflareTunnelNotFound
 from app.modules.cloudflare.models import (
     CloudflareTunnel,
     TunnelPublicHostname,
 )
-from app.modules.cloudflare.schemas import (
-    CloudflareTunnelRead,
-)
+from app.modules.cloudflare.schemas import CloudflareTunnelRead
 
 
 class AbstractCloudflareTunnelRepository(AbstractRepository[CloudflareTunnelRead, UUID]):

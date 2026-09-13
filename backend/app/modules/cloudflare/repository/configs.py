@@ -8,15 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database
 from app.core.base.repository import AbstractRepository
-from app.modules.cloudflare.exceptions import (
-    CloudflareConfigNotFound,
-)
-from app.modules.cloudflare.models import (
-    CloudflareConfig,
-)
-from app.modules.cloudflare.schemas import (
-    CloudflareConfigRead,
-)
+from app.modules.cloudflare.exceptions import CloudflareConfigNotFound
+from app.modules.cloudflare.models import CloudflareConfig
+from app.modules.cloudflare.schemas import CloudflareConfigRead
 
 
 class AbstractCloudflareConfigRepository(AbstractRepository[CloudflareConfigRead, UUID]):

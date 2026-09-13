@@ -9,12 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.base.markers import database
 from app.core.base.repository import AbstractRepository
 from app.modules.projects.constants import ProjectLinkType
-from app.modules.projects.exceptions import (
-    ProjectLinkNotFound,
-)
-from app.modules.projects.models import (
-    ProjectLink,
-)
+from app.modules.projects.exceptions import ProjectLinkNotFound
+from app.modules.projects.models import ProjectLink
 from app.modules.projects.schemas import ProjectLinkRead
 
 
