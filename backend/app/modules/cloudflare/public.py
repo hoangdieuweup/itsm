@@ -28,8 +28,8 @@ from app.modules.cloudflare.schemas import (
     TunnelDriftEntry,
     TunnelPublicHostnameRead,
 )
-from app.modules.cloudflare.services.sync_dns_records import SyncDnsRecords
-from app.modules.cloudflare.services.sync_tunnels import SyncTunnels
+from app.modules.cloudflare.services.dns.sync_dns_records import SyncDnsRecords
+from app.modules.cloudflare.services.tunnels.sync_tunnels import SyncTunnels
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 from app.modules.projects.public import ProjectsApi, get_projects_api
 
