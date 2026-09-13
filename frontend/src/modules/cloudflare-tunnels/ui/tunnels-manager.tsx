@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Trash2, RefreshCw, KeyRound, ArrowRight } from "lucide-react";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
-import { CanInProject } from "@/entities/permission";
+import { CanInProject, CanInProjectOrAccount } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
 import {
   useTunnelsQuery,
@@ -133,7 +133,7 @@ export function TunnelsManager({ environmentId }: { environmentId: string }) {
                   <TunnelHostnamePreview environmentId={environmentId} tunnelId={tunnel.id} />
                 </button>
                 <div className="flex items-center gap-1 shrink-0 self-end sm:self-auto">
-                  <CanInProject I={ACTIONS.REFRESH_STATUS} a={PERMISSIONS.PROJECT_CLOUDFLARE_TUNNEL.RESOURCE}>
+                  <CanInProjectOrAccount I={ACTIONS.REFRESH_STATUS} a={PERMISSIONS.PROJECT_CLOUDFLARE_TUNNEL.RESOURCE}>
                     <button
                       type="button"
                       onClick={() => refreshStatus.mutate(tunnel.id)}
@@ -143,12 +143,7 @@ export function TunnelsManager({ environmentId }: { environmentId: string }) {
                     >
                       <RefreshCw className="size-4" aria-hidden="true" />
                     </button>
-                  </CanInProject>
-                  {/* reveal-token/delete are ACCOUNT-level-only actions (no
-                      project-scoped twin exists — see the ownership fix's
-                      D8) — CanInProject on the old resource name correctly
-                      shows these only when the global half of the union
-                      grants them. */}
+                  </CanInProjectOrAccount>
                   <CanInProject I={ACTIONS.REVEAL_TOKEN} a={PERMISSIONS.CLOUDFLARE_TUNNEL.RESOURCE}>
                     <button
                       type="button"

@@ -11,6 +11,8 @@ import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { formatDatetime, defaultRange } from "@/shared/lib/datetime";
 import { useLokiConfigQuery, type LokiConfig } from "@/entities/loki-config";
 import { useCloudflareConfigQuery } from "@/entities/cloudflare-config";
+import { useCanInProject } from "@/entities/permission";
+import { ACTIONS, RESOURCES } from "@/shared/constants/permissions";
 import { useLogQuery } from "../hooks/use-log-query";
 import { useLogTail } from "../hooks/use-log-tail";
 import { useCloudflareTrafficStatsQuery } from "../hooks/use-cloudflare-traffic-stats";
@@ -417,7 +419,7 @@ function LogViewerTabSection({
  * tabs — with no page-level chrome of its own. Shared by the full-page route
  * (`LogViewerPageContent`, which adds the `<h1>`/padding wrapper) and the
  * inline drawer opened from the environment chip on Project Detail. Only
- * shows a tab for whichever of Loki/Cloudflare is actually configured.
+ * shows a tab for whichever of Loki/Cloudflare is configured AND readable.
  */
 export function LogViewerManager({ environmentId }: { environmentId: string }) {
   const t = useTranslations("logViewer");
@@ -427,9 +429,11 @@ export function LogViewerManager({ environmentId }: { environmentId: string }) {
 
   const [activeTab, setActiveTab] = useState<TabKey | null>(null);
 
+  const canReadTraffic = useCanInProject(RESOURCES.ENVIRONMENT_CLOUDFLARE_TRAFFIC, ACTIONS.READ);
+
   const configLoading = lokiLoading || cloudflareLoading;
   const hasLoki = Boolean(config);
-  const hasCloudflare = Boolean(cloudflareConfig);
+  const hasCloudflare = Boolean(cloudflareConfig) && canReadTraffic;
 
   const tabs: { key: TabKey; label: string }[] = [
     ...(hasLoki ? [{ key: "loki" as const, label: t("tabs.loki") }] : []),

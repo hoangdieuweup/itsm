@@ -13,6 +13,7 @@ export function useProjectPermissionsQuery(projectId: string) {
   return useQuery({
     queryKey: projectPermissionsKeys.forProject(projectId),
     queryFn: () => fetchProjectPermissions(projectId),
-    staleTime: 10_000,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }

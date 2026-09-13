@@ -9,6 +9,7 @@ export { RequirePermission } from "./ui/require-permission";
 export { NoPermission } from "./ui/no-permission";
 export { ProjectPermissionProvider, useCanInProject } from "./model/project-permission-context";
 export { CanInProject } from "./ui/can-in-project";
+export { CanInProjectOrAccount, useCanInProjectOrAccount } from "./ui/can-in-project-or-account";
 export { fetchProjectPermissions } from "./api/fetchers";
 export { projectPermissionsKeys } from "./api/query-keys";
 export { useProjectPermissionsQuery } from "./hooks/use-project-permissions";

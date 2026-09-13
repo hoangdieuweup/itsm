@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Bell, Plus, Pencil, Trash2, Send, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
-import { Can } from "@/entities/permission";
+import { CanInProject } from "@/entities/permission";
 import { ACTIONS, RESOURCES } from "@/shared/constants/permissions";
 import { useNotificationChannelsQuery, type NotificationChannel } from "@/entities/notification-channel";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
@@ -53,13 +54,14 @@ function TestSendButton({ channelId }: { channelId: string }) {
 
 export function NotificationChannelsSection({ projectId }: { projectId: string }) {
   const t = useTranslations("notifications");
-  const { data: channels } = useNotificationChannelsQuery(projectId);
+  const { data: channels = [], isLoading } = useNotificationChannelsQuery(projectId);
   const deleteChannel = useDeleteNotificationChannel(projectId);
 
   const [formTarget, setFormTarget] = useState<NotificationChannel | "create" | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<NotificationChannel | null>(null);
 
   return (
+    <CanInProject I={ACTIONS.READ} a={RESOURCES.PROJECT_NOTIFICATION_CHANNEL}>
     <m.section
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
@@ -81,7 +83,7 @@ export function NotificationChannelsSection({ projectId }: { projectId: string }
           </div>
         </div>
 
-        <Can I={ACTIONS.CREATE} a={RESOURCES.NOTIFICATION_CHANNEL}>
+        <CanInProject I={ACTIONS.CREATE} a={RESOURCES.PROJECT_NOTIFICATION_CHANNEL}>
           <Button
             size="sm"
             onClick={() => setFormTarget("create")}
@@ -89,10 +91,15 @@ export function NotificationChannelsSection({ projectId }: { projectId: string }
           >
             <Plus className="size-3.5" aria-hidden="true" /> {t("actions.add")}
           </Button>
-        </Can>
+        </CanInProject>
       </div>
 
-      {channels.length === 0 ? (
+      {isLoading ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Skeleton className="h-20 w-full rounded-3xl" />
+          <Skeleton className="h-20 w-full rounded-3xl" />
+        </div>
+      ) : channels.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 py-10 text-center">
           <div className="flex size-10 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground mb-2">
             <Bell className="size-5" aria-hidden="true" />
@@ -135,10 +142,10 @@ export function NotificationChannelsSection({ projectId }: { projectId: string }
 
               {/* Right: actions */}
               <div className="flex items-center gap-1 shrink-0">
-                <Can I={ACTIONS.UPDATE} a={RESOURCES.NOTIFICATION_CHANNEL}>
+                <CanInProject I={ACTIONS.UPDATE} a={RESOURCES.PROJECT_NOTIFICATION_CHANNEL}>
                   <TestSendButton channelId={channel.id} />
-                </Can>
-                <Can I={ACTIONS.UPDATE} a={RESOURCES.NOTIFICATION_CHANNEL}>
+                </CanInProject>
+                <CanInProject I={ACTIONS.UPDATE} a={RESOURCES.PROJECT_NOTIFICATION_CHANNEL}>
                   <button
                     type="button"
                     onClick={() => setFormTarget(channel)}
@@ -148,8 +155,8 @@ export function NotificationChannelsSection({ projectId }: { projectId: string }
                   >
                     <Pencil className="size-3.5" aria-hidden="true" />
                   </button>
-                </Can>
-                <Can I={ACTIONS.DELETE} a={RESOURCES.NOTIFICATION_CHANNEL}>
+                </CanInProject>
+                <CanInProject I={ACTIONS.DELETE} a={RESOURCES.PROJECT_NOTIFICATION_CHANNEL}>
                   <button
                     type="button"
                     onClick={() => setDeleteTarget(channel)}
@@ -159,7 +166,7 @@ export function NotificationChannelsSection({ projectId }: { projectId: string }
                   >
                     <Trash2 className="size-3.5" aria-hidden="true" />
                   </button>
-                </Can>
+                </CanInProject>
               </div>
             </div>
           ))}
@@ -189,5 +196,6 @@ export function NotificationChannelsSection({ projectId }: { projectId: string }
         isLoading={deleteChannel.isPending}
       />
     </m.section>
+    </CanInProject>
   );
 }

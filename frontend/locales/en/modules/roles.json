@@ -38,18 +38,16 @@
     "cloudflare_tunnel": "CF Tunnels (account-level)",
     "cloudflare_hostname": "CF Public Hostnames (account-level)",
     "cloudflare_dns": "CF DNS Records (account-level)",
-    "cloudflare_traffic": "CF Traffic Stats (account-level)",
-    "notification_channel": "Notification Channels",
-    "alert_rule": "Alert Rules (account-level)",
+    "environment_cloudflare_traffic": "CF Traffic Stats (environment)",
     "incident": "Incident Management (account-level)",
     "project_cloudflare_config": "CF Zone Binding (project)",
     "project_cloudflare_dns": "CF DNS Records (project)",
     "project_cloudflare_tunnel": "CF Tunnels (project)",
     "project_cloudflare_hostname": "CF Public Hostnames (project)",
-    "project_cloudflare_traffic": "CF Traffic Stats (project)",
     "project_loki_config": "Loki / Log Viewer (project)",
     "project_alert_rule": "Alert Rules (project)",
-    "project_incident": "Incident Management (project)"
+    "project_incident": "Incident Management (project)",
+    "project_notification_channel": "Notification Channels (project)"
   },
   "catalog": {
     "permissions": {
@@ -133,18 +131,8 @@
         "update": "Edit DNS records (any account you manage)",
         "delete": "Delete DNS records (any account you manage)"
       },
-      "cloudflare_traffic": {
-        "read": "View Cloudflare traffic stats (any account you manage)"
-      },
-      "notification_channel": {
-        "create": "Create notification channels",
-        "read": "View notification channels",
-        "update": "Edit notification channels",
-        "delete": "Delete notification channels",
-        "test_send": "Send test notification"
-      },
-      "alert_rule": {
-        "read": "View available Cloudflare alert types (any account you manage)"
+      "environment_cloudflare_traffic": {
+        "read": "View Cloudflare traffic stats"
       },
       "incident": {
         "read": "View incidents across every project"
@@ -170,9 +158,6 @@
         "update": "Edit this project's hostname service targets",
         "delete": "Remove this project's public hostnames"
       },
-      "project_cloudflare_traffic": {
-        "read": "View this project's Cloudflare traffic stats"
-      },
       "project_loki_config": {
         "read": "View this project's Loki config & query logs",
         "manage": "Create / Edit / Delete this project's Loki config"
@@ -188,6 +173,13 @@
         "read": "View this project's incidents and details",
         "acknowledge": "Acknowledge this project's active incidents",
         "resolve": "Resolve this project's incidents"
+      },
+      "project_notification_channel": {
+        "create": "Create notification channels",
+        "read": "View notification channels",
+        "update": "Edit notification channels",
+        "delete": "Delete notification channels",
+        "test_send": "Send test notification"
       }
     }
   },
