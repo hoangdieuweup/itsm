@@ -12,7 +12,7 @@ interface ChannelMultiselectProps {
 
 function ChannelMultiselectList({ projectId, selectedIds, onChange }: ChannelMultiselectProps) {
   const t = useTranslations("alerting");
-  const { data: channels } = useNotificationChannelsQuery(projectId);
+  const { data: channels = [] } = useNotificationChannelsQuery(projectId);
 
   function toggle(id: string) {
     onChange(selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id]);
@@ -40,14 +40,6 @@ function ChannelMultiselectList({ projectId, selectedIds, onChange }: ChannelMul
   );
 }
 
-/**
- * useNotificationChannelsQuery is a suspense query — safe for a page body
- * (which already sits under a route-level Suspense boundary) but not for a
- * modal opened after the page has settled: without its own boundary here,
- * the suspend would bubble up and unmount the whole page behind the dialog
- * while channels load. Scoping Suspense to just the list keeps the dialog
- * shell and its other fields mounted throughout.
- */
 export function ChannelMultiselect({ projectId, selectedIds, onChange }: ChannelMultiselectProps) {
   const t = useTranslations("alerting");
 

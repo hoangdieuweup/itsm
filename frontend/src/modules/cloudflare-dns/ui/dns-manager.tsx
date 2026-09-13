@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Cloud, Globe, Pencil, Trash2, ExternalLink } from "lucide-react";
 import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
-import { Can, CanInProject } from "@/entities/permission";
+import { Can, CanInProjectOrAccount } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
 import { MANAGED_BY } from "@/shared/constants/cloudflare";
 import { useCloudflareConfigQuery } from "@/entities/cloudflare-config";
@@ -39,7 +40,7 @@ export function DnsManager({ environmentId }: { environmentId: string }) {
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      {configLoading && <div className="h-24 w-full animate-pulse rounded-xl bg-muted/50" />}
+      {configLoading && <Skeleton className="h-24 w-full rounded-2xl" />}
 
       {!configLoading && !isBound && <CloudflareBindingForm environmentId={environmentId} />}
 
@@ -96,7 +97,7 @@ export function DnsManager({ environmentId }: { environmentId: string }) {
                         </td>
                         <td className="py-2 text-right">
                           <div className="flex justify-end gap-2">
-                            <CanInProject I={ACTIONS.UPDATE} a={PERMISSIONS.PROJECT_CLOUDFLARE_DNS.RESOURCE}>
+                            <CanInProjectOrAccount I={ACTIONS.UPDATE} a={PERMISSIONS.PROJECT_CLOUDFLARE_DNS.RESOURCE}>
                               <button
                                 type="button"
                                 onClick={() => setRecordFormTarget(record)}
@@ -105,8 +106,8 @@ export function DnsManager({ environmentId }: { environmentId: string }) {
                               >
                                 <Pencil className="size-3.5" aria-hidden="true" />
                               </button>
-                            </CanInProject>
-                            <CanInProject I={ACTIONS.DELETE} a={PERMISSIONS.PROJECT_CLOUDFLARE_DNS.RESOURCE}>
+                            </CanInProjectOrAccount>
+                            <CanInProjectOrAccount I={ACTIONS.DELETE} a={PERMISSIONS.PROJECT_CLOUDFLARE_DNS.RESOURCE}>
                               <button
                                 type="button"
                                 onClick={() => setRecordDeleteTarget(record)}
@@ -115,7 +116,7 @@ export function DnsManager({ environmentId }: { environmentId: string }) {
                               >
                                 <Trash2 className="size-3.5" aria-hidden="true" />
                               </button>
-                            </CanInProject>
+                            </CanInProjectOrAccount>
                           </div>
                         </td>
                       </tr>

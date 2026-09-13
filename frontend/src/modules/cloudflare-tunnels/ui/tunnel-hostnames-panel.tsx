@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Plus, Pencil, Trash2, ArrowRight, Copy, Check } from "lucide-react";
 import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
-import { CanInProject } from "@/entities/permission";
+import { CanInProjectOrAccount } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
 import { useTunnelHostnamesQuery, useRemoveTunnelHostname } from "../hooks/use-tunnel-hostnames";
 import { useCloudflareConfigQuery } from "@/entities/cloudflare-config";
@@ -43,7 +44,7 @@ export function TunnelHostnamesPanel({ environmentId, tunnelId }: { environmentI
             </p>
           </div>
         </div>
-        <CanInProject I={ACTIONS.CREATE} a={PERMISSIONS.PROJECT_CLOUDFLARE_HOSTNAME.RESOURCE}>
+        <CanInProjectOrAccount I={ACTIONS.CREATE} a={PERMISSIONS.PROJECT_CLOUDFLARE_HOSTNAME.RESOURCE}>
           <Button
             size="sm"
             onClick={() => setFormTarget("create")}
@@ -51,27 +52,19 @@ export function TunnelHostnamesPanel({ environmentId, tunnelId }: { environmentI
           >
             <Plus className="size-3.5" aria-hidden="true" /> {t("hostnames.add")}
           </Button>
-        </CanInProject>
+        </CanInProjectOrAccount>
       </div>
 
       {hostnamesLoading ? (
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 rounded-2xl border border-border/60 bg-card/60 p-4.5 animate-pulse">
-            <div className="flex flex-col gap-2 w-full max-w-xs">
-              <div className="h-4 w-44 rounded-md bg-muted/80" />
-              <div className="h-3 w-32 rounded-md bg-muted/50" />
-            </div>
-            <div className="flex gap-2">
-              <div className="size-8 rounded-xl bg-muted/60" />
-              <div className="size-8 rounded-xl bg-muted/60" />
-            </div>
-          </div>
+          <Skeleton className="h-16 w-full rounded-2xl" />
+          <Skeleton className="h-16 w-full rounded-2xl" />
         </div>
       ) : hostnames.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 py-10 px-4 text-center">
           <IconDns className="size-12 rounded-2xl shadow-xs mb-3 opacity-90" />
           <p className="text-sm font-bold text-foreground">{t("hostnames.empty")}</p>
-          <CanInProject I={ACTIONS.CREATE} a={PERMISSIONS.PROJECT_CLOUDFLARE_HOSTNAME.RESOURCE}>
+          <CanInProjectOrAccount I={ACTIONS.CREATE} a={PERMISSIONS.PROJECT_CLOUDFLARE_HOSTNAME.RESOURCE}>
             <Button
               size="sm"
               variant="outline"
@@ -80,7 +73,7 @@ export function TunnelHostnamesPanel({ environmentId, tunnelId }: { environmentI
             >
               <Plus className="size-3.5" aria-hidden="true" /> {t("hostnames.add")}
             </Button>
-          </CanInProject>
+          </CanInProjectOrAccount>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -122,7 +115,7 @@ export function TunnelHostnamesPanel({ environmentId, tunnelId }: { environmentI
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0 self-end sm:self-auto">
-                <CanInProject I={ACTIONS.UPDATE} a={PERMISSIONS.PROJECT_CLOUDFLARE_HOSTNAME.RESOURCE}>
+                <CanInProjectOrAccount I={ACTIONS.UPDATE} a={PERMISSIONS.PROJECT_CLOUDFLARE_HOSTNAME.RESOURCE}>
                   <button
                     type="button"
                     onClick={() => setFormTarget(hostname)}
@@ -132,8 +125,8 @@ export function TunnelHostnamesPanel({ environmentId, tunnelId }: { environmentI
                   >
                     <Pencil className="size-4" aria-hidden="true" />
                   </button>
-                </CanInProject>
-                <CanInProject I={ACTIONS.DELETE} a={PERMISSIONS.PROJECT_CLOUDFLARE_HOSTNAME.RESOURCE}>
+                </CanInProjectOrAccount>
+                <CanInProjectOrAccount I={ACTIONS.DELETE} a={PERMISSIONS.PROJECT_CLOUDFLARE_HOSTNAME.RESOURCE}>
                   <button
                     type="button"
                     onClick={() => setDeleteTarget(hostname)}
@@ -143,7 +136,7 @@ export function TunnelHostnamesPanel({ environmentId, tunnelId }: { environmentI
                   >
                     <Trash2 className="size-4" aria-hidden="true" />
                   </button>
-                </CanInProject>
+                </CanInProjectOrAccount>
               </div>
             </div>
           ))}

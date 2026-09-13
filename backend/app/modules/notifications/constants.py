@@ -20,6 +20,8 @@ class ErrorCode(StrEnum):
     ENVIRONMENT_NOT_FOUND = "notifications_environment_not_found"
     INVALID_CONFIG = "notification_channel_invalid_config"
     UNSUPPORTED_TYPE = "notification_channel_unsupported_type"
+    SMTP_NOT_CONFIGURED = "notification_smtp_not_configured"
+    PERMISSION_DENIED = "notification_permission_denied"
 
 
 class NotificationsAuditActions(StrEnum):

@@ -131,7 +131,7 @@ class ProjectScopedPermissionCatalog:
             ("project_cloudflare_hostname", "create"),
             ("project_cloudflare_hostname", "update"),
             ("project_cloudflare_hostname", "delete"),
-            ("project_cloudflare_traffic", "read"),
+            ("environment_cloudflare_traffic", "read"),
             ("project_loki_config", "read"),
             ("project_loki_config", "manage"),
             ("project_alert_rule", "create"),
@@ -142,5 +142,10 @@ class ProjectScopedPermissionCatalog:
             ("project_incident", "read"),
             ("project_incident", "acknowledge"),
             ("project_incident", "resolve"),
+            ("project_notification_channel", "create"),
+            ("project_notification_channel", "read"),
+            ("project_notification_channel", "update"),
+            ("project_notification_channel", "delete"),
+            ("project_notification_channel", "test_send"),
         }
     )

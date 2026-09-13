@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { CanInProject } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
@@ -55,7 +56,7 @@ export function AlertingManager({ environmentId }: { environmentId: string }) {
           </CanInProject>
         </div>
 
-        {isLoading && <div className="h-28 w-full animate-pulse rounded-2xl bg-muted/50" />}
+        {isLoading && <Skeleton className="h-28 w-full rounded-2xl" />}
 
         {!isLoading && rules.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 py-10 px-4 text-center">

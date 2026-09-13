@@ -1,4 +1,4 @@
-from app.core.exceptions import NotFoundError, ValidationFailedError
+from app.core.exceptions import ForbiddenError, NotFoundError, ValidationFailedError
 from app.modules.notifications.constants import ErrorCode
 
 
@@ -29,3 +29,15 @@ class InvalidChannelConfig(ValidationFailedError):
 class UnsupportedChannelType(ValidationFailedError):
     code = ErrorCode.UNSUPPORTED_TYPE
     message = "This channel type does not support sending yet"
+
+
+class SmtpNotConfigured(ValidationFailedError):
+    code = ErrorCode.SMTP_NOT_CONFIGURED
+    message = "SMTP relay is not configured — set EMAIL__SMTP_HOST and related env vars"
+
+
+class NotificationPermissionDenied(ForbiddenError):
+    """Raised when the caller lacks a project-scoped notification permission."""
+
+    code = ErrorCode.PERMISSION_DENIED
+    message = "Missing permission"

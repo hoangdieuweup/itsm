@@ -38,18 +38,16 @@
     "cloudflare_tunnel": "Tunnel Cloudflare (cấp tài khoản)",
     "cloudflare_hostname": "Hostname công khai CF (cấp tài khoản)",
     "cloudflare_dns": "DNS Records CF (cấp tài khoản)",
-    "cloudflare_traffic": "Thống kê lưu lượng CF (cấp tài khoản)",
-    "notification_channel": "Kênh thông báo",
-    "alert_rule": "Quy tắc cảnh báo (cấp tài khoản)",
+    "environment_cloudflare_traffic": "Thống kê lưu lượng CF (môi trường)",
     "incident": "Quản lý sự cố (cấp tài khoản)",
     "project_cloudflare_config": "Cấu hình Zone CF (dự án)",
     "project_cloudflare_dns": "DNS Records CF (dự án)",
     "project_cloudflare_tunnel": "Tunnel Cloudflare (dự án)",
     "project_cloudflare_hostname": "Hostname công khai CF (dự án)",
-    "project_cloudflare_traffic": "Thống kê lưu lượng CF (dự án)",
     "project_loki_config": "Loki / Xem Log (dự án)",
     "project_alert_rule": "Quy tắc cảnh báo (dự án)",
-    "project_incident": "Quản lý sự cố (dự án)"
+    "project_incident": "Quản lý sự cố (dự án)",
+    "project_notification_channel": "Kênh thông báo (dự án)"
   },
   "catalog": {
     "permissions": {
@@ -133,18 +131,8 @@
         "update": "Sửa DNS record (mọi tài khoản bạn quản trị)",
         "delete": "Xóa DNS record (mọi tài khoản bạn quản trị)"
       },
-      "cloudflare_traffic": {
-        "read": "Xem thống kê lưu lượng Cloudflare (mọi tài khoản bạn quản trị)"
-      },
-      "notification_channel": {
-        "create": "Tạo kênh thông báo mới",
-        "read": "Xem danh sách kênh thông báo",
-        "update": "Chỉnh sửa kênh thông báo",
-        "delete": "Xóa kênh thông báo",
-        "test_send": "Gửi thử thông báo"
-      },
-      "alert_rule": {
-        "read": "Xem danh sách loại cảnh báo Cloudflare khả dụng (mọi tài khoản bạn quản trị)"
+      "environment_cloudflare_traffic": {
+        "read": "Xem thống kê lưu lượng Cloudflare"
       },
       "incident": {
         "read": "Xem sự cố của mọi dự án"
@@ -170,9 +158,6 @@
         "update": "Sửa service target hostname của dự án này",
         "delete": "Xóa hostname công khai của dự án này"
       },
-      "project_cloudflare_traffic": {
-        "read": "Xem thống kê lưu lượng Cloudflare của dự án này"
-      },
       "project_loki_config": {
         "read": "Xem cấu hình Loki & truy vấn log của dự án này",
         "manage": "Tạo / Sửa / Xóa cấu hình Loki của dự án này"
@@ -188,6 +173,13 @@
         "read": "Xem danh sách & chi tiết sự cố của dự án này",
         "acknowledge": "Tiếp nhận xử lý sự cố của dự án này",
         "resolve": "Đóng sự cố đã xử lý của dự án này"
+      },
+      "project_notification_channel": {
+        "create": "Tạo kênh thông báo mới",
+        "read": "Xem danh sách kênh thông báo",
+        "update": "Chỉnh sửa kênh thông báo",
+        "delete": "Xóa kênh thông báo",
+        "test_send": "Gửi thử thông báo"
       }
     }
   },

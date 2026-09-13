@@ -22,6 +22,7 @@ from app.modules.auth.constants import AuthCookies
 from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.models import CloudflareAccount
 from app.modules.observability.config import observability_settings
+from app.modules.projects.models import Environment, ProjectMember
 from app.modules.rbac.models import Permission, Role, RolePermission, UserRole
 from app.modules.users.models import User
 
@@ -96,6 +97,23 @@ async def _make_environment(client: AsyncClient, engine: AsyncEngine) -> str:
         f"/api/v1/projects/{project_id}/environments", json={"type": "dev", "name": "Dev"}
     )
     return env_resp.json()["data"]["id"]
+
+
+async def _login_as_bare_project_member(
+    client: AsyncClient, engine: AsyncEngine, *, environment_id: str, email: str
+) -> UUID:
+    """Log in a user who is a REAL member of the environment's project and
+    holds no permission at all.
+
+    project:manage_all cannot express "denied" any more — it grants the scoped
+    surface. Plain membership is what isolates one atom."""
+    user_id = await _login_with_permissions(client, engine, permissions=[], email=email)
+    async with engine.begin() as conn:
+        project_id = await conn.scalar(
+            select(Environment.project_id).where(Environment.id == UUID(environment_id))
+        )
+        await conn.execute(insert(ProjectMember).values(project_id=project_id, user_id=user_id))
+    return user_id
 
 
 class TestCreateLokiConfig:
@@ -701,11 +719,8 @@ class TestIncidentRoutes:
         )
         incident_id = create_resp.json()["data"]["id"]
 
-        await _login_with_permissions(
-            client,
-            engine,
-            permissions=[("project", "manage_all")],
-            email="noincidentperm@x.com",
+        await _login_as_bare_project_member(
+            client, engine, environment_id=environment_id, email="noincidentperm@x.com"
         )
         response = await client.post(f"/api/v1/incidents/{incident_id}/acknowledge")
         assert response.status_code == 403
@@ -729,14 +744,43 @@ class TestIncidentRoutes:
         )
         incident_id = create_resp.json()["data"]["id"]
 
+        await _login_as_bare_project_member(
+            client, engine, environment_id=environment_id, email="noresolveperm@x.com"
+        )
+        response = await client.post(f"/api/v1/incidents/{incident_id}/resolve")
+        assert response.status_code == 403
+
+    async def test_manage_all_holder_acknowledges_without_membership_or_project_role(
+        self, client: AsyncClient, engine: AsyncEngine
+    ) -> None:
+        """Not a member, no project role, yet reaches a scoped route —
+        manage_all now carries the scoped surface."""
+        environment_id = await _make_environment(client, engine)
+        await _login_with_permissions(
+            client,
+            engine,
+            permissions=[("project_incident", "create"), ("project", "manage_all")],
+            email="incidentcreator3@x.com",
+        )
+        create_resp = await client.post(
+            "/api/v1/incidents",
+            json={
+                "environmentId": environment_id,
+                "category": "TRAFFIC",
+                "severity": "MEDIUM",
+                "title": "X",
+            },
+        )
+        incident_id = create_resp.json()["data"]["id"]
+
         await _login_with_permissions(
             client,
             engine,
             permissions=[("project", "manage_all")],
-            email="noresolveperm@x.com",
+            email="manageallonly@x.com",
         )
-        response = await client.post(f"/api/v1/incidents/{incident_id}/resolve")
-        assert response.status_code == 403
+        response = await client.post(f"/api/v1/incidents/{incident_id}/acknowledge")
+        assert response.status_code == 200, response.text
 
     async def test_returns_404_for_unknown_incident_even_without_permission(
         self, client: AsyncClient, engine: AsyncEngine

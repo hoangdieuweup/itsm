@@ -15,7 +15,11 @@ from app.modules.audit.public import AuditApi, get_audit_api
 from app.modules.auth.public import AuthApi, get_auth_api
 from app.modules.cloudflare.access import resolve_account_access_grant
 from app.modules.cloudflare.constants import AccessLevel
-from app.modules.cloudflare.exceptions import CloudflareConfigNotFound, InsufficientAccountAccess
+from app.modules.cloudflare.exceptions import (
+    CloudflareConfigNotFound,
+    CloudflareEnvironmentNotFound,
+    InsufficientAccountAccess,
+)
 from app.modules.cloudflare.schemas import AccountAccessGrant
 from app.modules.cloudflare.services.add_tunnel_hostname import AddTunnelHostname
 from app.modules.cloudflare.services.assign_manager import AssignCloudflareAccountManager
@@ -57,7 +61,7 @@ from app.modules.cloudflare.services.update_tunnel_hostname import UpdateTunnelH
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork, CloudflareUnitOfWork
 from app.modules.projects.public import ProjectsApi, get_projects_api
 from app.modules.rbac.public import RbacApi, get_rbac_api
-from app.modules.users.public import UsersApi, get_users_api
+from app.modules.users.public import UserRead, UsersApi, get_users_api
 
 
 async def get_uow(
@@ -114,6 +118,29 @@ def require_account_access_for_environment(min_level: AccessLevel):
         return await resolve_account_access_grant(
             config.cloudflare_account_id, user, rbac_api, uow, min_level
         )
+
+    return check
+
+
+def require_project_permission_for_environment(resource: str, action: str):
+    """Environment-scoped project-permission gate. Same shape as the
+    observability module's wrapper — projects/dependencies.py cannot be
+    imported across the module boundary, only projects.public."""
+
+    async def check(
+        environment_id: UUID,
+        auth_api: AuthApi = Depends(get_auth_api),
+        rbac_api: RbacApi = Depends(get_rbac_api),
+        projects_api: ProjectsApi = Depends(get_projects_api),
+    ) -> UserRead:
+        user = auth_api.current_user()
+        environment = await projects_api.get_environment_by_id(environment_id)
+        if environment is None:
+            raise CloudflareEnvironmentNotFound()
+        permissions = await projects_api.resolve_effective_permissions(environment.project_id, user, rbac_api)
+        if f"{resource}.{action}" not in permissions:
+            raise InsufficientAccountAccess()
+        return user
 
     return check
 

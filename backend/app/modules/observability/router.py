@@ -197,7 +197,6 @@ async def list_available_alerts(
     account_id: UUID,
     use_case: ListAvailableAlerts = Depends(get_list_available_alerts),
     _grant=Depends(require_account_access(AccessLevel.VIEWER)),
-    _user: UserRead = Depends(require_permission(RbacResources.ALERT_RULE, RbacActions.READ)),
 ) -> ApiResponse[list[AvailableAlertOption]]:
     return ApiResponse[list[AvailableAlertOption]](success=True, data=await use_case.execute(account_id))
 

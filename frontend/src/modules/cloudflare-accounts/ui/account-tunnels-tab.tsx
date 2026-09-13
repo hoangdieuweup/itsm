@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Cable, Plus, Trash2, Wifi, WifiOff, AlertTriangle, Server, Copy, Check, Key } from "lucide-react";
 import { fetchAccountTunnels, cloudflareAccountsKeys, type CfTunnel } from "@/entities/cloudflare-account";
 import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { useCreateAccountTunnel, useDeleteAccountTunnel } from "../hooks/use-account-mutations";
 
@@ -162,8 +163,10 @@ export function AccountTunnelsTab({ accountId }: { accountId: string }) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="space-y-3 py-2">
+        <Skeleton className="h-10 w-full rounded-2xl" />
+        <Skeleton className="h-14 w-full rounded-2xl" />
+        <Skeleton className="h-14 w-full rounded-2xl" />
       </div>
     );
   }

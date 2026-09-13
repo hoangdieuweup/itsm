@@ -20,6 +20,7 @@
     "closeDnsDrawer": "Close DNS panel",
     "closeTunnelsDrawer": "Close tunnels panel",
     "closeAlertingDrawer": "Close alerting panel",
+    "closeLokiDrawer": "Close Loki panel",
     "manageLogs": "View Logs",
     "manageAlerting": "Manage Alerting",
     "inspect": "Inspect",
@@ -39,7 +40,7 @@
   "environmentsCount": "{count} Environments",
   "heroDescription": "Production workspace configuration and environment bindings.",
   "edgeDns": "Edge DNS",
-  "lokiLogs": "Loki Logs",
+  "lokiLogs": "Grafana Loki",
   "alerts": "Alerts",
   "sections": {
     "environments": "Environments",

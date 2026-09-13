@@ -9,10 +9,11 @@ from app.core.base.use_case import AbstractUseCase
 from app.core.crypto import FernetCodec
 from app.integrations.base_vn.client import BaseVnClient
 from app.integrations.email.client import EmailClient
+from app.integrations.email.config import email_settings
 from app.integrations.telegram.client import TelegramClient
 from app.modules.notifications.config import notifications_settings
 from app.modules.notifications.constants import NotificationChannelType
-from app.modules.notifications.exceptions import UnsupportedChannelType
+from app.modules.notifications.exceptions import SmtpNotConfigured, UnsupportedChannelType
 from app.modules.notifications.rules import NotificationRules
 from app.modules.notifications.schemas import NotificationChannelRead
 from app.modules.notifications.uow import AbstractNotificationsUnitOfWork
@@ -45,6 +46,8 @@ class DispatchNotification(AbstractUseCase):
                 bot_token=bot_token, chat_id=raw_config["chat_id"], text=text
             )
         elif channel.type == NotificationChannelType.EMAIL:
+            if not email_settings.SMTP_HOST:
+                raise SmtpNotConfigured()
             await self._email_client.send(
                 recipients=raw_config["recipients"], subject="ITSM Notification", body=text
             )

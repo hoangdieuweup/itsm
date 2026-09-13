@@ -17,4 +17,3 @@ __all__ = [
     "sse_event",
     "use_case",
 ]
-

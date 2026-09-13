@@ -87,4 +87,3 @@ class sse_event(_MethodMarker):  # noqa: N801 -- lowercase by design, read as an
     """A streaming / SSE generator method — yields events over time."""
 
     layer = "sse_event"
-

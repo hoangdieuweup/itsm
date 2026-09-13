@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { IconCloudflare } from "@/shared/ui/icons";
 import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
@@ -400,7 +401,7 @@ function ManagersTabPanel({
 }) {
   const t = useTranslations("cloudflareAccounts");
   const getErrorMessage = useApiErrorMessage("cloudflareAccounts");
-  const { data: managers } = useCloudflareAccountManagersQuery(accountId);
+  const { data: managers = [], isLoading } = useCloudflareAccountManagersQuery(accountId);
   const updateManager = useUpdateCloudflareAccountManager(accountId);
 
   return (
@@ -441,7 +442,12 @@ function ManagersTabPanel({
         </p>
       )}
 
-      {managers.length === 0 ? (
+      {isLoading ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-16 w-full rounded-2xl" />
+          <Skeleton className="h-16 w-full rounded-2xl" />
+        </div>
+      ) : managers.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 py-10 text-center">
           <div className="flex size-10 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground mb-2">
             <Users className="size-5" aria-hidden="true" />

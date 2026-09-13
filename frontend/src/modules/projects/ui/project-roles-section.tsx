@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, ShieldCheck } from "lucide-react";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { CanInProject } from "@/entities/permission";
 import { ACTIONS, RESOURCES } from "@/shared/constants/permissions";
 import { fetchProjectRoles, type ProjectRole } from "../api/fetchers";
@@ -14,7 +15,7 @@ import { ProjectRoleFormDialog } from "./project-role-form-dialog";
 
 export function ProjectRolesSection({ projectId }: { projectId: string }) {
   const t = useTranslations("projects");
-  const { data: roles = [] } = useQuery({
+  const { data: roles = [], isLoading } = useQuery({
     queryKey: projectRolesKeys.forProject(projectId),
     queryFn: () => fetchProjectRoles(projectId),
   });
@@ -46,7 +47,12 @@ export function ProjectRolesSection({ projectId }: { projectId: string }) {
 
         {/* Roles List */}
         <div className="divide-y divide-border/20">
-          {roles.length === 0 ? (
+          {isLoading ? (
+            <div className="space-y-2 p-3">
+              <Skeleton className="h-10 w-full rounded-xl" />
+              <Skeleton className="h-10 w-full rounded-xl" />
+            </div>
+          ) : roles.length === 0 ? (
             <div className="flex items-center justify-center py-10 px-5">
               <p className="text-xs text-muted-foreground">{t("empty.projectRoles")}</p>
             </div>

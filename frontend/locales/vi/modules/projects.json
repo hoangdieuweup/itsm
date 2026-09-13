@@ -20,6 +20,7 @@
     "closeDnsDrawer": "Đóng bảng điều khiển DNS",
     "closeTunnelsDrawer": "Đóng bảng điều khiển Tunnel",
     "closeAlertingDrawer": "Đóng bảng điều khiển Cảnh báo",
+    "closeLokiDrawer": "Đóng bảng điều khiển Loki",
     "manageLogs": "Xem Log",
     "manageAlerting": "Quản lý Cảnh báo",
     "inspect": "Chi tiết",
@@ -39,7 +40,7 @@
   "environmentsCount": "{count} Môi trường",
   "heroDescription": "Cấu hình không gian làm việc sản xuất và liên kết môi trường.",
   "edgeDns": "DNS Cloudflare",
-  "lokiLogs": "Nhật ký Loki",
+  "lokiLogs": "Grafana Loki",
   "alerts": "Cảnh báo",
   "sections": {
     "environments": "Môi trường",

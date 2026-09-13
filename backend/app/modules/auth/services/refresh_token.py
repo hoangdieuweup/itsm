@@ -42,9 +42,7 @@ class RefreshToken(AbstractUseCase):
         if claims.get("type") != TokenType.REFRESH:
             raise NotAuthenticated()
 
-        blacklist_key = CacheKeyBuilder.session_key(
-            AuthCacheNamespaces.TOKEN_BLACKLIST, str(claims["jti"])
-        )
+        blacklist_key = CacheKeyBuilder.session_key(AuthCacheNamespaces.TOKEN_BLACKLIST, str(claims["jti"]))
         if await self._cache.get_json(blacklist_key) is not None:
             raise NotAuthenticated()
 
@@ -68,7 +66,5 @@ class RefreshToken(AbstractUseCase):
             ttl = max(int(exp) - int(datetime.now(UTC).timestamp()), 1)
         else:
             ttl = auth_settings.REFRESH_TOKEN_TTL_SECONDS
-        key = CacheKeyBuilder.session_key(
-            AuthCacheNamespaces.TOKEN_BLACKLIST, str(claims["jti"])
-        )
+        key = CacheKeyBuilder.session_key(AuthCacheNamespaces.TOKEN_BLACKLIST, str(claims["jti"]))
         await self._cache.set_json(key, {"revoked": True}, ttl=ttl)

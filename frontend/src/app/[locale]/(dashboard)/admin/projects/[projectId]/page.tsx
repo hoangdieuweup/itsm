@@ -6,7 +6,6 @@ import { fetchAuthSession } from "@/modules/auth";
 import { RESOURCES, ACTIONS } from "@/shared/constants/permissions";
 import { fetchProject, projectsKeys } from "@/entities/project";
 import { fetchProjectEnvironments, environmentsKeys } from "@/entities/environment";
-import { fetchNotificationChannels, notificationChannelsKeys } from "@/entities/notification-channel";
 import { NotificationChannelsSection } from "@/modules/notifications";
 import { ProjectDetailClient } from "./project-detail-client";
 
@@ -20,11 +19,6 @@ export default async function AdminProjectDetailPage({
 
   const session = await fetchAuthSession();
   const canReadProjects = hasPermission(session, RESOURCES.PROJECT, ACTIONS.READ);
-  const canReadNotificationChannels = hasPermission(
-    session,
-    RESOURCES.NOTIFICATION_CHANNEL,
-    ACTIONS.READ,
-  );
 
   const queryClient = createQueryClient();
   const prefetches = [];
@@ -40,14 +34,6 @@ export default async function AdminProjectDetailPage({
       }),
     );
   }
-  if (canReadNotificationChannels) {
-    prefetches.push(
-      queryClient.prefetchQuery({
-        queryKey: notificationChannelsKeys.list(projectId),
-        queryFn: () => fetchNotificationChannels(projectId),
-      }),
-    );
-  }
   await Promise.all(prefetches);
 
   return (
@@ -58,13 +44,7 @@ export default async function AdminProjectDetailPage({
         fallback={<NoPermission />}
       >
         <ProjectDetailClient projectId={projectId}>
-          <RequirePermission
-            resource={RESOURCES.NOTIFICATION_CHANNEL}
-            action={ACTIONS.READ}
-            fallback={null}
-          >
-            <NotificationChannelsSection projectId={projectId} />
-          </RequirePermission>
+          <NotificationChannelsSection projectId={projectId} />
         </ProjectDetailClient>
       </RequirePermission>
     </HydrationBoundary>

@@ -10,6 +10,12 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    # logging:
+    #   driver: loki
+    #   options:
+    #     loki-url: "${LOKI_URL}"
+    #     loki-tenant-id: "${LOKI_TENANT_ID:-}"
+    #     loki-external-labels: "container_name={{.Name}},compose_service=api"
 
   postgres:
     image: postgres:16-alpine
@@ -50,6 +56,12 @@ services:
         condition: service_healthy
     command: ["./scripts/start-worker.sh"]
     restart: unless-stopped
+    # logging:
+    #   driver: loki
+    #   options:
+    #     loki-url: "${LOKI_URL}"
+    #     loki-tenant-id: "${LOKI_TENANT_ID:-}"
+    #     loki-external-labels: "container_name={{.Name}},compose_service=worker"
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"

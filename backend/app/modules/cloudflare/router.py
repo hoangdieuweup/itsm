@@ -63,6 +63,7 @@ from app.modules.cloudflare.dependencies import (
     require_account_access,
     require_account_access_for_environment,
     require_cloudflare_environment_access,
+    require_project_permission_for_environment,
 )
 from app.modules.cloudflare.exceptions import CloudflareAccountNotFound, CloudflareConfigNotFound
 from app.modules.cloudflare.schemas import (
@@ -515,12 +516,9 @@ async def get_cloudflare_traffic_stats(
     since: datetime | None = None,
     until: datetime | None = None,
     use_case: GetCloudflareTrafficStats = Depends(get_get_cloudflare_traffic_stats),
-    _grant: AccountAccessGrant = Depends(
-        require_cloudflare_environment_access(
-            RbacResources.CLOUDFLARE_TRAFFIC,
-            RbacResources.PROJECT_CLOUDFLARE_TRAFFIC,
-            RbacActions.READ,
-            AccessLevel.VIEWER,
+    _user: UserRead = Depends(
+        require_project_permission_for_environment(
+            RbacResources.ENVIRONMENT_CLOUDFLARE_TRAFFIC, RbacActions.READ
         )
     ),
 ) -> ApiResponse[CloudflareTrafficStats]:

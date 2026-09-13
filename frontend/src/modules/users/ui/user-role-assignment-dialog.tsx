@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Lock } from "lucide-react";
 import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { Dialog, DialogErrorAlert } from "@/shared/ui/dialog";
 import { useApiErrorMessage } from "@/shared/lib/handle-api-error";
 import { useCan } from "@/entities/permission";
@@ -155,8 +156,8 @@ function UserRoleAssignmentInner({
           {/* Roles Checkbox List */}
           {isRolesLoading ? (
             <div className="flex flex-col gap-2 py-4">
-              <div className="h-12 w-full animate-pulse rounded-2xl bg-muted/50" />
-              <div className="h-12 w-full animate-pulse rounded-2xl bg-muted/50" />
+              <Skeleton className="h-12 w-full rounded-2xl" />
+              <Skeleton className="h-12 w-full rounded-2xl" />
             </div>
           ) : (
             <div className="flex flex-col gap-2.5">

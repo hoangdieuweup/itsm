@@ -1,10 +1,16 @@
 import { setRequestLocale } from "next-intl/server";
 import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { createQueryClient } from "@/shared/lib/query-client";
-import { RequirePermission, NoPermission, hasPermission } from "@/entities/permission";
+import {
+  RequirePermission,
+  NoPermission,
+  hasPermission,
+  fetchProjectPermissions,
+  projectPermissionsKeys,
+} from "@/entities/permission";
 import { fetchAuthSession } from "@/modules/auth";
 import { RESOURCES, ACTIONS } from "@/shared/constants/permissions";
-import { fetchEnvironmentById, environmentsKeys } from "@/entities/environment";
+import { fetchEnvironmentById, environmentsKeys, type Environment } from "@/entities/environment";
 import { CloudflareDnsPageContent } from "@/modules/cloudflare-dns";
 
 export default async function AdminEnvironmentDnsPage({
@@ -16,7 +22,7 @@ export default async function AdminEnvironmentDnsPage({
   setRequestLocale(locale);
 
   const session = await fetchAuthSession();
-  const canView = hasPermission(session, RESOURCES.CLOUDFLARE_DNS, ACTIONS.READ);
+  const canView = hasPermission(session, RESOURCES.ENVIRONMENT, ACTIONS.READ);
 
   const queryClient = createQueryClient();
   if (canView) {
@@ -24,15 +30,18 @@ export default async function AdminEnvironmentDnsPage({
       queryKey: environmentsKeys.detail(environmentId),
       queryFn: () => fetchEnvironmentById(environmentId),
     });
+    const environment = queryClient.getQueryData<Environment>(environmentsKeys.detail(environmentId));
+    if (environment) {
+      await queryClient.prefetchQuery({
+        queryKey: projectPermissionsKeys.forProject(environment.projectId),
+        queryFn: () => fetchProjectPermissions(environment.projectId),
+      });
+    }
   }
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <RequirePermission
-        resource={RESOURCES.CLOUDFLARE_DNS}
-        action={ACTIONS.READ}
-        fallback={<NoPermission />}
-      >
+      <RequirePermission resource={RESOURCES.ENVIRONMENT} action={ACTIONS.READ} fallback={<NoPermission />}>
         <CloudflareDnsPageContent environmentId={environmentId} />
       </RequirePermission>
     </HydrationBoundary>

@@ -14,6 +14,7 @@ from app.main import app
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCookies
 from app.modules.notifications.config import notifications_settings
+from app.modules.projects.models import ProjectMember
 from app.modules.rbac.models import Permission, Role, RolePermission, UserRole
 from app.modules.users.models import User
 
@@ -66,6 +67,13 @@ async def _login_with_permissions(
     return user_id
 
 
+async def _join_project(engine: AsyncEngine, project_id: str, user_id: UUID) -> None:
+    """Project-scoped guards resolve permissions through project membership,
+    so a caller holding the permission globally still needs a row here."""
+    async with engine.begin() as conn:
+        await conn.execute(insert(ProjectMember).values(project_id=UUID(project_id), user_id=user_id))
+
+
 async def _make_project(client: AsyncClient, engine: AsyncEngine) -> str:
     await _login_with_permissions(client, engine, permissions=[("project", "create")])
     resp = await client.post("/api/v1/projects", json={"name": "Site"})
@@ -75,10 +83,11 @@ async def _make_project(client: AsyncClient, engine: AsyncEngine) -> str:
 class TestCreateAndListChannels:
     async def test_requires_create_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
         project_id = await _make_project(client, engine)
-        await _login_with_permissions(client, engine, permissions=[], email="nope@x.com")
+        user_id = await _login_with_permissions(client, engine, permissions=[], email="nope@x.com")
+        await _join_project(engine, project_id, user_id)
 
         response = await client.post(
-            "/api/v1/notification-channels",
+            f"/api/v1/notification-channels?projectId={project_id}",
             json={
                 "projectId": project_id,
                 "type": "email",
@@ -90,15 +99,19 @@ class TestCreateAndListChannels:
 
     async def test_create_then_list(self, client: AsyncClient, engine: AsyncEngine) -> None:
         project_id = await _make_project(client, engine)
-        await _login_with_permissions(
+        user_id = await _login_with_permissions(
             client,
             engine,
-            permissions=[("notification_channel", "create"), ("notification_channel", "read")],
+            permissions=[
+                ("project_notification_channel", "create"),
+                ("project_notification_channel", "read"),
+            ],
             email="admin@x.com",
         )
+        await _join_project(engine, project_id, user_id)
 
         create_response = await client.post(
-            "/api/v1/notification-channels",
+            f"/api/v1/notification-channels?projectId={project_id}",
             json={
                 "projectId": project_id,
                 "type": "telegram",
@@ -117,12 +130,13 @@ class TestCreateAndListChannels:
 
     async def test_rejects_invalid_config(self, client: AsyncClient, engine: AsyncEngine) -> None:
         project_id = await _make_project(client, engine)
-        await _login_with_permissions(
-            client, engine, permissions=[("notification_channel", "create")], email="badconfig@x.com"
+        user_id = await _login_with_permissions(
+            client, engine, permissions=[("project_notification_channel", "create")], email="badconfig@x.com"
         )
+        await _join_project(engine, project_id, user_id)
 
         response = await client.post(
-            "/api/v1/notification-channels",
+            f"/api/v1/notification-channels?projectId={project_id}",
             json={"projectId": project_id, "type": "telegram", "name": "Ops", "config": {}},
         )
         assert response.status_code == 422
@@ -132,14 +146,18 @@ class TestCreateAndListChannels:
 class TestUpdateAndDeleteChannel:
     async def test_update_requires_permission(self, client: AsyncClient, engine: AsyncEngine) -> None:
         project_id = await _make_project(client, engine)
-        await _login_with_permissions(
+        user_id = await _login_with_permissions(
             client,
             engine,
-            permissions=[("notification_channel", "create"), ("notification_channel", "read")],
+            permissions=[
+                ("project_notification_channel", "create"),
+                ("project_notification_channel", "read"),
+            ],
             email="creator@x.com",
         )
+        await _join_project(engine, project_id, user_id)
         create_response = await client.post(
-            "/api/v1/notification-channels",
+            f"/api/v1/notification-channels?projectId={project_id}",
             json={
                 "projectId": project_id,
                 "type": "email",
@@ -149,25 +167,28 @@ class TestUpdateAndDeleteChannel:
         )
         channel_id = create_response.json()["data"]["id"]
 
-        await _login_with_permissions(client, engine, permissions=[], email="noupdate@x.com")
+        user_id = await _login_with_permissions(client, engine, permissions=[], email="noupdate@x.com")
+
+        await _join_project(engine, project_id, user_id)
         response = await client.patch(f"/api/v1/notification-channels/{channel_id}", json={"name": "Renamed"})
         assert response.status_code == 403
 
     async def test_update_then_delete(self, client: AsyncClient, engine: AsyncEngine) -> None:
         project_id = await _make_project(client, engine)
-        await _login_with_permissions(
+        user_id = await _login_with_permissions(
             client,
             engine,
             permissions=[
-                ("notification_channel", "create"),
-                ("notification_channel", "read"),
-                ("notification_channel", "update"),
-                ("notification_channel", "delete"),
+                ("project_notification_channel", "create"),
+                ("project_notification_channel", "read"),
+                ("project_notification_channel", "update"),
+                ("project_notification_channel", "delete"),
             ],
             email="full@x.com",
         )
+        await _join_project(engine, project_id, user_id)
         create_response = await client.post(
-            "/api/v1/notification-channels",
+            f"/api/v1/notification-channels?projectId={project_id}",
             json={
                 "projectId": project_id,
                 "type": "email",
@@ -195,14 +216,18 @@ class TestTestSendChannel:
         self, client: AsyncClient, engine: AsyncEngine
     ) -> None:
         project_id = await _make_project(client, engine)
-        await _login_with_permissions(
+        user_id = await _login_with_permissions(
             client,
             engine,
-            permissions=[("notification_channel", "create"), ("notification_channel", "read")],
+            permissions=[
+                ("project_notification_channel", "create"),
+                ("project_notification_channel", "read"),
+            ],
             email="reader@x.com",
         )
+        await _join_project(engine, project_id, user_id)
         create_response = await client.post(
-            "/api/v1/notification-channels",
+            f"/api/v1/notification-channels?projectId={project_id}",
             json={
                 "projectId": project_id,
                 "type": "telegram",
@@ -217,14 +242,18 @@ class TestTestSendChannel:
 
     async def test_dispatches_to_telegram_client(self, client: AsyncClient, engine: AsyncEngine) -> None:
         project_id = await _make_project(client, engine)
-        await _login_with_permissions(
+        user_id = await _login_with_permissions(
             client,
             engine,
-            permissions=[("notification_channel", "create"), ("notification_channel", "update")],
+            permissions=[
+                ("project_notification_channel", "create"),
+                ("project_notification_channel", "test_send"),
+            ],
             email="sender@x.com",
         )
+        await _join_project(engine, project_id, user_id)
         create_response = await client.post(
-            "/api/v1/notification-channels",
+            f"/api/v1/notification-channels?projectId={project_id}",
             json={
                 "projectId": project_id,
                 "type": "telegram",

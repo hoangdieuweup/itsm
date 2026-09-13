@@ -1,14 +1,22 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { runLogQuery, type LogQueryValues } from "../api/fetchers";
+import { logViewerKeys } from "../api/query-keys";
 
 /**
- * Running a query is an action, not a cacheable resource — every "Run
- * query" click is a fresh POST, so this is a mutation, not a useQuery.
+ * Declarative TanStack Query hook for reading Loki logs.
+ * Executes automatically on mount when enabled, and refetches when params change.
  */
-export function useRunLogQuery(environmentId: string) {
-  return useMutation({
-    mutationFn: (data: LogQueryValues) => runLogQuery(environmentId, data),
+export function useLogQuery(
+  environmentId: string,
+  params: LogQueryValues,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: logViewerKeys.query(environmentId, params),
+    queryFn: () => runLogQuery(environmentId, params),
+    enabled: options?.enabled ?? Boolean(params.query),
+    staleTime: 10_000,
   });
 }
