@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Plus, Pencil, Trash2, ArrowRight, Copy, Check } from "lucide-react";
 import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { CanInProjectOrAccount } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
@@ -56,16 +57,8 @@ export function TunnelHostnamesPanel({ environmentId, tunnelId }: { environmentI
 
       {hostnamesLoading ? (
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 rounded-2xl border border-border/60 bg-card/60 p-4.5 animate-pulse">
-            <div className="flex flex-col gap-2 w-full max-w-xs">
-              <div className="h-4 w-44 rounded-md bg-muted/80" />
-              <div className="h-3 w-32 rounded-md bg-muted/50" />
-            </div>
-            <div className="flex gap-2">
-              <div className="size-8 rounded-xl bg-muted/60" />
-              <div className="size-8 rounded-xl bg-muted/60" />
-            </div>
-          </div>
+          <Skeleton className="h-16 w-full rounded-2xl" />
+          <Skeleton className="h-16 w-full rounded-2xl" />
         </div>
       ) : hostnames.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 py-10 px-4 text-center">

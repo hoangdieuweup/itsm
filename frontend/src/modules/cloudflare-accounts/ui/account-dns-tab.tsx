@@ -12,6 +12,7 @@ import {
   type CfZone,
 } from "@/entities/cloudflare-account";
 import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
@@ -51,8 +52,10 @@ function DnsRecordsTable({ accountId, zoneId }: { accountId: string; zoneId: str
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="size-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="space-y-3 py-2">
+        <Skeleton className="h-10 w-full rounded-2xl" />
+        <Skeleton className="h-12 w-full rounded-2xl" />
+        <Skeleton className="h-12 w-full rounded-2xl" />
       </div>
     );
   }

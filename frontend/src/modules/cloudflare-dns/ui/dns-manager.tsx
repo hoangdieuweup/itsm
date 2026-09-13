@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Cloud, Globe, Pencil, Trash2, ExternalLink } from "lucide-react";
 import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Can, CanInProjectOrAccount } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
@@ -39,7 +40,7 @@ export function DnsManager({ environmentId }: { environmentId: string }) {
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      {configLoading && <div className="h-24 w-full animate-pulse rounded-xl bg-muted/50" />}
+      {configLoading && <Skeleton className="h-24 w-full rounded-2xl" />}
 
       {!configLoading && !isBound && <CloudflareBindingForm environmentId={environmentId} />}
 

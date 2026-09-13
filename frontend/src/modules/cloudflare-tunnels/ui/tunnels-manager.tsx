@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Trash2, RefreshCw, KeyRound, ArrowRight } from "lucide-react";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { CanInProject, CanInProjectOrAccount } from "@/entities/permission";
 import { ACTIONS, PERMISSIONS } from "@/shared/constants/permissions";
 import {
@@ -94,16 +95,8 @@ export function TunnelsManager({ environmentId }: { environmentId: string }) {
 
         {tunnelsLoading ? (
           <div className="flex flex-col gap-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-border/60 bg-card/60 p-4.5 animate-pulse">
-              <div className="flex flex-col gap-2.5 w-full max-w-sm">
-                <div className="h-5 w-32 rounded-md bg-muted/80" />
-                <div className="h-4 w-56 rounded-md bg-muted/50" />
-              </div>
-              <div className="flex gap-2">
-                <div className="size-8 rounded-xl bg-muted/60" />
-                <div className="size-8 rounded-xl bg-muted/60" />
-              </div>
-            </div>
+            <Skeleton className="h-20 w-full rounded-2xl" />
+            <Skeleton className="h-20 w-full rounded-2xl" />
           </div>
         ) : tunnels.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 py-10 px-4 text-center">
