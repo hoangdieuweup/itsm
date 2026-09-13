@@ -176,9 +176,9 @@ class TestRequireProjectPermissionForIncident:
             title="t",
         )
         user = UserRead.model_construct(id=uuid4(), email="a@b.com", name="A")
-        projects_api = FakeProjectsApi(permissions=frozenset({"incident.acknowledge"}))
+        projects_api = FakeProjectsApi(permissions=frozenset({"project_incident.acknowledge"}))
 
-        check = require_project_permission_for_incident("incident", "acknowledge")
+        check = require_project_permission_for_incident("project_incident", "acknowledge")
         result = await check(
             incident_id=incident.id,
             auth_api=_FakeAuthApi(user),
