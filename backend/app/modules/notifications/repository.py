@@ -13,6 +13,7 @@ from app.core.base.repository import AbstractRepository
 from app.core.crypto import FernetCodec
 from app.modules.notifications.config import notifications_settings
 from app.modules.notifications.constants import NotificationChannelSecrets, NotificationChannelType
+from app.modules.notifications.exceptions import NotificationChannelNotFound
 from app.modules.notifications.models import NotificationChannel
 from app.modules.notifications.schemas import NotificationChannelRead
 
@@ -164,7 +165,7 @@ class NotificationChannelRepository(AbstractNotificationChannelRepository):
     ) -> NotificationChannelRead:
         row = await self._session.get(NotificationChannel, channel_id)
         if row is None:
-            raise ValueError(f"notification channel {channel_id} does not exist")
+            raise NotificationChannelNotFound()
         if name is not None:
             row.name = name
         if config is not None:

@@ -21,6 +21,13 @@ from app.modules.cloudflare.constants import (
     ManagedBy,
     TunnelStatus,
 )
+from app.modules.cloudflare.exceptions import (
+    CloudflareAccountNotFound,
+    CloudflareConfigNotFound,
+    CloudflareTunnelNotFound,
+    DnsRecordNotFound,
+    TunnelPublicHostnameNotFound,
+)
 from app.modules.cloudflare.models import (
     CloudflareAccount,
     CloudflareAccountManager,
@@ -161,7 +168,7 @@ class CloudflareAccountRepository(AbstractCloudflareAccountRepository):
         """Rename and/or rotate the token. Caller must confirm account_id exists first."""
         row = await self._session.get(CloudflareAccount, account_id)
         if row is None:
-            raise ValueError(f"cloudflare account {account_id} does not exist")
+            raise CloudflareAccountNotFound()
         if label is not None:
             row.label = label
         if api_token is not None:
@@ -197,7 +204,7 @@ class CloudflareAccountRepository(AbstractCloudflareAccountRepository):
     ) -> None:
         row = await self._session.get(CloudflareAccount, account_id)
         if row is None:
-            raise ValueError(f"cloudflare account {account_id} does not exist")
+            raise CloudflareAccountNotFound()
         row.cf_webhook_destination_id = cf_webhook_destination_id
         row.webhook_secret_ciphertext = secret_ciphertext
         await self._session.flush()
@@ -428,7 +435,7 @@ class CloudflareConfigRepository(AbstractCloudflareConfigRepository):
             select(CloudflareConfig).where(CloudflareConfig.environment_id == environment_id)
         )
         if row is None:
-            raise ValueError(f"cloudflare config for environment {environment_id} does not exist")
+            raise CloudflareConfigNotFound()
         row.cloudflare_account_id = cloudflare_account_id
         row.zone_id = zone_id
         row.zone_name = zone_name
@@ -606,7 +613,7 @@ class DnsRecordRepository(AbstractDnsRecordRepository):
     ) -> DnsRecordRead:
         row = await self._session.get(DnsRecord, record_id)
         if row is None:
-            raise ValueError(f"dns record {record_id} does not exist")
+            raise DnsRecordNotFound()
         row.content = content
         row.priority = priority
         row.proxied = proxied
@@ -804,7 +811,7 @@ class CloudflareTunnelRepository(AbstractCloudflareTunnelRepository):
     ) -> CloudflareTunnelRead:
         row = await self._session.get(CloudflareTunnel, tunnel_id)
         if row is None:
-            raise ValueError(f"cloudflare tunnel {tunnel_id} does not exist")
+            raise CloudflareTunnelNotFound()
         row.status = status
         row.last_synced_at = last_synced_at
         await self._session.flush()
@@ -1000,7 +1007,7 @@ class TunnelHostnameRepository(AbstractTunnelHostnameRepository):
     async def update_service(self, hostname_id: UUID, *, service: str) -> TunnelPublicHostnameRead:
         row = await self._session.get(TunnelPublicHostname, hostname_id)
         if row is None:
-            raise ValueError(f"tunnel hostname {hostname_id} does not exist")
+            raise TunnelPublicHostnameNotFound()
         row.service = service
         await self._session.flush()
         await self._session.refresh(row)

@@ -12,6 +12,12 @@ from app.core.base.repository import AbstractRepository
 from app.core.models import FrozenModel
 from app.integrations.cache.client import CacheClient
 from app.modules.projects.constants import EnvironmentType, ProjectLinkType, ProjectsCacheKeys
+from app.modules.projects.exceptions import (
+    EnvironmentNotFound,
+    ProjectLinkNotFound,
+    ProjectNotFound,
+    ProjectRoleNotFound,
+)
 from app.modules.projects.models import (
     Environment,
     Project,
@@ -113,7 +119,7 @@ class ProjectRepository(AbstractProjectRepository):
         """Rename and/or redescribe a project. Caller must confirm project_id exists first."""
         row = await self._session.get(Project, project_id)
         if row is None:
-            raise ValueError(f"project {project_id} does not exist")
+            raise ProjectNotFound()
         if name is not None:
             row.name = name
         if description is not None:
@@ -244,7 +250,7 @@ class EnvironmentRepository(AbstractEnvironmentRepository):
         """Rename and/or re-point an environment. Caller must confirm environment_id exists first."""
         row = await self._session.get(Environment, environment_id)
         if row is None:
-            raise ValueError(f"environment {environment_id} does not exist")
+            raise EnvironmentNotFound()
         if name is not None:
             row.name = name
         if base_url is not None:
@@ -335,7 +341,7 @@ class ProjectLinkRepository(AbstractProjectLinkRepository):
         """Rename and/or re-point a link. Caller must confirm link_id exists first."""
         row = await self._session.get(ProjectLink, link_id)
         if row is None:
-            raise ValueError(f"project link {link_id} does not exist")
+            raise ProjectLinkNotFound()
         if name is not None:
             row.name = name
         if url is not None:
@@ -597,7 +603,7 @@ class ProjectRoleRepository(AbstractProjectRoleRepository):
     ) -> ProjectRoleRow:
         row = await self._session.get(ProjectRole, project_role_id)
         if row is None:
-            raise ValueError(f"project role {project_role_id} does not exist")
+            raise ProjectRoleNotFound()
         if name is not None:
             row.name = name
         if permission_ids is not None:

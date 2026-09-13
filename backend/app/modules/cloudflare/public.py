@@ -20,6 +20,7 @@ from app.integrations.cloudflare.dependencies import get_cloudflare_client
 from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import CloudflareWebhookDefaults, DriftKind, ManagedBy
 from app.modules.cloudflare.dependencies import get_uow, require_account_access
+from app.modules.cloudflare.exceptions import CloudflareAccountNotFound
 from app.modules.cloudflare.schemas import (
     CloudflareConfigRead,
     DnsReconciliationDiff,
@@ -112,7 +113,7 @@ class CloudflareApi:
         account = await self._uow.accounts.get_by_id(cloudflare_account_id)
         ciphertext = await self._uow.accounts.get_token_ciphertext(cloudflare_account_id)
         if account is None or ciphertext is None:
-            raise ValueError(f"cloudflare account {cloudflare_account_id} does not exist")
+            raise CloudflareAccountNotFound()
         plaintext_token = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
         secret = secrets.token_urlsafe(32)
         destination_id = await self._client.create_webhook_destination(

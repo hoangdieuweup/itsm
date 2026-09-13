@@ -12,6 +12,7 @@ from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
 from app.integrations.cache.client import CacheClient
 from app.modules.rbac.constants import RbacCacheKeys
+from app.modules.rbac.exceptions import RoleNotFound
 from app.modules.rbac.models import Permission, Role, RolePermission, UserRole
 from app.modules.rbac.schemas import PermissionRead, RoleRead
 
@@ -109,7 +110,7 @@ class RoleRepository(AbstractRoleRepository):
         """Rename and/or replace a role's permission set. None means unchanged."""
         row = await self._session.get(Role, role_id)
         if row is None:
-            raise ValueError(f"role {role_id} does not exist")
+            raise RoleNotFound()
         if name is not None:
             row.name = name
         if permission_ids is not None:

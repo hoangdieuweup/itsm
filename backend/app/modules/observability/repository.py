@@ -16,6 +16,7 @@ from app.modules.observability.constants import (
     IncidentStatus,
     LokiAuthType,
 )
+from app.modules.observability.exceptions import AlertRuleNotFound, IncidentNotFound, LokiConfigNotFound
 from app.modules.observability.models import AlertRule, AlertRuleChannel, Incident, LokiConfig
 from app.modules.observability.schemas import AlertRuleRead, IncidentRead, LokiConfigRead
 
@@ -170,7 +171,7 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
             select(LokiConfig).where(LokiConfig.environment_id == environment_id)
         )
         if row is None:
-            raise ValueError(f"loki config for environment {environment_id} does not exist")
+            raise LokiConfigNotFound()
         row.endpoint_url = endpoint_url
         row.tenant_id = tenant_id
         row.auth_type = auth_type
@@ -306,7 +307,7 @@ class AlertRuleRepository(AbstractAlertRuleRepository):
     async def set_cf_policy_id(self, alert_rule_id: UUID, *, cf_policy_id: str) -> None:
         row = await self._session.get(AlertRule, alert_rule_id)
         if row is None:
-            raise ValueError(f"alert rule {alert_rule_id} does not exist")
+            raise AlertRuleNotFound()
         row.cf_policy_id = cf_policy_id
         await self._session.flush()
 
@@ -321,7 +322,7 @@ class AlertRuleRepository(AbstractAlertRuleRepository):
     ) -> AlertRuleRead:
         row = await self._session.get(AlertRule, alert_rule_id)
         if row is None:
-            raise ValueError(f"alert rule {alert_rule_id} does not exist")
+            raise AlertRuleNotFound()
         if name is not None:
             row.name = name
         if is_active is not None:
@@ -503,7 +504,7 @@ class IncidentRepository(AbstractIncidentRepository):
     ) -> IncidentRead:
         row = await self._session.get(Incident, incident_id)
         if row is None:
-            raise ValueError(f"incident {incident_id} does not exist")
+            raise IncidentNotFound()
         row.status = status
         if status == IncidentStatus.ACKNOWLEDGED:
             row.acknowledged_at, row.acknowledged_by = at, actor_id

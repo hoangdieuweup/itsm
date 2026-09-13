@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.crypto import FernetCodec
 from app.modules.notifications.config import notifications_settings
 from app.modules.notifications.constants import NotificationChannelType
+from app.modules.notifications.exceptions import NotificationChannelNotFound
 from app.modules.notifications.models import NotificationChannel
 from app.modules.notifications.repository import NotificationChannelRepository
 from app.modules.projects.models import Environment, Project
@@ -180,3 +181,11 @@ class TestNotificationChannelRepository:
         await repo.delete(created.id)
 
         assert await repo.get_by_id(created.id) is None
+
+
+class TestNotificationChannelRepositoryMissingRows:
+    async def test_update_raises_channel_not_found(self, _session: AsyncSession) -> None:
+        with pytest.raises(NotificationChannelNotFound):
+            await NotificationChannelRepository(_session).update(
+                uuid4(), name="x", config=None, is_active=None
+            )

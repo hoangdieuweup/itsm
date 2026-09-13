@@ -17,7 +17,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.integrations.cache.client import CacheClient
-from app.modules.cloudflare.constants import DnsRecordType
+from app.modules.cloudflare.constants import DnsRecordType, TunnelStatus
+from app.modules.cloudflare.exceptions import (
+    CloudflareAccountNotFound,
+    CloudflareConfigNotFound,
+    CloudflareTunnelNotFound,
+    DnsRecordNotFound,
+    TunnelPublicHostnameNotFound,
+)
 from app.modules.cloudflare.models import (
     CloudflareAccount,
     CloudflareAccountManager,
@@ -464,3 +471,39 @@ class TestTunnelHostnameRepository:
         )
         await repo.delete(created.id)
         assert await repo.get_by_id(created.id) is None
+
+
+class TestUpdatesRaiseNotFoundForMissingRows:
+    async def test_account_update(self, _session: AsyncSession) -> None:
+        with pytest.raises(CloudflareAccountNotFound):
+            await CloudflareAccountRepository(_session, CacheClient.__new__(CacheClient)).update(
+                uuid4(), label="x", api_token=None
+            )
+
+    async def test_account_set_webhook_destination(self, _session: AsyncSession) -> None:
+        with pytest.raises(CloudflareAccountNotFound):
+            await CloudflareAccountRepository(
+                _session, CacheClient.__new__(CacheClient)
+            ).set_webhook_destination(uuid4(), cf_webhook_destination_id="wh", secret_ciphertext="c")
+
+    async def test_config(self, _session: AsyncSession) -> None:
+        with pytest.raises(CloudflareConfigNotFound):
+            await CloudflareConfigRepository(_session).update_by_environment_id(
+                uuid4(), cloudflare_account_id=uuid4(), zone_id="z", zone_name="a.com"
+            )
+
+    async def test_dns_record(self, _session: AsyncSession) -> None:
+        with pytest.raises(DnsRecordNotFound):
+            await DnsRecordRepository(_session).update(
+                uuid4(), content="1.1.1.1", priority=None, proxied=False, ttl=1
+            )
+
+    async def test_tunnel(self, _session: AsyncSession) -> None:
+        with pytest.raises(CloudflareTunnelNotFound):
+            await CloudflareTunnelRepository(_session).update_status(
+                uuid4(), status=TunnelStatus.HEALTHY, last_synced_at=datetime.now(UTC)
+            )
+
+    async def test_tunnel_hostname(self, _session: AsyncSession) -> None:
+        with pytest.raises(TunnelPublicHostnameNotFound):
+            await TunnelHostnameRepository(_session).update_service(uuid4(), service="http://x")

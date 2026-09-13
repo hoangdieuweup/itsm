@@ -10,8 +10,20 @@ import pytest
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from app.integrations.cache.client import CacheClient
+from app.modules.projects.exceptions import (
+    EnvironmentNotFound,
+    ProjectLinkNotFound,
+    ProjectNotFound,
+    ProjectRoleNotFound,
+)
 from app.modules.projects.models import Project
-from app.modules.projects.repository import ProjectRoleRepository
+from app.modules.projects.repository import (
+    EnvironmentRepository,
+    ProjectLinkRepository,
+    ProjectRepository,
+    ProjectRoleRepository,
+)
 from app.modules.rbac.models import Permission
 
 
@@ -91,3 +103,25 @@ class TestProjectRoleRepositoryBatchLoading:
         assert total == 3
         assert sorted(len(role.permission_ids) for role in roles) == [1, 2, 3]
         assert len(statements) == 3
+
+
+class TestUpdatesRaiseNotFoundForMissingRows:
+    async def test_project(self, _session: AsyncSession) -> None:
+        with pytest.raises(ProjectNotFound):
+            await ProjectRepository(_session, CacheClient.__new__(CacheClient)).update(
+                uuid4(), name="x", description=None
+            )
+
+    async def test_environment(self, _session: AsyncSession) -> None:
+        with pytest.raises(EnvironmentNotFound):
+            await EnvironmentRepository(_session, CacheClient.__new__(CacheClient)).update(
+                uuid4(), name="x", base_url=None
+            )
+
+    async def test_project_link(self, _session: AsyncSession) -> None:
+        with pytest.raises(ProjectLinkNotFound):
+            await ProjectLinkRepository(_session).update(uuid4(), name="x", url=None)
+
+    async def test_project_role(self, _session: AsyncSession) -> None:
+        with pytest.raises(ProjectRoleNotFound):
+            await ProjectRoleRepository(_session).update(uuid4(), name="x", permission_ids=None)

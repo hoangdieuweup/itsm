@@ -12,6 +12,7 @@ from app.core.base.repository import AbstractRepository
 from app.integrations.cache.client import CacheClient
 from app.modules.common.constants import UserStatus
 from app.modules.users.constants import UsersCacheKeys
+from app.modules.users.exceptions import UserNotFound
 from app.modules.users.models import User
 from app.modules.users.schemas import UserRead
 
@@ -153,7 +154,7 @@ class UserRepository(AbstractUserRepository):
         """Sync an existing user's profile fields from DX (status untouched)."""
         row = await self._session.get(User, user_id)
         if row is None:
-            raise ValueError(f"user {user_id} does not exist")
+            raise UserNotFound()
         row.email = email
         row.name = name
         row.external_user_id = external_user_id
@@ -176,7 +177,7 @@ class UserRepository(AbstractUserRepository):
         """Block or unblock a user."""
         row = await self._session.get(User, user_id)
         if row is None:
-            raise ValueError(f"user {user_id} does not exist")
+            raise UserNotFound()
         row.status = status
         await self._session.flush()
         await self._session.refresh(row)
