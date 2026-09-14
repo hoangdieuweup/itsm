@@ -15,10 +15,10 @@ import pytest
 from app.core.events import DomainEvent
 from app.integrations.cache.keys import CacheKeyBuilder
 from app.integrations.dx_core.client import DxDepartment, DxUserProfile
-from app.integrations.dx_core.repository import AbstractDxTokenRepository
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCacheNamespaces, TokenType
 from app.modules.auth.exceptions import NotAuthenticated, UserBlocked
+from app.modules.auth.repository import AbstractDxTokenRepository
 from app.modules.auth.services.authenticate import AuthenticateWithDx
 from app.modules.auth.services.issue_tokens import IssueTokens
 from app.modules.auth.services.logout import LogoutUser
@@ -30,10 +30,11 @@ from app.modules.users.public import UserRead, UsersApi
 
 
 class FakeAuthUnitOfWork(AbstractAuthUnitOfWork):
-    """In-memory transaction coordinator. commit/rollback are no-ops that
-    just count calls — auth owns no repository, so there's nothing to fake here."""
+    """In-memory transaction coordinator. commit/rollback are no-ops that just
+    count calls; dx_tokens is the in-memory DX token repository."""
 
     def __init__(self) -> None:
+        self.dx_tokens = FakeDxTokenRepository()
         self.commits = 0
         self.rollbacks = 0
 
@@ -145,7 +146,7 @@ class FakeRbacApi:
 
 @dataclass
 class FakeDxTokenRow:
-    """Stand-in for app.integrations.dx_core.models.DxToken — plaintext, no encryption."""
+    """Stand-in for app.modules.auth.models.DxToken — plaintext, no encryption."""
 
     user_id: UUID
     access_token: str
@@ -180,6 +181,9 @@ class FakeDxTokenRepository(AbstractDxTokenRepository):
 
     def decrypt_access_token(self, row: FakeDxTokenRow) -> str:
         return row.access_token
+
+    def decrypt_refresh_token(self, row: FakeDxTokenRow) -> str:
+        return row.refresh_token
 
 
 @dataclass
@@ -319,14 +323,13 @@ class TestAuthenticateWithDx:
 
     def _build(self, *, profile: DxUserProfile, token: FakeDxTokenSet | None = None):
         uow = FakeAuthUnitOfWork()
-        dx_tokens = FakeDxTokenRepository()
+        dx_tokens = uow.dx_tokens
         dx_client = FakeDxCoreClient(token=token, profile=profile)
         events = FakeEventBus()
         rbac_api = FakeRbacApi()
         users_api = FakeUsersApi()
         use_case = AuthenticateWithDx(
             uow,
-            dx_tokens,
             dx_client,
             SyncExternalUser(users_api),
             IssueTokens(),
@@ -377,11 +380,10 @@ class TestAuthenticateWithDx:
             created_at=datetime.now(UTC),
         )
         users_api.seed_blocked(blocked)
-        dx_tokens = FakeDxTokenRepository()
+        dx_tokens = uow.dx_tokens
         events = FakeEventBus()
         use_case = AuthenticateWithDx(
             uow,
-            dx_tokens,
             FakeDxCoreClient(profile=_dx_profile(email="blocked@example.com")),
             SyncExternalUser(users_api),
             IssueTokens(),
@@ -415,13 +417,14 @@ class TestLogoutUser:
         )
 
     async def test_revokes_dx_token_clears_link_and_blacklists_both_app_tokens(self, cache_client) -> None:
-        dx_tokens = FakeDxTokenRepository()
+        uow = FakeAuthUnitOfWork()
+        dx_tokens = uow.dx_tokens
         user_id = uuid4()
         await dx_tokens.save(
             user_id, FakeDxTokenSet(access_token="plain-dx-token"), expires_at=datetime.now(UTC)
         )
         dx_client = FakeDxCoreClient()
-        use_case = LogoutUser(dx_tokens, dx_client, cache_client)
+        use_case = LogoutUser(uow, dx_client, cache_client)
         access = self._valid_token(sub=str(user_id))
         refresh = self._valid_token(sub=str(user_id))
 
@@ -429,13 +432,15 @@ class TestLogoutUser:
 
         assert dx_client.revoked == ["plain-dx-token"]
         assert dx_tokens.cleared == [user_id]
+        assert uow.commits == 1
         assert await cache_client.get_json(_blacklist_key(access)) == {"revoked": True}
         assert await cache_client.get_json(_blacklist_key(refresh)) == {"revoked": True}
 
     async def test_skips_dx_revoke_when_user_never_linked(self, cache_client) -> None:
-        dx_tokens = FakeDxTokenRepository()
+        uow = FakeAuthUnitOfWork()
+        dx_tokens = uow.dx_tokens
         dx_client = FakeDxCoreClient()
-        use_case = LogoutUser(dx_tokens, dx_client, cache_client)
+        use_case = LogoutUser(uow, dx_client, cache_client)
         user_id = uuid4()
 
         await use_case.execute(user_id, None, None)
@@ -444,8 +449,7 @@ class TestLogoutUser:
         assert dx_tokens.cleared == [user_id]
 
     async def test_skips_blacklisting_an_unparsable_token(self, cache_client) -> None:
-        dx_tokens = FakeDxTokenRepository()
-        use_case = LogoutUser(dx_tokens, FakeDxCoreClient(), cache_client)
+        use_case = LogoutUser(FakeAuthUnitOfWork(), FakeDxCoreClient(), cache_client)
         user_id = uuid4()
 
         await use_case.execute(user_id, "not-a-jwt", None)  # must not raise

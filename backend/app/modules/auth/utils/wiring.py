@@ -18,13 +18,7 @@ from fastapi import Depends
 from app.core.events import EventBus, get_event_bus
 from app.integrations.dx_core.client import DxCoreClient
 from app.integrations.dx_core.dependencies import get_dx_core_client
-from app.integrations.dx_core.repository import AbstractDxTokenRepository
-from app.modules.auth.dependencies import (
-    get_dx_token_repository,
-    get_issue_tokens,
-    get_sync_external_user,
-    get_uow,
-)
+from app.modules.auth.dependencies import get_issue_tokens, get_sync_external_user, get_uow
 from app.modules.auth.services.authenticate import AuthenticateWithDx
 from app.modules.auth.services.issue_tokens import IssueTokens
 from app.modules.auth.services.sync_external_user import SyncExternalUser
@@ -35,7 +29,6 @@ from app.modules.users.public import UsersApi, get_users_api
 
 async def get_authenticate_with_dx(
     uow: AbstractAuthUnitOfWork = Depends(get_uow),
-    dx_tokens: AbstractDxTokenRepository = Depends(get_dx_token_repository),
     dx_client: DxCoreClient = Depends(get_dx_core_client),
     sync_user: SyncExternalUser = Depends(get_sync_external_user),
     issue_tokens: IssueTokens = Depends(get_issue_tokens),
@@ -44,4 +37,4 @@ async def get_authenticate_with_dx(
     users_api: UsersApi = Depends(get_users_api),
 ) -> AuthenticateWithDx:
     """Provide the DX OAuth2 callback use case."""
-    return AuthenticateWithDx(uow, dx_tokens, dx_client, sync_user, issue_tokens, events, rbac_api, users_api)
+    return AuthenticateWithDx(uow, dx_client, sync_user, issue_tokens, events, rbac_api, users_api)

@@ -1,7 +1,8 @@
-"""ORM model owned by the dx_core integration. No other module may query this table.
+"""ORM models owned by the auth module. No other module may query these tables.
 
-access_token/refresh_token store Fernet ciphertext (base64), never plaintext
-— see app.core.crypto.FernetCodec and app.integrations.dx_core.repository.
+dx_tokens keeps the DX token set a user's SSO login returned, so logout can
+revoke it at DX. access_token/refresh_token store Fernet ciphertext (base64),
+never plaintext — see app.core.crypto.FernetCodec and app.modules.auth.repository.
 """
 
 import uuid

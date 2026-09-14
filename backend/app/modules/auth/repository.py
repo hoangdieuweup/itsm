@@ -18,8 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.base.markers import database, helper
 from app.core.crypto import FernetCodec
 from app.integrations.dx_core.client import DxTokenSet
-from app.integrations.dx_core.config import dx_core_settings
-from app.integrations.dx_core.models import DxToken
+from app.modules.auth.config import auth_settings
+from app.modules.auth.models import DxToken
 
 
 class AbstractDxTokenRepository(ABC):
@@ -43,6 +43,11 @@ class AbstractDxTokenRepository(ABC):
     @abstractmethod
     def decrypt_access_token(self, row: DxToken) -> str:
         """Decrypt a row's access token for one-off outbound use (e.g. revoke)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def decrypt_refresh_token(self, row: DxToken) -> str:
+        """Decrypt a row's refresh token for one-off outbound use (e.g. revoke)."""
         raise NotImplementedError
 
 
@@ -85,9 +90,19 @@ class DxTokenRepository(AbstractDxTokenRepository):
     @helper
     def decrypt_access_token(self, row: DxToken) -> str:
         """Decrypt a row's access token for one-off outbound use (e.g. revoke)."""
-        return FernetCodec.decrypt(row.access_token, key=dx_core_settings.FERNET_KEY)
+        return self._decrypt(row.access_token)
+
+    @helper
+    def decrypt_refresh_token(self, row: DxToken) -> str:
+        """Decrypt a row's refresh token for one-off outbound use (e.g. revoke)."""
+        return self._decrypt(row.refresh_token)
 
     @helper
     def _encrypt(self, plaintext: str) -> str:
-        """Encrypt one token value with this integration's own Fernet key."""
-        return FernetCodec.encrypt(plaintext, key=dx_core_settings.FERNET_KEY)
+        """Encrypt one token value with the auth module's DX token key."""
+        return FernetCodec.encrypt(plaintext, key=auth_settings.DX_TOKEN_FERNET_KEY.get_secret_value())
+
+    @helper
+    def _decrypt(self, ciphertext: str) -> str:
+        """Decrypt one token value with the auth module's DX token key."""
+        return FernetCodec.decrypt(ciphertext, key=auth_settings.DX_TOKEN_FERNET_KEY.get_secret_value())

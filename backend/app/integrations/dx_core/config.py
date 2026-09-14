@@ -1,10 +1,11 @@
 """Settings owned by the dx_core integration.
 
-Names follow docs/tasks/sso-login.md section 3 exactly. CLIENT_ID/CLIENT_SECRET/
-FERNET_KEY default to an empty string only so the settings object can be
-imported/tested without a real .env — DxCoreClient/DxTokenRepository fail
-fast (see their own docstrings) rather than silently proceeding once a real
-call is attempted with a blank value.
+Names follow docs/tasks/sso-login.md section 3 exactly. CLIENT_ID/CLIENT_SECRET
+default to an empty string only so the settings object can be imported/tested
+without a real .env; DX rejects a blank client once a real call is attempted.
+POST_LOGOUT_REDIRECT_URI is optional: when empty, DxCoreClient.build_logout_url
+leaves it out and DX redirects to the URI registered for this client. The key
+encrypting stored DX tokens belongs to the auth module (AUTH__DX_TOKEN_FERNET_KEY).
 """
 
 from pydantic import HttpUrl
@@ -21,10 +22,6 @@ class DxCoreConfig(BaseSettings):
     CLIENT_SECRET: str = ""
     SCOPES: str = ""
     POST_LOGOUT_REDIRECT_URI: str = ""
-    # Fernet key encrypting DxToken.access_token/refresh_token at rest.
-    # Generate with:
-    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-    FERNET_KEY: str = ""
 
 
 dx_core_settings = DxCoreConfig()

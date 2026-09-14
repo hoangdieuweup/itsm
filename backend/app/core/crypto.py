@@ -1,9 +1,9 @@
 """Symmetric encryption mechanism for any module storing a secret at rest.
 
-Generic on purpose: no key is hardcoded or read from settings here — the
-owning integration (app/integrations/dx_core/config.py, the only current
-consumer) supplies its own Fernet key, keeping "core holds mechanism, never
-a business concept" intact.
+Generic on purpose: no key is hardcoded or read from settings here — each
+module that stores a secret (auth, cloudflare, notifications, observability)
+supplies its own Fernet key from its own config.py, keeping "core holds
+mechanism, never a business concept" intact.
 """
 
 from cryptography.fernet import Fernet

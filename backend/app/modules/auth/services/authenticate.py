@@ -7,7 +7,6 @@ from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
 from app.core.events import EventBus
 from app.integrations.dx_core.client import DxCoreClient
-from app.integrations.dx_core.repository import AbstractDxTokenRepository
 from app.modules.auth.events import UserLoggedIn
 from app.modules.auth.exceptions import UserBlocked
 from app.modules.auth.rules import AuthRules
@@ -49,7 +48,6 @@ class AuthenticateWithDx(AbstractUseCase):
     def __init__(
         self,
         uow: AbstractAuthUnitOfWork,
-        dx_tokens: AbstractDxTokenRepository,
         dx_client: DxCoreClient,
         sync_user: SyncExternalUser,
         issue_tokens: IssueTokens,
@@ -58,7 +56,6 @@ class AuthenticateWithDx(AbstractUseCase):
         users_api: UsersApi,
     ) -> None:
         self._uow = uow
-        self._dx_tokens = dx_tokens
         self._dx_client = dx_client
         self._sync_user = sync_user
         self._issue_tokens = issue_tokens
@@ -79,7 +76,7 @@ class AuthenticateWithDx(AbstractUseCase):
             await self._rbac_api.assign_default_role(user.id)
 
         expires_at = datetime.now(UTC) + timedelta(seconds=token.expires_in)
-        await self._dx_tokens.save(user.id, token, expires_at=expires_at)
+        await self._uow.dx_tokens.save(user.id, token, expires_at=expires_at)
         await self._users_api.set_last_login(user.id, datetime.now(UTC))
         await self._uow.commit()
         await self._users_api.invalidate_user(user.id)
