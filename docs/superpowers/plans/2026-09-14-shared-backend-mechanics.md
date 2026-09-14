@@ -948,3 +948,35 @@ Expected: only `observability/repository/incidents.py`, plus any filtered counts
   - `PageQuery.fetch_rows` gains `options` for `rbac`'s `selectinload`.
   - The generic `secret_unreadable` translation is added.
 - **Type consistency:** the same names are used in every task: `CloudflareCredentials(account_id, cf_account_id, api_token)`, `get_credentials`, `get_webhook_destination_id`, `get_webhook_secret`, `set_webhook_destination(secret=)`, `get_credential`, `keep_credential`, `get_dispatch_config`, `SqlAlchemyUnitOfWork`, `CachedSqlAlchemyUnitOfWork`, `CacheVersionBumper`, `AbstractCachedUnitOfWork` and `PageQuery.fetch_rows`.
+
+## Execution Notes (2026-09-14)
+
+Branch `refactor/shared-backend-mechanics`, one commit per task:
+
+| Commit | Task |
+|---|---|
+| `0905253` | design |
+| `0541d9b` | plan |
+| `eb0b268` | 1 — `SecretUnreadableError` |
+| `7c2c355` | 2 — cloudflare `get_credentials` |
+| `e47a116` | 3 — Loki credential |
+| `91a0dd6` | 4 — notification channel secrets |
+| `4ab1156` | 5 — shared unit of work |
+| `b7a0179` | 6 — `PageQuery` |
+| `f18c5cc` | 7 — translations |
+
+**Results.** Backend 743 tests passed, up from 723 at the branch point. ruff check and format clean, lint-imports 11/11, `check_module_boundaries.py --strict` clean, OpenAPI still 65 paths. Frontend eslint and `tsc --noEmit` clean, vitest 53 passed. GitNexus `check --cycles` found no circular imports; `detect-changes --scope compare --base-ref develop` reports 88 files, 411 symbols, 5 affected processes, medium risk. `FernetCodec` is now imported only by `app/core/crypto.py`, which defines it, and the four repositories that own a secret; `auth/models.py` names it in a docstring only.
+
+**Deviations from the plan, all reflected in the spec:**
+
+- `get_credentials` reads the account row directly instead of through the cache-aside `get_by_id`, so the token never enters the cache.
+- Webhook access split into `get_webhook_destination_id`, which never decrypts, and `get_webhook_secret`. Registering an alert rule therefore still works when the stored secret is unreadable.
+- `update_by_environment_id` gained `keep_credential`, so a Loki update that doesn't rotate the credential never needs the key.
+- `PageQuery.fetch_rows` gained `options`, carrying rbac's `selectinload(Role.permissions)`.
+
+**Two mistakes worth recording:**
+
+- The cloudflare migration script renamed the local `api_token` in `sync_tunnels.py`, which also renamed `_sync_ingress`'s parameter and left the file unparsable. Repaired by hand, and every service file was then re-parsed with `ast` before the tests ran. A rename script needs a scope check, not just a regex.
+- The first locale insertion swallowed the indentation of the key that followed it. JSON still parsed, which is exactly why the check has to compare formatting, not only `json.loads`.
+
+**Not verified here:** no browser check of the new 409 messages, and no run against a real Cloudflare, Loki, Telegram or Base.vn account. Backend tests need Docker and `CACHE__URL=redis://localhost:6379/0`.
