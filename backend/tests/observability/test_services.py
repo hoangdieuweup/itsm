@@ -8,11 +8,9 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.exceptions import CloudflareDnsOperationRejected
 from app.integrations.loki.exceptions import LokiApiUnavailable
 from app.integrations.loki.schemas import LokiLogEntry, LokiQueryResult
-from app.modules.observability.config import observability_settings
 from app.modules.observability.constants import (
     AlertRuleSource,
     AlertSeverity,
@@ -63,21 +61,12 @@ from app.modules.users.public import UserRead
 
 ACTOR_ID = uuid4()
 ACTOR_EMAIL = "actor@example.com"
-TEST_FERNET_KEY = "kL8Zx3vQ9mN2pR7wT4yU6bC1dF5gH0jK3lM6nO9pQ2s="
-
-
-@pytest.fixture(autouse=True)
-def _observability_fernet_key(monkeypatch) -> None:
-    """Every test that encrypts/decrypts a credential needs a real 32-byte
-    Fernet key — the module's own default is "" (fail-fast), which Fernet()
-    rejects outright."""
-    monkeypatch.setattr(observability_settings, "FERNET_KEY", TEST_FERNET_KEY)
 
 
 class FakeLokiConfigRepo(AbstractLokiConfigRepository):
     def __init__(self) -> None:
         self._rows: dict[UUID, LokiConfigRead] = {}
-        self._ciphertexts: dict[UUID, str | None] = {}
+        self._credentials: dict[UUID, str | None] = {}
 
     async def get_by_id(self, entity_id):
         raise NotImplementedError
@@ -88,8 +77,8 @@ class FakeLokiConfigRepo(AbstractLokiConfigRepository):
     async def get_by_environment_id(self, environment_id):
         return self._rows.get(environment_id)
 
-    async def get_credential_ciphertext(self, environment_id):
-        return self._ciphertexts.get(environment_id)
+    async def get_credential(self, environment_id):
+        return self._credentials.get(environment_id)
 
     async def create(
         self,
@@ -115,7 +104,7 @@ class FakeLokiConfigRepo(AbstractLokiConfigRepository):
             updated_at=datetime.now(UTC),
         )
         self._rows[environment_id] = row
-        self._ciphertexts[environment_id] = credential
+        self._credentials[environment_id] = credential
         return row
 
     async def update_by_environment_id(
@@ -126,6 +115,7 @@ class FakeLokiConfigRepo(AbstractLokiConfigRepository):
         tenant_id,
         auth_type,
         credential,
+        keep_credential=False,
         default_query,
         default_range_minutes,
     ):
@@ -135,18 +125,23 @@ class FakeLokiConfigRepo(AbstractLokiConfigRepository):
                 "endpoint_url": endpoint_url,
                 "tenant_id": tenant_id,
                 "auth_type": auth_type,
-                "has_credential": credential is not None,
+                "has_credential": (
+                    self._credentials.get(environment_id) is not None
+                    if keep_credential
+                    else credential is not None
+                ),
                 "default_query": default_query,
                 "default_range_minutes": default_range_minutes,
             }
         )
         self._rows[environment_id] = updated
-        self._ciphertexts[environment_id] = credential
+        if not keep_credential:
+            self._credentials[environment_id] = credential
         return updated
 
     async def delete_by_environment_id(self, environment_id):
         self._rows.pop(environment_id, None)
-        self._ciphertexts.pop(environment_id, None)
+        self._credentials.pop(environment_id, None)
 
 
 class FakeAlertRuleRepo(AbstractAlertRuleRepository):
@@ -419,9 +414,7 @@ class TestCreateLokiConfig:
         )
 
         assert config.has_credential is True
-        stored_ciphertext = uow.loki_configs._ciphertexts[env_id]
-        assert stored_ciphertext != "raw-token"
-        assert FernetCodec.decrypt(stored_ciphertext, key=TEST_FERNET_KEY) == "raw-token"
+        assert uow.loki_configs._credentials[env_id] == "raw-token"
         assert uow.commits == 1
         assert len(audit_api.events) == 1
         assert audit_api.events[0]["actor"].email == ACTOR_EMAIL
@@ -466,7 +459,7 @@ class TestUpdateLokiConfig:
             endpoint_url="http://loki:3100",
             tenant_id="tenant-a",
             auth_type=LokiAuthType.BEARER,
-            credential=FernetCodec.encrypt("old-token", key=TEST_FERNET_KEY),
+            credential="old-token",
             default_query="{}",
             default_range_minutes=60,
         )
@@ -477,8 +470,7 @@ class TestUpdateLokiConfig:
         assert updated.default_range_minutes == 120
         assert updated.endpoint_url == "http://loki:3100"
         assert updated.tenant_id == "tenant-a"
-        stored_ciphertext = uow.loki_configs._ciphertexts[env_id]
-        assert FernetCodec.decrypt(stored_ciphertext, key=TEST_FERNET_KEY) == "old-token"
+        assert uow.loki_configs._credentials[env_id] == "old-token"
 
     async def test_switching_to_none_auth_clears_credential(self) -> None:
         uow = FakeObservabilityUnitOfWork()
@@ -488,7 +480,7 @@ class TestUpdateLokiConfig:
             endpoint_url="http://loki:3100",
             tenant_id=None,
             auth_type=LokiAuthType.BEARER,
-            credential=FernetCodec.encrypt("old-token", key=TEST_FERNET_KEY),
+            credential="old-token",
             default_query="",
             default_range_minutes=60,
         )
@@ -497,7 +489,7 @@ class TestUpdateLokiConfig:
         updated = await use_case.execute(env_id, auth_type=LokiAuthType.NONE, actor=_actor())
 
         assert updated.has_credential is False
-        assert uow.loki_configs._ciphertexts[env_id] is None
+        assert uow.loki_configs._credentials[env_id] is None
 
     async def test_rotating_credential_re_encrypts(self) -> None:
         uow = FakeObservabilityUnitOfWork()
@@ -507,7 +499,7 @@ class TestUpdateLokiConfig:
             endpoint_url="http://loki:3100",
             tenant_id=None,
             auth_type=LokiAuthType.BEARER,
-            credential=FernetCodec.encrypt("old-token", key=TEST_FERNET_KEY),
+            credential="old-token",
             default_query="",
             default_range_minutes=60,
         )
@@ -515,8 +507,7 @@ class TestUpdateLokiConfig:
 
         await use_case.execute(env_id, credential="new-token", actor=_actor())
 
-        stored_ciphertext = uow.loki_configs._ciphertexts[env_id]
-        assert FernetCodec.decrypt(stored_ciphertext, key=TEST_FERNET_KEY) == "new-token"
+        assert uow.loki_configs._credentials[env_id] == "new-token"
 
 
 class TestDeleteLokiConfig:
@@ -568,7 +559,7 @@ class TestRunLogQuery:
             endpoint_url="http://loki:3100",
             tenant_id="tenant-a",
             auth_type=LokiAuthType.BEARER,
-            credential=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            credential="tok",
             default_query="",
             default_range_minutes=60,
         )
@@ -594,7 +585,7 @@ class TestRunLogQuery:
             endpoint_url="http://loki:3100",
             tenant_id=None,
             auth_type=LokiAuthType.BASIC,
-            credential=FernetCodec.encrypt("user:pass", key=TEST_FERNET_KEY),
+            credential="user:pass",
             default_query="",
             default_range_minutes=60,
         )
@@ -741,8 +732,7 @@ class TestResolveLokiAuthHeader:
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
-        ciphertext = FernetCodec.encrypt("tok", key=TEST_FERNET_KEY)
-        assert LokiAuthHelper.resolve_loki_auth_header(config, ciphertext) == "Bearer tok"
+        assert LokiAuthHelper.resolve_loki_auth_header(config, "tok") == "Bearer tok"
 
     def test_basic_builds_base64_header(self) -> None:
         config = LokiConfigRead(
@@ -757,11 +747,10 @@ class TestResolveLokiAuthHeader:
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
-        ciphertext = FernetCodec.encrypt("user:pass", key=TEST_FERNET_KEY)
-        header = LokiAuthHelper.resolve_loki_auth_header(config, ciphertext)
+        header = LokiAuthHelper.resolve_loki_auth_header(config, "user:pass")
         assert header is not None and header.startswith("Basic ")
 
-    def test_missing_ciphertext_returns_none_even_if_auth_type_set(self) -> None:
+    def test_missing_credential_returns_none_even_if_auth_type_set(self) -> None:
         config = LokiConfigRead(
             id=uuid4(),
             environment_id=uuid4(),
@@ -793,7 +782,7 @@ class TestStreamLogTail:
             endpoint_url="http://loki:3100",
             tenant_id="tenant-a",
             auth_type=LokiAuthType.BEARER,
-            credential=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            credential="tok",
             default_query="",
             default_range_minutes=60,
         )

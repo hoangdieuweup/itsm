@@ -26,8 +26,8 @@ class RunLogQuery(AbstractUseCase):
         if config is None:
             raise LokiConfigNotFound()
 
-        ciphertext = await self._uow.loki_configs.get_credential_ciphertext(environment_id)
-        auth_header = LokiAuthHelper.resolve_loki_auth_header(config, ciphertext)
+        credential = await self._uow.loki_configs.get_credential(environment_id)
+        auth_header = LokiAuthHelper.resolve_loki_auth_header(config, credential)
 
         clamped_limit = min(limit, ObservabilityLimits.MAX_QUERY_LIMIT)
         return await self._client.query_range(

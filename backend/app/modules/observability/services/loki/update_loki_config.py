@@ -11,10 +11,8 @@ from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
-from app.core.crypto import FernetCodec
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
-from app.modules.observability.config import observability_settings
 from app.modules.observability.constants import LokiAuthType, ObservabilityAuditActions
 from app.modules.observability.exceptions import LokiConfigNotFound
 from app.modules.observability.schemas import LokiConfigRead
@@ -46,19 +44,15 @@ class UpdateLokiConfig(AbstractUseCase):
 
         new_auth_type = auth_type if auth_type is not None else existing.auth_type
 
-        if new_auth_type == LokiAuthType.NONE:
-            ciphertext = None
-        elif credential is not None:
-            ciphertext = FernetCodec.encrypt(credential, key=observability_settings.FERNET_KEY)
-        else:
-            ciphertext = await self._uow.loki_configs.get_credential_ciphertext(environment_id)
+        keep_credential = new_auth_type != LokiAuthType.NONE and credential is None
 
         config = await self._uow.loki_configs.update_by_environment_id(
             environment_id,
             endpoint_url=endpoint_url if endpoint_url is not None else existing.endpoint_url,
             tenant_id=tenant_id if tenant_id is not None else existing.tenant_id,
             auth_type=new_auth_type,
-            credential=ciphertext,
+            credential=None if new_auth_type == LokiAuthType.NONE else credential,
+            keep_credential=keep_credential,
             default_query=default_query if default_query is not None else existing.default_query,
             default_range_minutes=(
                 default_range_minutes if default_range_minutes is not None else existing.default_range_minutes

@@ -1,4 +1,10 @@
-from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationFailedError
+from app.core.exceptions import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    SecretUnreadableError,
+    ValidationFailedError,
+)
 from app.modules.observability.constants import ErrorCode
 
 
@@ -98,3 +104,12 @@ class CloudflarePolicyNotFound(Exception):
     receiver's own handler; a webhook whose policy_id matches nothing logs a
     warning and returns 200, it never surfaces this as an HTTP error to
     Cloudflare."""
+
+
+class LokiCredentialUnreadable(SecretUnreadableError):
+    """Raised when a stored Loki credential can't be decrypted with the current
+    OBSERVABILITY__FERNET_KEY — it was saved under a different key, or no valid key
+    is set. An admin has to re-enter it in the environment's Loki settings."""
+
+    code = ErrorCode.CREDENTIAL_UNREADABLE
+    message = "Stored Loki credential cannot be decrypted with the current key"
