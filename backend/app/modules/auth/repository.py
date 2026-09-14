@@ -12,12 +12,12 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from uuid import UUID
 
-from cryptography.fernet import InvalidToken
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database, helper
 from app.core.crypto import FernetCodec
+from app.core.exceptions import SecretUnreadableError
 from app.integrations.dx_core.client import DxTokenSet
 from app.modules.auth.config import auth_settings
 from app.modules.auth.exceptions import DxTokenUnreadable
@@ -110,5 +110,5 @@ class DxTokenRepository(AbstractDxTokenRepository):
         DxTokenUnreadable when it was encrypted under another key or no valid key is set."""
         try:
             return FernetCodec.decrypt(ciphertext, key=auth_settings.DX_TOKEN_FERNET_KEY.get_secret_value())
-        except (InvalidToken, ValueError) as exc:
+        except SecretUnreadableError as exc:
             raise DxTokenUnreadable() from exc
