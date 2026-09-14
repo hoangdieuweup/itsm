@@ -4,10 +4,8 @@ from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
-from app.core.crypto import FernetCodec
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import CloudflareAccountAuditActions
 from app.modules.cloudflare.exceptions import CloudflareAccountNotFound
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
@@ -28,10 +26,9 @@ class RevealCloudflareAccountToken(AbstractUseCase):
         account = await self._uow.accounts.get_by_id(account_id)
         if account is None:
             raise CloudflareAccountNotFound()
-        ciphertext = await self._uow.accounts.get_token_ciphertext(account_id)
-        if ciphertext is None:
+        credentials = await self._uow.accounts.get_credentials(account_id)
+        if credentials is None:
             raise CloudflareAccountNotFound()
-        plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
 
         await self._audit_api.log_event(
             type=AuditEventType.AUDIT,
@@ -41,4 +38,4 @@ class RevealCloudflareAccountToken(AbstractUseCase):
             message=f"Cloudflare account '{account.label}' token revealed",
             actor=AuditActor(user_id=actor_id, email=actor_email),
         )
-        return plaintext
+        return credentials.api_token

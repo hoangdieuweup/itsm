@@ -7,9 +7,7 @@ from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
-from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.client import CloudflareClient
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import TunnelStatus
 from app.modules.cloudflare.exceptions import CloudflareConfigNotFound, CloudflareTunnelNotFound
 from app.modules.cloudflare.rules import TunnelOwnershipRules
@@ -33,16 +31,14 @@ class RefreshTunnelStatus(AbstractUseCase):
         ):
             raise CloudflareTunnelNotFound()
 
-        ciphertext = await self._uow.accounts.get_token_ciphertext(config.cloudflare_account_id)
-        if ciphertext is None:
-            raise CloudflareConfigNotFound()
-        plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
-        account = await self._uow.accounts.get_by_id(config.cloudflare_account_id)
-        if account is None:
+        credentials = await self._uow.accounts.get_credentials(config.cloudflare_account_id)
+        if credentials is None:
             raise CloudflareConfigNotFound()
 
         connections = await self._client.list_tunnel_connections(
-            cf_account_id=account.cf_account_id, cf_tunnel_id=tunnel.cf_tunnel_id, api_token=plaintext
+            cf_account_id=credentials.cf_account_id,
+            cf_tunnel_id=tunnel.cf_tunnel_id,
+            api_token=credentials.api_token,
         )
         status = TunnelStatus.HEALTHY if connections else TunnelStatus.DOWN
 

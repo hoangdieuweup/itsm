@@ -14,13 +14,14 @@ from uuid import UUID
 from fastapi import Depends
 
 from app.core.base.markers import facade
-from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.client import CloudflareClient
 from app.integrations.cloudflare.dependencies import get_cloudflare_client
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import CloudflareWebhookDefaults, DriftKind, ManagedBy
 from app.modules.cloudflare.dependencies import get_uow, require_account_access
-from app.modules.cloudflare.exceptions import CloudflareAccountNotFound
+from app.modules.cloudflare.exceptions import (
+    CloudflareAccountNotFound,
+    CloudflareWebhookSecretUnreadable,
+)
 from app.modules.cloudflare.schemas import (
     CloudflareConfigRead,
     DnsReconciliationDiff,
@@ -39,6 +40,7 @@ __all__ = [
     "TunnelDriftEntry",
     "DriftKind",
     "CloudflareApi",
+    "CloudflareWebhookSecretUnreadable",
     "get_cloudflare_api",
     "require_account_access",
 ]
@@ -63,16 +65,14 @@ class CloudflareApi:
         config = await self._uow.configs.get_by_environment_id(environment_id)
         if config is None:
             return None
-        account = await self._uow.accounts.get_by_id(config.cloudflare_account_id)
-        ciphertext = await self._uow.accounts.get_token_ciphertext(config.cloudflare_account_id)
-        if account is None or ciphertext is None:
+        credentials = await self._uow.accounts.get_credentials(config.cloudflare_account_id)
+        if credentials is None:
             return None
-        plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
         return ReadyCloudflareClient(
             client=self._client,
-            cf_account_id=account.cf_account_id,
-            api_token=plaintext,
-            cloudflare_account_id=account.id,
+            cf_account_id=credentials.cf_account_id,
+            api_token=credentials.api_token,
+            cloudflare_account_id=credentials.account_id,
             zone_id=config.zone_id,
         )
 
@@ -82,16 +82,14 @@ class CloudflareApi:
         lookup, since some routes (e.g. available-alerts) are account-scoped
         with no environment anywhere in their path. Returns None if the
         account doesn't exist or has no stored token."""
-        account = await self._uow.accounts.get_by_id(cloudflare_account_id)
-        ciphertext = await self._uow.accounts.get_token_ciphertext(cloudflare_account_id)
-        if account is None or ciphertext is None:
+        credentials = await self._uow.accounts.get_credentials(cloudflare_account_id)
+        if credentials is None:
             return None
-        plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
         return ReadyCloudflareClient(
             client=self._client,
-            cf_account_id=account.cf_account_id,
-            api_token=plaintext,
-            cloudflare_account_id=account.id,
+            cf_account_id=credentials.cf_account_id,
+            api_token=credentials.api_token,
+            cloudflare_account_id=credentials.account_id,
         )
 
     @facade
@@ -104,30 +102,25 @@ class CloudflareApi:
         id immediately afterward for create_policy's mechanisms.webhooks.
         The secret is a separate, read-only concern (get_webhook_secret
         below), fetched only by the webhook-auth verification path."""
-        existing_id, _existing_ciphertext = await self._uow.accounts.get_webhook_destination_ciphertext(
-            cloudflare_account_id
-        )
+        existing_id = await self._uow.accounts.get_webhook_destination_id(cloudflare_account_id)
         if existing_id:
             return existing_id
 
-        account = await self._uow.accounts.get_by_id(cloudflare_account_id)
-        ciphertext = await self._uow.accounts.get_token_ciphertext(cloudflare_account_id)
-        if account is None or ciphertext is None:
+        credentials = await self._uow.accounts.get_credentials(cloudflare_account_id)
+        if credentials is None:
             raise CloudflareAccountNotFound()
-        plaintext_token = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
         secret = secrets.token_urlsafe(32)
         destination_id = await self._client.create_webhook_destination(
-            cf_account_id=account.cf_account_id,
-            api_token=plaintext_token,
+            cf_account_id=credentials.cf_account_id,
+            api_token=credentials.api_token,
             name=CloudflareWebhookDefaults.DESTINATION_NAME,
             url=webhook_url,
             secret=secret,
         )
-        secret_ciphertext = FernetCodec.encrypt(secret, key=cloudflare_settings.FERNET_KEY)
         await self._uow.accounts.set_webhook_destination(
             cloudflare_account_id,
             cf_webhook_destination_id=destination_id,
-            secret_ciphertext=secret_ciphertext,
+            secret=secret,
         )
         await self._uow.commit()
         return destination_id
@@ -137,13 +130,9 @@ class CloudflareApi:
         """Read-only: the decrypted webhook secret for this account, or None
         if no destination has ever been registered. Used exclusively by
         verify_cloudflare_webhook_secret — never registers anything, unlike
-        ensure_webhook_destination."""
-        _existing_id, existing_ciphertext = await self._uow.accounts.get_webhook_destination_ciphertext(
-            cloudflare_account_id
-        )
-        if existing_ciphertext is None:
-            return None
-        return FernetCodec.decrypt(existing_ciphertext, key=cloudflare_settings.FERNET_KEY)
+        ensure_webhook_destination. Raises CloudflareWebhookSecretUnreadable when
+        the stored secret was encrypted under a different key."""
+        return await self._uow.accounts.get_webhook_secret(cloudflare_account_id)
 
     @facade
     async def list_bound_configs(self) -> list[CloudflareConfigRead]:

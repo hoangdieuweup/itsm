@@ -9,10 +9,8 @@ from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
-from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.client import CloudflareClient
 from app.integrations.cloudflare.schemas import CloudflareTrafficStats
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.exceptions import (
     CloudflareAccountNotFound,
     CloudflareConfigNotFound,
@@ -45,20 +43,16 @@ class GetCloudflareTrafficStats(AbstractUseCase):
         if hostname is None:
             raise EnvironmentBaseUrlNotConfigured()
 
-        account = await self._uow.accounts.get_by_id(config.cloudflare_account_id)
-        if account is None:
+        credentials = await self._uow.accounts.get_credentials(config.cloudflare_account_id)
+        if credentials is None:
             raise CloudflareAccountNotFound()
-        ciphertext = await self._uow.accounts.get_token_ciphertext(config.cloudflare_account_id)
-        if ciphertext is None:
-            raise CloudflareAccountNotFound()
-        plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
 
         resolved_until = until or datetime.now(UTC)
         resolved_since = since or (resolved_until - DEFAULT_RANGE)
 
         return await self._client.get_zone_traffic_stats(
             zone_id=config.zone_id,
-            api_token=plaintext,
+            api_token=credentials.api_token,
             hostname=hostname,
             since=resolved_since,
             until=resolved_until,

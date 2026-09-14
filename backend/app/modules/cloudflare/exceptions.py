@@ -8,6 +8,7 @@ from app.core.exceptions import (
     ForbiddenError,
     IntegrationError,
     NotFoundError,
+    SecretUnreadableError,
     ValidationFailedError,
 )
 from app.modules.cloudflare.constants import ErrorCode
@@ -177,3 +178,21 @@ class TunnelIngressSyncFailed(IntegrationError):
 
     code = ErrorCode.TUNNEL_INGRESS_SYNC_FAILED
     message = "Cloudflare was updated but the local record failed to save — check logs for details"
+
+
+class CloudflareAccountTokenUnreadable(SecretUnreadableError):
+    """Raised when an account's stored API token can't be decrypted with the current
+    CLOUDFLARE__FERNET_KEY — it was saved under a different key, or no valid key is set.
+    An admin has to re-enter the token for that account."""
+
+    code = ErrorCode.ACCOUNT_TOKEN_UNREADABLE
+    message = "Stored Cloudflare API token cannot be decrypted with the current key"
+
+
+class CloudflareWebhookSecretUnreadable(SecretUnreadableError):
+    """Raised when an account's stored webhook secret can't be decrypted. The webhook
+    destination id itself is readable without the key, so alert-rule registration keeps
+    working; only verifying an inbound Cloudflare webhook needs the secret."""
+
+    code = ErrorCode.WEBHOOK_SECRET_UNREADABLE
+    message = "Stored Cloudflare webhook secret cannot be decrypted with the current key"

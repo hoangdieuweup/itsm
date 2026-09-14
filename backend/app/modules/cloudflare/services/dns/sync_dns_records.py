@@ -30,9 +30,7 @@ from uuid import UUID
 
 from app.core.base.markers import helper, use_case
 from app.core.base.use_case import AbstractUseCase
-from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.client import CloudflareClient
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import ManagedBy
 from app.modules.cloudflare.rules import DnsRecordSyncRules, TunnelHostnameRules
 from app.modules.cloudflare.schemas import DnsRecordRead
@@ -61,12 +59,13 @@ class SyncDnsRecords(AbstractUseCase):
         if config is None:
             return await self._uow.dns_records.list_for_environment(environment_id)
 
-        ciphertext = await self._uow.accounts.get_token_ciphertext(config.cloudflare_account_id)
-        if ciphertext is None:
+        credentials = await self._uow.accounts.get_credentials(config.cloudflare_account_id)
+        if credentials is None:
             return await self._uow.dns_records.list_for_environment(environment_id)
-        plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
 
-        cf_records = await self._client.list_dns_records(zone_id=config.zone_id, api_token=plaintext)
+        cf_records = await self._client.list_dns_records(
+            zone_id=config.zone_id, api_token=credentials.api_token
+        )
 
         cf_record_ids: set[str] = set()
         now = datetime.now(UTC)

@@ -40,6 +40,8 @@ class ErrorCode(StrEnum):
     """Stable error codes returned to clients by this module."""
 
     ACCOUNT_NOT_FOUND = "cloudflare_account_not_found"
+    ACCOUNT_TOKEN_UNREADABLE = "cloudflare_account_token_unreadable"
+    WEBHOOK_SECRET_UNREADABLE = "cloudflare_webhook_secret_unreadable"
     MANAGER_NOT_FOUND = "cloudflare_account_manager_not_found"
     INSUFFICIENT_ACCESS = "cloudflare_insufficient_account_access"
     LAST_OWNER_REMOVAL_BLOCKED = "cloudflare_last_owner_removal_blocked"

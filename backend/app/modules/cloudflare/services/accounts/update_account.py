@@ -4,11 +4,9 @@ from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
-from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.client import CloudflareClient
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import CloudflareAccountAuditActions
 from app.modules.cloudflare.exceptions import CloudflareAccountNotFound, InsufficientAccountAccess
 from app.modules.cloudflare.rules import CloudflareAccountRules
@@ -55,12 +53,10 @@ class UpdateCloudflareAccount(AbstractUseCase):
         if not CloudflareAccountRules.satisfies_level(grant.held_level, required):
             raise InsufficientAccountAccess()
 
-        ciphertext = None
         if api_token is not None:
             await self._client.test_connection(cf_account_id=existing.cf_account_id, api_token=api_token)
-            ciphertext = FernetCodec.encrypt(api_token, key=cloudflare_settings.FERNET_KEY)
 
-        account = await self._uow.accounts.update(account_id, label=label, api_token=ciphertext)
+        account = await self._uow.accounts.update(account_id, label=label, api_token=api_token)
         await self._uow.commit()
 
         await self._audit_api.log_event(

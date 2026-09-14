@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import ConfigDict, SkipValidation
+from pydantic import ConfigDict, Field, SkipValidation
 
 from app.core.models import CustomModel, FrozenModel
 from app.integrations.cloudflare.client import CloudflareClient
@@ -20,6 +20,16 @@ class CloudflareAccountRead(FrozenModel):
     created_by: UUID | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class CloudflareCredentials(FrozenModel):
+    """An account's Cloudflare id plus its decrypted API token, for calling the
+    Cloudflare API. Internal only — never returned by a route; api_token stays out
+    of repr so a traceback or log line can't leak it."""
+
+    account_id: UUID
+    cf_account_id: str
+    api_token: str = Field(repr=False)
 
 
 class CloudflareAccountCreate(CustomModel):

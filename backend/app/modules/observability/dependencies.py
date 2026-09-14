@@ -2,6 +2,7 @@
 depends on an Abstract* contract."""
 
 import hmac
+import logging
 from uuid import UUID
 
 from fastapi import Depends, Header
@@ -12,7 +13,11 @@ from app.integrations.loki.client import LokiClient
 from app.integrations.loki.dependencies import get_loki_client
 from app.modules.audit.public import AuditApi, get_audit_api
 from app.modules.auth.public import AuthApi, get_auth_api
-from app.modules.cloudflare.public import CloudflareApi, get_cloudflare_api
+from app.modules.cloudflare.public import (
+    CloudflareApi,
+    CloudflareWebhookSecretUnreadable,
+    get_cloudflare_api,
+)
 from app.modules.notifications.public import NotificationsApi, get_notifications_api
 from app.modules.observability.config import observability_settings
 from app.modules.observability.constants import ObservabilityDefaults
@@ -45,6 +50,8 @@ from app.modules.observability.uow import AbstractObservabilityUnitOfWork, Obser
 from app.modules.projects.public import ProjectsApi, get_projects_api
 from app.modules.rbac.public import RbacApi, get_rbac_api
 from app.modules.users.public import UserRead
+
+logger = logging.getLogger(__name__)
 
 
 async def get_uow(session: AsyncSession = Depends(get_session)) -> ObservabilityUnitOfWork:
@@ -178,8 +185,14 @@ async def verify_cloudflare_webhook_secret(
     """Reject unless cf-webhook-auth matches the secret stored for this
     account (Decision #5 — the path segment is what resolves WHICH secret
     to check, never a body/payload field). Uses CloudflareApi.get_webhook_secret
-    (Task 5) — the read-only counterpart of ensure_webhook_destination."""
-    stored_secret = await cloudflare_api.get_webhook_secret(cloudflare_account_id)
+    (Task 5) — the read-only counterpart of ensure_webhook_destination. A stored
+    secret that can't be decrypted is rejected like a wrong one: the caller is
+    Cloudflare, not a user who could act on a 409."""
+    try:
+        stored_secret = await cloudflare_api.get_webhook_secret(cloudflare_account_id)
+    except CloudflareWebhookSecretUnreadable:
+        logger.warning("stored cloudflare webhook secret unreadable account_id=%s", cloudflare_account_id)
+        raise InvalidWebhookSecret() from None
     if not stored_secret or not cf_webhook_auth or not hmac.compare_digest(cf_webhook_auth, stored_secret):
         raise InvalidWebhookSecret()
 
