@@ -1,6 +1,6 @@
 """Single access path to the notification_channels table. Owns the only
-place secret sub-fields within `config` get encrypted (on write) and
-masked (on read)."""
+place secret sub-fields within `config` get encrypted (on write), masked
+(on read) and decrypted (for the send path)."""
 
 from abc import abstractmethod
 from uuid import UUID
@@ -11,9 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
 from app.core.crypto import FernetCodec
+from app.core.exceptions import SecretUnreadableError
 from app.modules.notifications.config import notifications_settings
 from app.modules.notifications.constants import NotificationChannelSecrets, NotificationChannelType
-from app.modules.notifications.exceptions import NotificationChannelNotFound
+from app.modules.notifications.exceptions import (
+    NotificationChannelNotFound,
+    NotificationChannelSecretUnreadable,
+)
 from app.modules.notifications.models import NotificationChannel
 from app.modules.notifications.schemas import NotificationChannelRead
 
@@ -53,10 +57,10 @@ class AbstractNotificationChannelRepository(AbstractRepository[NotificationChann
         raise NotImplementedError
 
     @abstractmethod
-    async def get_config_ciphertext_fields(self, channel_id: UUID) -> dict:
-        """Returns the raw stored config (secret sub-field still ciphertext,
-        everything else plaintext) — for the send path only, bypassing
-        NotificationChannelRead's masking entirely."""
+    async def get_dispatch_config(self, channel_id: UUID) -> dict:
+        """Returns the stored config with this type's secret sub-field decrypted —
+        for the send path only, bypassing NotificationChannelRead's masking
+        entirely. Empty dict when the channel doesn't exist."""
         raise NotImplementedError
 
 
@@ -89,6 +93,24 @@ class NotificationChannelRepository(AbstractNotificationChannelRepository):
             config[secret_field], key=notifications_settings.FERNET_KEY
         )
         return encrypted
+
+    @staticmethod
+    @helper
+    def _decrypt_config(channel_type: NotificationChannelType, config: dict) -> dict:
+        """Mirror of _encrypt_config for the send path: decrypts this type's secret
+        sub-field, leaving every other key as-is. Raises
+        NotificationChannelSecretUnreadable when the stored value needs another key."""
+        secret_field = NotificationChannelSecrets.FIELDS_BY_TYPE.get(channel_type)
+        if secret_field is None or secret_field not in config:
+            return dict(config)
+        decrypted = dict(config)
+        try:
+            decrypted[secret_field] = FernetCodec.decrypt(
+                config[secret_field], key=notifications_settings.FERNET_KEY
+            )
+        except SecretUnreadableError as exc:
+            raise NotificationChannelSecretUnreadable() from exc
+        return decrypted
 
     @classmethod
     @helper
@@ -184,6 +206,6 @@ class NotificationChannelRepository(AbstractNotificationChannelRepository):
             await self._session.flush()
 
     @database
-    async def get_config_ciphertext_fields(self, channel_id: UUID) -> dict:
+    async def get_dispatch_config(self, channel_id: UUID) -> dict:
         row = await self._session.get(NotificationChannel, channel_id)
-        return dict(row.config) if row is not None else {}
+        return self._decrypt_config(row.type, row.config) if row is not None else {}

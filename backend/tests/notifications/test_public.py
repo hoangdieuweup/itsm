@@ -21,7 +21,7 @@ class FakeChannelsRepo:
     async def get_by_id(self, channel_id):
         return self._channel
 
-    async def get_config_ciphertext_fields(self, channel_id):
+    async def get_dispatch_config(self, channel_id):
         return self._raw_config
 
 

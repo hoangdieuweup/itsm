@@ -1,4 +1,9 @@
-from app.core.exceptions import ForbiddenError, NotFoundError, ValidationFailedError
+from app.core.exceptions import (
+    ForbiddenError,
+    NotFoundError,
+    SecretUnreadableError,
+    ValidationFailedError,
+)
 from app.modules.notifications.constants import ErrorCode
 
 
@@ -41,3 +46,12 @@ class NotificationPermissionDenied(ForbiddenError):
 
     code = ErrorCode.PERMISSION_DENIED
     message = "Missing permission"
+
+
+class NotificationChannelSecretUnreadable(SecretUnreadableError):
+    """Raised when a channel's stored secret (Telegram bot token, Base.vn webhook URL)
+    can't be decrypted with the current NOTIFICATIONS__FERNET_KEY. An admin has to
+    re-enter it on the channel."""
+
+    code = ErrorCode.SECRET_UNREADABLE
+    message = "Stored notification channel secret cannot be decrypted with the current key"

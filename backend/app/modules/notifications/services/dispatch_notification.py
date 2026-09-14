@@ -6,12 +6,10 @@ both the test-send endpoint and cross-module incident notifications
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
-from app.core.crypto import FernetCodec
 from app.integrations.base_vn.client import BaseVnClient
 from app.integrations.email.client import EmailClient
 from app.integrations.email.config import email_settings
 from app.integrations.telegram.client import TelegramClient
-from app.modules.notifications.config import notifications_settings
 from app.modules.notifications.constants import NotificationChannelType
 from app.modules.notifications.exceptions import SmtpNotConfigured, UnsupportedChannelType
 from app.modules.notifications.rules import NotificationRules
@@ -38,22 +36,18 @@ class DispatchNotification(AbstractUseCase):
         if channel.type == NotificationChannelType.OTHER:
             raise UnsupportedChannelType()
 
-        raw_config = await self._uow.channels.get_config_ciphertext_fields(channel.id)
+        config = await self._uow.channels.get_dispatch_config(channel.id)
 
         if channel.type == NotificationChannelType.TELEGRAM:
-            bot_token = FernetCodec.decrypt(raw_config["bot_token"], key=notifications_settings.FERNET_KEY)
             await self._telegram_client.send_message(
-                bot_token=bot_token, chat_id=raw_config["chat_id"], text=text
+                bot_token=config["bot_token"], chat_id=config["chat_id"], text=text
             )
         elif channel.type == NotificationChannelType.EMAIL:
             if not email_settings.SMTP_HOST:
                 raise SmtpNotConfigured()
             await self._email_client.send(
-                recipients=raw_config["recipients"], subject="ITSM Notification", body=text
+                recipients=config["recipients"], subject="ITSM Notification", body=text
             )
         elif channel.type == NotificationChannelType.BASE_VN:
-            webhook_url = FernetCodec.decrypt(
-                raw_config["webhook_url"], key=notifications_settings.FERNET_KEY
-            )
-            content = NotificationRules.render_base_content(raw_config.get("message_template", ""), text)
-            await self._base_vn_client.send(webhook_url=webhook_url, base_content=content)
+            content = NotificationRules.render_base_content(config.get("message_template", ""), text)
+            await self._base_vn_client.send(webhook_url=config["webhook_url"], base_content=content)

@@ -7,13 +7,17 @@ from collections.abc import AsyncIterator
 from uuid import uuid4
 
 import pytest
+from cryptography.fernet import Fernet
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.crypto import FernetCodec
 from app.modules.notifications.config import notifications_settings
 from app.modules.notifications.constants import NotificationChannelType
-from app.modules.notifications.exceptions import NotificationChannelNotFound
+from app.modules.notifications.exceptions import (
+    NotificationChannelNotFound,
+    NotificationChannelSecretUnreadable,
+)
 from app.modules.notifications.models import NotificationChannel
 from app.modules.notifications.repository import NotificationChannelRepository
 from app.modules.projects.models import Environment, Project
@@ -94,7 +98,7 @@ class TestNotificationChannelRepository:
         )
         assert created.config == {"recipients": ["a@b.com"]}
 
-    async def test_get_config_ciphertext_fields_returns_raw_secrets(self, _session: AsyncSession) -> None:
+    async def test_get_dispatch_config_decrypts_the_secret(self, _session: AsyncSession) -> None:
         project = await _make_project(_session)
         repo = NotificationChannelRepository(_session)
         created = await repo.create(
@@ -105,9 +109,31 @@ class TestNotificationChannelRepository:
             config={"bot_token": "raw-token", "chat_id": "1"},
         )
 
-        fields = await repo.get_config_ciphertext_fields(created.id)
-        assert FernetCodec.decrypt(fields["bot_token"], key=TEST_FERNET_KEY) == "raw-token"
+        fields = await repo.get_dispatch_config(created.id)
+        assert fields["bot_token"] == "raw-token"
         assert fields["chat_id"] == "1"
+
+    async def test_get_dispatch_config_returns_empty_for_an_unknown_channel(
+        self, _session: AsyncSession
+    ) -> None:
+        assert await NotificationChannelRepository(_session).get_dispatch_config(uuid4()) == {}
+
+    async def test_get_dispatch_config_raises_unreadable_after_a_key_change(
+        self, _session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        project = await _make_project(_session)
+        repo = NotificationChannelRepository(_session)
+        created = await repo.create(
+            project_id=project.id,
+            environment_id=None,
+            type=NotificationChannelType.TELEGRAM,
+            name="Ops",
+            config={"bot_token": "raw-token", "chat_id": "1"},
+        )
+        monkeypatch.setattr(notifications_settings, "FERNET_KEY", Fernet.generate_key().decode())
+
+        with pytest.raises(NotificationChannelSecretUnreadable):
+            await repo.get_dispatch_config(created.id)
 
     async def test_list_for_project_filters_by_environment(self, _session: AsyncSession) -> None:
         project = await _make_project(_session)
@@ -164,8 +190,8 @@ class TestNotificationChannelRepository:
         )
 
         assert updated.config == {"chat_id": "1", "has_bot_token": True}
-        fields = await repo.get_config_ciphertext_fields(created.id)
-        assert FernetCodec.decrypt(fields["bot_token"], key=TEST_FERNET_KEY) == "new-token"
+        fields = await repo.get_dispatch_config(created.id)
+        assert fields["bot_token"] == "new-token"
 
     async def test_delete_removes_row(self, _session: AsyncSession) -> None:
         project = await _make_project(_session)
