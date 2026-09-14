@@ -8,7 +8,7 @@ from uuid import UUID
 from fastapi import Depends
 
 from app.core.base.markers import facade
-from app.modules.users.constants import UsersCacheKeys
+from app.modules.users.constants import UsersCacheKeys, UserStatus
 from app.modules.users.dependencies import get_uow
 from app.modules.users.events import UserCreated
 from app.modules.users.rules import UsersRules
@@ -18,6 +18,7 @@ from app.modules.users.uow import AbstractUsersUnitOfWork
 __all__ = [
     "UserCreated",
     "UserRead",
+    "UserStatus",
     "UsersApi",
     "get_users_api",
 ]

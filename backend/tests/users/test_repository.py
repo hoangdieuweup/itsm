@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.integrations.cache.client import CacheClient
-from app.modules.common.constants import UserStatus
+from app.modules.users.constants import UserStatus
 from app.modules.users.exceptions import UserNotFound
 from app.modules.users.repository import UserRepository
 

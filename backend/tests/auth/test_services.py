@@ -25,7 +25,7 @@ from app.modules.auth.services.logout import LogoutUser
 from app.modules.auth.services.refresh_token import RefreshToken
 from app.modules.auth.services.sync_external_user import SyncExternalUser
 from app.modules.auth.uow import AbstractAuthUnitOfWork
-from app.modules.common.constants import UserStatus
+from app.modules.users.constants import UserStatus
 from app.modules.users.public import UserRead, UsersApi
 
 
