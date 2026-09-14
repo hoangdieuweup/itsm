@@ -1,5 +1,10 @@
 {
   "errors": {
+    "secret_unreadable": "A saved secret can't be decrypted with the current key.",
+    "cloudflare_account_token_unreadable": "The saved Cloudflare API token can't be decrypted. Re-enter the token for this account.",
+    "cloudflare_webhook_secret_unreadable": "The saved Cloudflare webhook secret can't be decrypted.",
+    "loki_credential_unreadable": "The saved Loki credential can't be decrypted. Re-enter it in this environment's Loki settings.",
+    "notification_channel_secret_unreadable": "This channel's saved secret can't be decrypted. Re-enter the bot token or webhook URL.",
     "somethingWentWrong": "Something went wrong",
     "tryAgain": "Try again",
     "unknown": "An unexpected error occurred.",

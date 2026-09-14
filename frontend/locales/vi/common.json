@@ -1,5 +1,10 @@
 {
   "errors": {
+    "secret_unreadable": "Không giải mã được một secret đã lưu bằng key hiện tại.",
+    "cloudflare_account_token_unreadable": "Không giải mã được API token Cloudflare đã lưu. Hãy nhập lại token cho tài khoản này.",
+    "cloudflare_webhook_secret_unreadable": "Không giải mã được secret webhook Cloudflare đã lưu.",
+    "loki_credential_unreadable": "Không giải mã được credential Loki đã lưu. Hãy nhập lại trong cấu hình Loki của môi trường này.",
+    "notification_channel_secret_unreadable": "Không giải mã được secret đã lưu của kênh này. Hãy nhập lại bot token hoặc webhook URL.",
     "somethingWentWrong": "Đã xảy ra lỗi",
     "tryAgain": "Thử lại",
     "unknown": "Đã xảy ra lỗi không xác định.",
