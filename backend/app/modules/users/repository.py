@@ -11,8 +11,7 @@ from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
 from app.core.pagination import PageQuery
 from app.integrations.cache.client import CacheClient
-from app.modules.common.constants import UserStatus
-from app.modules.users.constants import UsersCacheKeys
+from app.modules.users.constants import UsersCacheKeys, UserStatus
 from app.modules.users.exceptions import UserNotFound
 from app.modules.users.models import User
 from app.modules.users.schemas import UserRead

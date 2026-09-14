@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import Field
 
 from app.core.models import FrozenModel
-from app.modules.common.constants import UserStatus
+from app.modules.users.constants import UserStatus
 
 
 class UserRead(FrozenModel):

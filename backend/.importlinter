@@ -7,7 +7,6 @@ type = forbidden
 source_modules =
     app.modules.rbac
     app.modules.users
-    app.modules.common
 forbidden_modules =
     app.modules.auth.repository
     app.modules.auth.models
@@ -22,7 +21,6 @@ type = forbidden
 source_modules =
     app.modules.auth
     app.modules.users
-    app.modules.common
     app.modules.cloudflare
     app.modules.observability
     app.modules.notifications
@@ -39,7 +37,6 @@ type = forbidden
 source_modules =
     app.modules.auth
     app.modules.rbac
-    app.modules.common
     app.modules.cloudflare
     app.modules.observability
     app.modules.notifications
@@ -58,7 +55,6 @@ source_modules =
     app.modules.auth
     app.modules.rbac
     app.modules.users
-    app.modules.common
     app.modules.cloudflare
     app.modules.observability
     app.modules.notifications
@@ -77,7 +73,6 @@ source_modules =
     app.modules.rbac
     app.modules.users
     app.modules.projects
-    app.modules.common
     app.modules.cloudflare
     app.modules.observability
     app.modules.notifications
@@ -94,7 +89,6 @@ source_modules =
     app.modules.users
     app.modules.projects
     app.modules.audit
-    app.modules.common
     app.modules.observability
 forbidden_modules =
     app.modules.cloudflare.repository
@@ -113,7 +107,6 @@ source_modules =
     app.modules.projects
     app.modules.audit
     app.modules.cloudflare
-    app.modules.common
 forbidden_modules =
     app.modules.observability.repository
     app.modules.observability.models
@@ -132,7 +125,6 @@ source_modules =
     app.modules.audit
     app.modules.cloudflare
     app.modules.observability
-    app.modules.common
 forbidden_modules =
     app.modules.notifications.repository
     app.modules.notifications.models
@@ -140,16 +132,6 @@ forbidden_modules =
     app.modules.notifications.services
 allow_indirect_imports = True
 
-[importlinter:contract:common-is-a-leaf-module]
-name = common is a promotion target, not a hub — it never imports another domain module
-type = forbidden
-source_modules =
-    app.modules.common
-forbidden_modules =
-    app.modules.auth
-    app.modules.rbac
-    app.modules.users
-allow_indirect_imports = True
 
 [importlinter:contract:root-is-mechanism]
 name = The root holds mechanism and never imports a module

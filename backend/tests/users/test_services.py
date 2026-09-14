@@ -3,8 +3,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.modules.common.constants import UserStatus
 from app.modules.users.config import users_settings
+from app.modules.users.constants import UserStatus
 from app.modules.users.exceptions import CannotBlockLastAdmin, CannotModifyProtectedAdmin
 from app.modules.users.repository import AbstractUserRepository
 from app.modules.users.schemas import UserRead

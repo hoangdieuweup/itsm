@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.pagination import PageQuery
-from app.modules.common.constants import UserStatus
+from app.modules.users.constants import UserStatus
 from app.modules.users.models import User
 
 

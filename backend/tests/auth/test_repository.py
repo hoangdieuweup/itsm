@@ -15,7 +15,7 @@ from app.integrations.dx_core.client import DxTokenSet
 from app.modules.auth.config import auth_settings
 from app.modules.auth.exceptions import DxTokenUnreadable
 from app.modules.auth.repository import DxTokenRepository
-from app.modules.common.constants import UserStatus
+from app.modules.users.constants import UserStatus
 from app.modules.users.models import User
 
 
