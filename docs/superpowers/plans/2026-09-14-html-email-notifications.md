@@ -482,3 +482,29 @@ Update the docstring to say the text part is set first so a client that can't re
 - **Placeholders:** none — every step carries the code or the exact command.
 - **Type consistency:** `NotificationKind`, `NotificationEvent`, `NotificationTemplates`, `NotificationTemplateDefaults`, `subject`, `render_html`, `render_text`, `severity_label` and `EmailClient.send(html=...)` are spelled the same in every task.
 - **Risk noted:** `StrictUndefined` turns a missing i18n key into a test failure rather than a blank cell in a sent email — deliberate, and Task 1's coverage test exists to catch it early.
+
+## Execution Notes (2026-09-14)
+
+Branch `feature/html-email-notifications`, from `develop` at `6801234`:
+
+| Commit | Task |
+|---|---|
+| `6981d03` | design |
+| `bd211f1` | plan, and Jinja2 added |
+| `41285dc` | 1 — event, templates, loader |
+| `475a307` | 2 — email HTML alternative |
+| `c6f22bb` | 3 and 4 — per-channel rendering, the facade and both webhooks |
+
+**Results.** Backend 772 tests passed, up from 743 at the branch point. ruff check and format clean, lint-imports 10/10, `check_module_boundaries.py --strict` clean, OpenAPI still 65 paths. GitNexus `check --cycles` found no circular imports; `detect-changes --scope compare --base-ref develop` reports 25 files, 146 symbols, no affected processes, low risk. Two checks beyond the gates: the image was built and the six template files were confirmed under `app/modules/notifications/templates` inside the container, and the loader was exercised with the working directory set to `/`, proving it resolves its templates from `__file__`.
+
+**Where the plan was wrong:**
+
+- **Tasks 3 and 4 have no green state between them.** The plan said Task 3 would end with `pytest tests/notifications` passing, but changing `DispatchNotification.execute`'s signature breaks `NotificationsApi.dispatch` the moment it lands — it still handed over a string. They were committed together as `c6f22bb`. A task boundary has to fall where the suite can actually be green.
+- **Task 4's red step did not go red.** Passing a `NotificationEvent` into `dispatch(channel_id, message: str)` runs fine, because Python does not enforce annotations. The real failing evidence was `AttributeError: 'str' object has no attribute 'kind'` from `test_dispatches_to_email` during Task 3.
+- **The fakes needed more than the plan listed.** `FakeProjectsApi` had no `get_project_by_id`, and 23 environment stubs carried no `name`; the webhooks now read both.
+
+**Also worth recording:** a loader assertion originally read `assert source.value not in html or source.value == "CLOUDFLARE"`. That `or` made the Cloudflare case vacuous, so it was tightened to `assert html.count(source.value) == 0` before Task 1 was committed.
+
+**Not verified here:** no email was sent through a real SMTP relay, and the HTML has not been opened in Gmail or Outlook. It uses a table layout with inline styles for that reason, since mail clients drop `<style>` blocks, but that is reasoning, not evidence.
+
+**Still out of scope, unchanged:** acknowledge, resolve and drift reconciliation write audit entries and send nothing.
