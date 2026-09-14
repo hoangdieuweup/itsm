@@ -7,10 +7,10 @@ from uuid import uuid4
 import pytest
 
 from app.integrations.email.config import email_settings
-from app.modules.notifications.constants import NotificationChannelType
+from app.modules.notifications.constants import NotificationChannelType, NotificationKind
 from app.modules.notifications.exceptions import NotificationChannelNotFound
 from app.modules.notifications.public import NotificationsApi
-from app.modules.notifications.schemas import NotificationChannelRead
+from app.modules.notifications.schemas import NotificationChannelRead, NotificationEvent
 
 
 class FakeChannelsRepo:
@@ -34,8 +34,16 @@ class FakeEmailClient:
     def __init__(self) -> None:
         self.sent = []
 
-    async def send(self, *, recipients, subject, body):
-        self.sent.append((recipients, subject, body))
+    async def send(self, *, recipients, subject, body, html=None):
+        self.sent.append((recipients, subject, body, html))
+
+
+def _event() -> NotificationEvent:
+    return NotificationEvent(
+        kind=NotificationKind.INCIDENT_DETECTED,
+        title="DDoS trên example.com",
+        severity="CRITICAL",
+    )
 
 
 def _email_channel(channel_id) -> NotificationChannelRead:
@@ -68,7 +76,7 @@ class TestDispatch:
             base_vn_client=None,
         )
         with pytest.raises(NotificationChannelNotFound):
-            await api.dispatch(uuid4(), "hello")
+            await api.dispatch(uuid4(), _event())
 
     async def test_dispatches_to_email(self) -> None:
         channel = _email_channel(uuid4())
@@ -79,5 +87,11 @@ class TestDispatch:
             email_client=email_client,
             base_vn_client=None,
         )
-        await api.dispatch(channel.id, "hello")
-        assert email_client.sent == [(["a@b.com"], "ITSM Notification", "hello")]
+        await api.dispatch(channel.id, _event())
+
+        recipients, subject, body, html = email_client.sent[0]
+        assert recipients == ["a@b.com"]
+        assert "DDoS trên example.com" in subject
+        assert "DDoS trên example.com" in body
+        assert "<" not in body
+        assert "<table" in html

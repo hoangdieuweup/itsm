@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="vi" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>{{ heading }}</title>
+  <!--[if mso]><style>table,td{font-family:Arial,Helvetica,sans-serif!important}</style><![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#1a1d23;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;">
+
+  <!-- Outer wrapper for centering -->
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f0f2f5;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+
+        <!-- Main card -->
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:580px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08),0 4px 12px rgba(0,0,0,0.04);">
+
+          <!-- Top accent bar -->
+          <tr>
+            <td style="height:4px;background:linear-gradient(90deg,#2563eb 0%,#7c3aed 100%);font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+
+          <!-- Header -->
+          <tr>
+            <td style="padding:24px 32px 20px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td>
+                    <span style="display:inline-block;font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:#6366f1;">ITSM</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding-top:8px;">
+                    <span style="font-size:20px;font-weight:700;color:#111827;line-height:1.3;">{{ heading }}</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding:0 32px;">
+              <div style="height:1px;background-color:#e5e7eb;"></div>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:24px 32px 28px;">
+{% block body %}{% endblock %}
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:0 32px;">
+              <div style="height:1px;background-color:#e5e7eb;"></div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px 24px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td>
+                    <span style="font-size:12px;color:#9ca3af;line-height:1.5;">{{ labels.footer }}</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Main card -->
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

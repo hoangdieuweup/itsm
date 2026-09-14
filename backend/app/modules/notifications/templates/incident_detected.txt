@@ -1,0 +1,28 @@
+{{ heading }}
+
+{{ event.title }}
+{% if event.severity %}
+{{ labels.severity }}: {{ severity_label }}
+{% endif %}
+{% if event.category %}
+{{ labels.category }}: {{ category_label }}
+{% endif %}
+{% if event.source %}
+{{ labels.source }}: {{ source_label }}
+{% endif %}
+{% if event.project_name %}
+{{ labels.project }}: {{ event.project_name }}
+{% endif %}
+{% if event.environment_name %}
+{{ labels.environment }}: {{ event.environment_name }}
+{% endif %}
+{% if event.rule_name %}
+{{ labels.rule }}: {{ event.rule_name }}
+{% endif %}
+{% if detected_at %}
+{{ labels.detected_at }}: {{ detected_at }}
+{% endif %}
+{% if event.incident_url %}
+
+{{ labels.view_incident }}: {{ event.incident_url }}
+{% endif %}

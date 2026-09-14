@@ -40,3 +40,26 @@ class TestSend:
             mock_send.side_effect = SMTPConnectError("refused")
             with pytest.raises(EmailApiUnavailable):
                 await EmailClient().send(recipients=["a@b.com"], subject="Test", body="Hello")
+
+
+class TestHtmlAlternative:
+    async def test_sends_both_parts_with_text_first(self) -> None:
+        """A client that can't render HTML must still find something to show, so the
+        text part is set before the HTML alternative is added."""
+        with patch("app.integrations.email.client.aiosmtplib.send", new_callable=AsyncMock) as mock_send:
+            mock_send.return_value = ({}, "OK")
+            await EmailClient().send(
+                recipients=["a@b.com"], subject="Test", body="Xin chào", html="<p>Xin chào</p>"
+            )
+
+        message = mock_send.await_args.args[0]
+        assert message.get_content_type() == "multipart/alternative"
+        assert [part.get_content_subtype() for part in message.iter_parts()] == ["plain", "html"]
+
+    async def test_stays_single_part_without_html(self) -> None:
+        with patch("app.integrations.email.client.aiosmtplib.send", new_callable=AsyncMock) as mock_send:
+            mock_send.return_value = ({}, "OK")
+            await EmailClient().send(recipients=["a@b.com"], subject="Test", body="Xin chào")
+
+        message = mock_send.await_args.args[0]
+        assert message.get_content_type() == "text/plain"

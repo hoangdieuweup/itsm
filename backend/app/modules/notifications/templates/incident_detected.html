@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block body %}
+          <!-- Incident title -->
+          <p style="margin:0 0 20px;font-size:17px;font-weight:600;line-height:1.5;color:#111827;">{{ event.title }}</p>
+
+          <!-- Detail card -->
+          <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f9fafb;border-radius:12px;border:1px solid #e5e7eb;">
+{% if event.severity %}
+            <tr>
+              <td style="padding:14px 20px;border-bottom:1px solid #e5e7eb;" colspan="2">
+                <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                  <tr>
+                    <td style="font-size:13px;color:#6b7280;line-height:1.4;">{{ labels.severity }}</td>
+                    <td align="right">
+{% if event.severity == "CRITICAL" %}
+                      <span style="display:inline-block;padding:4px 12px;font-size:12px;font-weight:700;color:#991b1b;background-color:#fef2f2;border:1px solid #fecaca;border-radius:20px;letter-spacing:0.3px;">⬤ {{ severity_label }}</span>
+{% elif event.severity == "HIGH" %}
+                      <span style="display:inline-block;padding:4px 12px;font-size:12px;font-weight:700;color:#c2410c;background-color:#fff7ed;border:1px solid #fed7aa;border-radius:20px;letter-spacing:0.3px;">⬤ {{ severity_label }}</span>
+{% elif event.severity == "MEDIUM" %}
+                      <span style="display:inline-block;padding:4px 12px;font-size:12px;font-weight:700;color:#a16207;background-color:#fefce8;border:1px solid #fef08a;border-radius:20px;letter-spacing:0.3px;">⬤ {{ severity_label }}</span>
+{% else %}
+                      <span style="display:inline-block;padding:4px 12px;font-size:12px;font-weight:700;color:#15803d;background-color:#f0fdf4;border:1px solid #bbf7d0;border-radius:20px;letter-spacing:0.3px;">⬤ {{ severity_label }}</span>
+{% endif %}
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+{% endif %}
+{% if event.category %}
+            <tr>
+              <td style="padding:12px 20px;color:#6b7280;font-size:13px;width:42%;border-bottom:1px solid #e5e7eb;">{{ labels.category }}</td>
+              <td style="padding:12px 20px;font-size:14px;font-weight:500;color:#1f2937;border-bottom:1px solid #e5e7eb;">{{ category_label }}</td>
+            </tr>
+{% endif %}
+{% if event.source %}
+            <tr>
+              <td style="padding:12px 20px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">{{ labels.source }}</td>
+              <td style="padding:12px 20px;font-size:14px;font-weight:500;color:#1f2937;border-bottom:1px solid #e5e7eb;">{{ source_label }}</td>
+            </tr>
+{% endif %}
+{% if event.project_name %}
+            <tr>
+              <td style="padding:12px 20px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">{{ labels.project }}</td>
+              <td style="padding:12px 20px;font-size:14px;font-weight:500;color:#1f2937;border-bottom:1px solid #e5e7eb;">{{ event.project_name }}</td>
+            </tr>
+{% endif %}
+{% if event.environment_name %}
+            <tr>
+              <td style="padding:12px 20px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">{{ labels.environment }}</td>
+              <td style="padding:12px 20px;font-size:14px;font-weight:500;color:#1f2937;border-bottom:1px solid #e5e7eb;">
+                <span style="display:inline-block;padding:2px 10px;font-size:12px;font-weight:600;color:#4338ca;background-color:#eef2ff;border-radius:6px;">{{ event.environment_name }}</span>
+              </td>
+            </tr>
+{% endif %}
+{% if event.rule_name %}
+            <tr>
+              <td style="padding:12px 20px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">{{ labels.rule }}</td>
+              <td style="padding:12px 20px;font-size:14px;font-weight:500;color:#1f2937;border-bottom:1px solid #e5e7eb;">{{ event.rule_name }}</td>
+            </tr>
+{% endif %}
+{% if detected_at %}
+            <tr>
+              <td style="padding:12px 20px;color:#6b7280;font-size:13px;">{{ labels.detected_at }}</td>
+              <td style="padding:12px 20px;font-size:14px;color:#374151;">
+                <span style="font-family:'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;color:#4b5563;">{{ detected_at }}</span>
+              </td>
+            </tr>
+{% endif %}
+          </table>
+
+{% if event.incident_url %}
+          <!-- CTA button -->
+          <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top:28px;">
+            <tr>
+              <td align="center">
+                <!--[if mso]>
+                <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ event.incident_url }}" style="height:44px;v-text-anchor:middle;width:220px;" arcsize="18%" fillcolor="#4f46e5">
+                  <w:anchorlock/>
+                  <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;">{{ labels.view_incident }} →</center>
+                </v:roundrect>
+                <![endif]-->
+                <!--[if !mso]><!-->
+                <a href="{{ event.incident_url }}" style="display:inline-block;padding:12px 28px;background:linear-gradient(135deg,#4f46e5 0%,#6366f1 100%);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:10px;box-shadow:0 2px 4px rgba(79,70,229,0.3);letter-spacing:0.2px;">{{ labels.view_incident }}&nbsp;&nbsp;→</a>
+                <!--<![endif]-->
+              </td>
+            </tr>
+          </table>
+{% endif %}
+{% endblock %}
