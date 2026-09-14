@@ -3,11 +3,12 @@
 from abc import abstractmethod
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database
 from app.core.base.repository import AbstractRepository
+from app.core.pagination import PageQuery
 from app.modules.cloudflare.exceptions import CloudflareConfigNotFound
 from app.modules.cloudflare.models import CloudflareConfig
 from app.modules.cloudflare.schemas import CloudflareConfigRead
@@ -82,12 +83,14 @@ class CloudflareConfigRepository(AbstractCloudflareConfigRepository):
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[CloudflareConfigRead], int]:
         """Required by AbstractRepository; bindings are looked up per-environment in practice."""
-        rows = await self._session.scalars(
-            select(CloudflareConfig).order_by(CloudflareConfig.id).limit(limit).offset(offset)
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            CloudflareConfig,
+            limit=limit,
+            offset=offset,
+            order_by=CloudflareConfig.id,
         )
-        items = [CloudflareConfigRead.model_validate(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(CloudflareConfig))
-        return items, total or 0
+        return [CloudflareConfigRead.model_validate(row) for row in rows], total
 
     @database
     async def get_by_environment_id(self, environment_id: UUID) -> CloudflareConfigRead | None:

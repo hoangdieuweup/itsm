@@ -3,11 +3,12 @@
 from abc import abstractmethod
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database
 from app.core.base.repository import AbstractRepository
+from app.core.pagination import PageQuery
 from app.modules.projects.constants import ProjectLinkType
 from app.modules.projects.exceptions import ProjectLinkNotFound
 from app.modules.projects.models import ProjectLink
@@ -56,12 +57,14 @@ class ProjectLinkRepository(AbstractProjectLinkRepository):
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[ProjectLinkRead], int]:
         """Required by AbstractRepository; links are listed per-project in practice (list_for_project)."""
-        rows = await self._session.scalars(
-            select(ProjectLink).order_by(ProjectLink.id).limit(limit).offset(offset)
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            ProjectLink,
+            limit=limit,
+            offset=offset,
+            order_by=ProjectLink.id,
         )
-        items = [ProjectLinkRead.model_validate(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(ProjectLink))
-        return items, total or 0
+        return [ProjectLinkRead.model_validate(row) for row in rows], total
 
     @database
     async def list_for_project(self, project_id: UUID) -> list[ProjectLinkRead]:

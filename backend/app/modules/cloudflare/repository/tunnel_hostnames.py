@@ -5,11 +5,12 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import delete as sa_delete
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database
 from app.core.base.repository import AbstractRepository
+from app.core.pagination import PageQuery
 from app.modules.cloudflare.constants import ManagedBy
 from app.modules.cloudflare.exceptions import TunnelPublicHostnameNotFound
 from app.modules.cloudflare.models import TunnelPublicHostname
@@ -102,12 +103,14 @@ class TunnelHostnameRepository(AbstractTunnelHostnameRepository):
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[TunnelPublicHostnameRead], int]:
         """Required by AbstractRepository; hostnames are listed per-tunnel in practice."""
-        rows = await self._session.scalars(
-            select(TunnelPublicHostname).order_by(TunnelPublicHostname.id).limit(limit).offset(offset)
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            TunnelPublicHostname,
+            limit=limit,
+            offset=offset,
+            order_by=TunnelPublicHostname.id,
         )
-        items = [TunnelPublicHostnameRead.model_validate(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(TunnelPublicHostname))
-        return items, total or 0
+        return [TunnelPublicHostnameRead.model_validate(row) for row in rows], total
 
     @database
     async def list_for_tunnel(

@@ -3,11 +3,12 @@
 from abc import abstractmethod
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
+from app.core.pagination import PageQuery
 from app.integrations.cache.client import CacheClient
 from app.modules.projects.constants import ProjectsCacheKeys
 from app.modules.projects.exceptions import ProjectNotFound
@@ -63,10 +64,14 @@ class ProjectRepository(AbstractProjectRepository):
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[ProjectRead], int]:
         """Return one page of projects together with the total count."""
-        rows = await self._session.scalars(select(Project).order_by(Project.id).limit(limit).offset(offset))
-        items = [ProjectRead.model_validate(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(Project))
-        return items, total or 0
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            Project,
+            limit=limit,
+            offset=offset,
+            order_by=Project.id,
+        )
+        return [ProjectRead.model_validate(row) for row in rows], total
 
     @database
     async def create(self, *, name: str, description: str | None, created_by: UUID | None) -> ProjectRead:

@@ -3,13 +3,14 @@
 from abc import abstractmethod
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
 from app.core.crypto import FernetCodec
 from app.core.exceptions import SecretUnreadableError
+from app.core.pagination import PageQuery
 from app.modules.observability.config import observability_settings
 from app.modules.observability.constants import LokiAuthType
 from app.modules.observability.exceptions import LokiConfigNotFound, LokiCredentialUnreadable
@@ -108,12 +109,14 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[LokiConfigRead], int]:
         """Required by AbstractRepository; configs are looked up per-environment in practice."""
-        rows = await self._session.scalars(
-            select(LokiConfig).order_by(LokiConfig.id).limit(limit).offset(offset)
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            LokiConfig,
+            limit=limit,
+            offset=offset,
+            order_by=LokiConfig.id,
         )
-        items = [self._to_read(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(LokiConfig))
-        return items, total or 0
+        return [self._to_read(row) for row in rows], total
 
     @database
     async def get_by_environment_id(self, environment_id: UUID) -> LokiConfigRead | None:

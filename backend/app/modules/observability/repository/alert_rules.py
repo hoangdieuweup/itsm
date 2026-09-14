@@ -3,11 +3,12 @@
 from abc import abstractmethod
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
+from app.core.pagination import PageQuery
 from app.modules.observability.constants import (
     AlertRuleSource,
     AlertSeverity,
@@ -85,12 +86,14 @@ class AlertRuleRepository(AbstractAlertRuleRepository):
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[AlertRuleRead], int]:
         """Required by AbstractRepository; alert rules are looked up per-environment in practice."""
-        rows = await self._session.scalars(
-            select(AlertRule).order_by(AlertRule.created_at).limit(limit).offset(offset)
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            AlertRule,
+            limit=limit,
+            offset=offset,
+            order_by=AlertRule.created_at,
         )
-        items = [await self._to_read(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(AlertRule))
-        return items, total or 0
+        return [await self._to_read(row) for row in rows], total
 
     @database
     async def get_by_cf_policy_id(self, cf_policy_id: str) -> AlertRuleRead | None:

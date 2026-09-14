@@ -5,13 +5,14 @@ place secret sub-fields within `config` get encrypted (on write), masked
 from abc import abstractmethod
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
 from app.core.crypto import FernetCodec
 from app.core.exceptions import SecretUnreadableError
+from app.core.pagination import PageQuery
 from app.modules.notifications.config import notifications_settings
 from app.modules.notifications.constants import NotificationChannelSecrets, NotificationChannelType
 from app.modules.notifications.exceptions import (
@@ -134,12 +135,14 @@ class NotificationChannelRepository(AbstractNotificationChannelRepository):
 
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[NotificationChannelRead], int]:
-        rows = await self._session.scalars(
-            select(NotificationChannel).order_by(NotificationChannel.id).limit(limit).offset(offset)
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            NotificationChannel,
+            limit=limit,
+            offset=offset,
+            order_by=NotificationChannel.id,
         )
-        items = [self._to_read(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(NotificationChannel))
-        return items, total or 0
+        return [self._to_read(row) for row in rows], total
 
     @database
     async def list_for_project(

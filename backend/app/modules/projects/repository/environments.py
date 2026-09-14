@@ -3,11 +3,12 @@
 from abc import abstractmethod
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
+from app.core.pagination import PageQuery
 from app.integrations.cache.client import CacheClient
 from app.modules.projects.constants import EnvironmentType, ProjectsCacheKeys
 from app.modules.projects.exceptions import EnvironmentNotFound
@@ -77,12 +78,14 @@ class EnvironmentRepository(AbstractEnvironmentRepository):
     async def list_page(self, limit: int, offset: int) -> tuple[list[EnvironmentRead], int]:
         """Required by AbstractRepository; environments are listed per-project
         in practice (list_for_project)."""
-        rows = await self._session.scalars(
-            select(Environment).order_by(Environment.id).limit(limit).offset(offset)
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            Environment,
+            limit=limit,
+            offset=offset,
+            order_by=Environment.id,
         )
-        items = [EnvironmentRead.model_validate(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(Environment))
-        return items, total or 0
+        return [EnvironmentRead.model_validate(row) for row in rows], total
 
     @database
     async def list_for_project(self, project_id: UUID) -> list[EnvironmentRead]:

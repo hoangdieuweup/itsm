@@ -3,13 +3,14 @@
 from abc import abstractmethod
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
 from app.core.crypto import FernetCodec
 from app.core.exceptions import SecretUnreadableError
+from app.core.pagination import PageQuery
 from app.integrations.cache.client import CacheClient
 from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import CloudflareAccountsCacheKeys
@@ -110,12 +111,14 @@ class CloudflareAccountRepository(AbstractCloudflareAccountRepository):
     async def list_page(self, limit: int, offset: int) -> tuple[list[CloudflareAccountRead], int]:
         """Required by AbstractRepository; the router never lists unfiltered —
         see list_for_ids, which backs the actual GET /cloudflare-accounts route."""
-        rows = await self._session.scalars(
-            select(CloudflareAccount).order_by(CloudflareAccount.id).limit(limit).offset(offset)
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            CloudflareAccount,
+            limit=limit,
+            offset=offset,
+            order_by=CloudflareAccount.id,
         )
-        items = [CloudflareAccountRead.model_validate(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(CloudflareAccount))
-        return items, total or 0
+        return [CloudflareAccountRead.model_validate(row) for row in rows], total
 
     @database
     async def list_all(self) -> list[CloudflareAccountRead]:
