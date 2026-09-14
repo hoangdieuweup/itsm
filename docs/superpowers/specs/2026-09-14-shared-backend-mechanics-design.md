@@ -46,8 +46,8 @@ All of these subclass `SecretUnreadableError` (409) and are raised by the owning
 
 | Repository | Change |
 |---|---|
-| `cloudflare` accounts | `create/update(api_token=<plaintext>)`. `get_token_ciphertext` becomes `get_api_token` (see also `get_credentials`, §3). `get_webhook_destination_ciphertext` becomes `get_webhook_destination` and returns `(destination_id, secret)`. `set_webhook_destination(secret=<plaintext>)`. |
-| `observability` Loki configs | `create/update(credential=<plaintext>)`. `get_credential_ciphertext` becomes `get_credential`. `LokiAuthHelper.resolve_loki_auth_header` takes the plaintext credential. |
+| `cloudflare` accounts | `create/update(api_token=<plaintext>)`. `get_token_ciphertext` is replaced by `get_credentials` (§3). `get_webhook_destination_ciphertext` is split into `get_webhook_destination_id`, which never decrypts so registering alert rules keeps working when the secret is unreadable, and `get_webhook_secret`. `set_webhook_destination(secret=<plaintext>)`. |
+| `observability` Loki configs | `create/update(credential=<plaintext>)`; `update_by_environment_id` gains `keep_credential`, so an update that doesn't touch the credential never decrypts it. `get_credential_ciphertext` becomes `get_credential`. `LokiAuthHelper.resolve_loki_auth_header` takes the plaintext credential. |
 | `notifications` channels | Already encrypts on write. `get_config_ciphertext_fields` becomes `get_dispatch_config`, which returns the config with its secret field decrypted. |
 | `auth` DX tokens | `_decrypt` catches `SecretUnreadableError` instead of `InvalidToken`/`ValueError`. |
 
@@ -60,7 +60,7 @@ Services and `cloudflare/public.py` stop importing `FernetCodec` and the module 
 
 ### Frontend
 
-The four new codes go into `common.errors` (en, vi) and ask an admin to re-enter the token or credential. `useApiErrorMessage` falls back to `common.errors`, so the Cloudflare, log viewer and notifications pages all show them.
+The four module codes and the generic `secret_unreadable` go into `common.errors` (en, vi) and ask an admin to re-enter the token or credential. `useApiErrorMessage` falls back to `common.errors`, so the Cloudflare, log viewer and notifications pages all show them.
 
 There are no data or schema changes and no migration.
 
@@ -79,14 +79,14 @@ There are no data or schema changes and no migration.
 
 ### Pagination
 
-- `app/core/pagination.py` gains `PageQuery.fetch_rows(session, model, *, limit, offset, order_by=None) -> tuple[list[row], int]`. It runs the same two queries the repositories run today.
+- `app/core/pagination.py` gains `PageQuery.fetch_rows(session, model, *, limit, offset, order_by=None, options=()) -> tuple[list[row], int]`; `options` carries `rbac`'s `selectinload(Role.permissions)`. It runs the same two queries the repositories run today.
 - The 17 plain `list_page` implementations call it and keep their own row-to-schema mapping (`model_validate`, `_load_many`, `_to_read`).
 - `incidents` (filtered) and `audit` (MongoDB) keep their own implementations.
 
 ## 3. Cloudflare credentials
 
 - `CloudflareAccountRepository.get_credentials(account_id)` returns `CloudflareCredentials(account_id, cf_account_id, api_token)` or `None`.
-  - It reads the account through the existing cache-aside `get_by_id` and decrypts the token.
+  - It reads the account row once, never through the cache, so the token never enters it, and decrypts the token.
   - It raises `CloudflareAccountTokenUnreadable` when the token can't be decrypted.
 - `CloudflareCredentials` is an internal schema that is never returned by the API. `api_token` is declared with `repr=False`.
 - The 25 services replace their five-to-eight-line lookup with one call and a `None` check. Each keeps the error it raises today (mostly `CloudflareAccountNotFound` or `CloudflareConfigNotFound`), so HTTP behaviour does not change. `create_account` and `update_account` pass the plaintext token to the repository instead of encrypting it themselves.
