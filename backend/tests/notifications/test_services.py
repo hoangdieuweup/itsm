@@ -6,8 +6,9 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from app.integrations.email.config import email_settings
 from app.integrations.telegram.exceptions import TelegramApiUnavailable
-from app.modules.notifications.constants import NotificationChannelType
+from app.modules.notifications.constants import NotificationChannelType, NotificationKind
 from app.modules.notifications.exceptions import (
     InvalidChannelConfig,
     NotificationChannelNotFound,
@@ -15,9 +16,10 @@ from app.modules.notifications.exceptions import (
     UnsupportedChannelType,
 )
 from app.modules.notifications.repository import AbstractNotificationChannelRepository
-from app.modules.notifications.schemas import NotificationChannelRead
+from app.modules.notifications.schemas import NotificationChannelRead, NotificationEvent
 from app.modules.notifications.services.create_channel import CreateNotificationChannel
 from app.modules.notifications.services.delete_channel import DeleteNotificationChannel
+from app.modules.notifications.services.dispatch_notification import DispatchNotification
 from app.modules.notifications.services.get_channel import GetNotificationChannel
 from app.modules.notifications.services.test_send_channel import TestSendNotificationChannel
 from app.modules.notifications.services.update_channel import UpdateNotificationChannel
@@ -120,6 +122,22 @@ class FakeTelegramClient:
         self.calls.append(kwargs)
         if self._raises is not None:
             raise self._raises
+
+
+class FakeEmailClient:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    async def send(self, **kwargs) -> None:
+        self.calls.append(kwargs)
+
+
+class FakeBaseVnClient:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    async def send(self, **kwargs) -> None:
+        self.calls.append(kwargs)
 
 
 class TestCreateNotificationChannel:
@@ -316,7 +334,8 @@ class TestTestSendNotificationChannel:
 
         assert telegram_client.calls[0]["bot_token"] == "real-token"
         assert telegram_client.calls[0]["chat_id"] == "chat-1"
-        assert telegram_client.calls[0]["text"] == "hello"
+        assert "hello" in telegram_client.calls[0]["text"]
+        assert "<" not in telegram_client.calls[0]["text"]
         assert any(e["action"] == "NOTIFICATION_CHANNEL_TEST_SENT" for e in audit_api.events)
 
     async def test_telegram_send_failure_still_audits(self) -> None:
@@ -346,3 +365,83 @@ class TestTestSendNotificationChannel:
             await use_case.execute(channel.id, message="hello", actor=_actor())
 
         assert any(e["action"] == "NOTIFICATION_CHANNEL_TEST_SENT" for e in audit_api.events)
+
+
+class TestDispatchNotificationPerChannel:
+    """DispatchNotification renders the event once and hands each channel the
+    format it can show: HTML plus text for email, text for the rest."""
+
+    async def _channel(self, uow, channel_type, config):
+        project_id = uuid4()
+        return await CreateNotificationChannel(
+            uow, FakeProjectsApi({project_id: object()}), FakeAuditApi()
+        ).execute(
+            project_id=project_id,
+            environment_id=None,
+            type=channel_type,
+            name="Kênh",
+            config=config,
+            actor=_actor(),
+        )
+
+    def _event(self) -> NotificationEvent:
+        return NotificationEvent(
+            kind=NotificationKind.INCIDENT_DETECTED,
+            title="DDoS trên example.com",
+            severity="CRITICAL",
+            project_name="Cổng thanh toán",
+            environment_name="Production",
+        )
+
+    async def test_email_gets_a_subject_and_both_bodies(self, monkeypatch) -> None:
+        monkeypatch.setattr(email_settings, "SMTP_HOST", "smtp.test")
+        uow = FakeNotificationsUnitOfWork()
+        channel = await self._channel(uow, NotificationChannelType.EMAIL, {"recipients": ["a@b.com"]})
+        email_client = FakeEmailClient()
+        use_case = DispatchNotification(
+            uow, telegram_client=FakeTelegramClient(), email_client=email_client, base_vn_client=None
+        )
+
+        await use_case.execute(channel, self._event())
+
+        call = email_client.calls[0]
+        assert call["recipients"] == ["a@b.com"]
+        assert "Nghiêm trọng" in call["subject"]
+        assert "DDoS trên example.com" in call["subject"]
+        assert "<" not in call["body"]
+        assert "Cổng thanh toán" in call["body"]
+        assert "<table" in call["html"]
+        assert "Cổng thanh toán" in call["html"]
+
+    async def test_telegram_gets_plain_text_only(self) -> None:
+        uow = FakeNotificationsUnitOfWork()
+        channel = await self._channel(
+            uow, NotificationChannelType.TELEGRAM, {"bot_token": "tok", "chat_id": "1"}
+        )
+        telegram_client = FakeTelegramClient()
+        use_case = DispatchNotification(
+            uow, telegram_client=telegram_client, email_client=None, base_vn_client=None
+        )
+
+        await use_case.execute(channel, self._event())
+
+        assert "DDoS trên example.com" in telegram_client.calls[0]["text"]
+        assert "<" not in telegram_client.calls[0]["text"]
+
+    async def test_base_vn_still_runs_through_the_channel_template(self) -> None:
+        uow = FakeNotificationsUnitOfWork()
+        channel = await self._channel(
+            uow,
+            NotificationChannelType.BASE_VN,
+            {"webhook_url": "https://base.vn/x", "message_template": "[ITSM] {message}"},
+        )
+        base_vn_client = FakeBaseVnClient()
+        use_case = DispatchNotification(
+            uow, telegram_client=None, email_client=None, base_vn_client=base_vn_client
+        )
+
+        await use_case.execute(channel, self._event())
+
+        content = base_vn_client.calls[0]["base_content"]
+        assert content.startswith("[ITSM]")
+        assert "DDoS trên example.com" in content

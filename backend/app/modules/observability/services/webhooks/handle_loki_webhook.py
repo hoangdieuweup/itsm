@@ -9,11 +9,17 @@ aborts the rest."""
 import logging
 from uuid import UUID
 
+from app.config import settings
 from app.core.base.markers import helper, use_case
 from app.core.base.use_case import AbstractUseCase
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
-from app.modules.notifications.public import NotificationsApi
+from app.modules.notifications.public import (
+    NotificationEvent,
+    NotificationKind,
+    NotificationsApi,
+    NotificationTemplateDefaults,
+)
 from app.modules.observability.constants import (
     AlertingAuditActions,
     AlertingLimits,
@@ -100,9 +106,24 @@ class HandleLokiWebhook(AbstractUseCase):
             environment_id=incident.environment_id,
             incident_id=str(incident.id),
         )
+        project = await self._projects_api.get_project_by_id(incident.project_id)
+        event = NotificationEvent(
+            kind=NotificationKind.INCIDENT_DETECTED,
+            title=title,
+            severity=incident.severity.value,
+            category=incident.category.value,
+            source=incident.source.value,
+            detected_at=incident.detected_at,
+            project_name=project.name if project is not None else None,
+            environment_name=environment.name,
+            rule_name=rule.name,
+            incident_url=(
+                f"{settings.FRONTEND_BASE_URL.rstrip('/')}{NotificationTemplateDefaults.INCIDENT_PATH}"
+            ),
+        )
         for channel_id in await self._uow.alert_rules.list_channel_ids(rule.id):
             try:
-                await self._notifications_api.dispatch(channel_id, title)
+                await self._notifications_api.dispatch(channel_id, event)
                 status = ObservabilityDefaults.NOTIFICATION_STATUS_SENT
             except Exception:  # noqa: BLE001 -- same Decision #7 reasoning as the Cloudflare path
                 logger.warning("notification dispatch failed for channel %s", channel_id, exc_info=True)

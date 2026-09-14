@@ -14,12 +14,20 @@ from app.integrations.email.client import EmailClient
 from app.integrations.email.dependencies import get_email_client
 from app.integrations.telegram.client import TelegramClient
 from app.integrations.telegram.dependencies import get_telegram_client
+from app.modules.notifications.constants import NotificationKind, NotificationTemplateDefaults
 from app.modules.notifications.dependencies import get_uow
 from app.modules.notifications.exceptions import NotificationChannelNotFound
+from app.modules.notifications.schemas import NotificationEvent
 from app.modules.notifications.services.dispatch_notification import DispatchNotification
 from app.modules.notifications.uow import AbstractNotificationsUnitOfWork
 
-__all__ = ["NotificationsApi", "get_notifications_api"]
+__all__ = [
+    "NotificationEvent",
+    "NotificationKind",
+    "NotificationTemplateDefaults",
+    "NotificationsApi",
+    "get_notifications_api",
+]
 
 
 class NotificationsApi:
@@ -39,8 +47,9 @@ class NotificationsApi:
         )
 
     @facade
-    async def dispatch(self, channel_id: UUID, message: str) -> None:
-        """Send `message` through channel_id. Raises NotificationChannelNotFound
+    async def dispatch(self, channel_id: UUID, event: NotificationEvent) -> None:
+        """Send `event` through channel_id, rendered into whatever that channel can
+        show. Raises NotificationChannelNotFound
         if it doesn't exist, or the channel-type-specific send exception on
         failure (EmailRejected, TelegramApiUnavailable, etc.) — the caller
         decides how to handle a failed dispatch (observability's incident
@@ -52,7 +61,7 @@ class NotificationsApi:
         channel = await self._uow.channels.get_by_id(channel_id)
         if channel is None:
             raise NotificationChannelNotFound()
-        await self._dispatch_use_case.execute(channel, message)
+        await self._dispatch_use_case.execute(channel, event)
 
 
 async def get_notifications_api(

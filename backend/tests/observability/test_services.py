@@ -308,12 +308,22 @@ class FakeObservabilityUnitOfWork(AbstractObservabilityUnitOfWork):
 
 
 class FakeProjectsApi:
-    def __init__(self, environments: dict, *, permissions: frozenset[str] = frozenset()) -> None:
+    def __init__(
+        self,
+        environments: dict,
+        *,
+        projects: dict | None = None,
+        permissions: frozenset[str] = frozenset(),
+    ) -> None:
         self._environments = environments
+        self._projects = projects or {}
         self._permissions = permissions
 
     async def get_environment_by_id(self, environment_id):
         return self._environments.get(environment_id)
+
+    async def get_project_by_id(self, project_id):
+        return self._projects.get(project_id)
 
     async def resolve_effective_permissions(self, project_id, user, rbac_api):
         return self._permissions
@@ -893,7 +903,7 @@ class TestCreateAlertRuleCloudflareNative:
             uow,
             cloudflare_api=cloudflare_api,
             loki_client=None,
-            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4())}),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4(), name="Dev")}),
             audit_api=FakeAuditApi(),
         )
 
@@ -924,7 +934,7 @@ class TestCreateAlertRuleCloudflareNative:
             FakeObservabilityUnitOfWork(),
             cloudflare_api=cloudflare_api,
             loki_client=None,
-            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4())}),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4(), name="Dev")}),
             audit_api=FakeAuditApi(),
         )
 
@@ -951,7 +961,7 @@ class TestCreateAlertRuleCloudflareNative:
             FakeObservabilityUnitOfWork(),
             cloudflare_api=cloudflare_api,
             loki_client=None,
-            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4())}),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4(), name="Dev")}),
             audit_api=FakeAuditApi(),
         )
 
@@ -976,7 +986,7 @@ class TestCreateAlertRuleCloudflareNative:
             uow,
             cloudflare_api=cloudflare_api,
             loki_client=None,
-            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4())}),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4(), name="Dev")}),
             audit_api=FakeAuditApi(),
         )
         with pytest.raises(CloudflareNotBoundForAlerting):
@@ -1008,7 +1018,7 @@ class TestCreateAlertRuleCloudflareNative:
             uow,
             cloudflare_api=cloudflare_api,
             loki_client=None,
-            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4())}),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4(), name="Dev")}),
             audit_api=FakeAuditApi(),
         )
         with pytest.raises(CloudflareDnsOperationRejected):
@@ -1053,7 +1063,7 @@ class TestCreateAlertRuleLokiQuery:
             FakeObservabilityUnitOfWork(),
             cloudflare_api=None,
             loki_client=loki_client,
-            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4())}),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=uuid4(), name="Dev")}),
             audit_api=FakeAuditApi(),
         )
         result = await use_case.execute(
@@ -1194,10 +1204,10 @@ class FakeNotificationsApiForWebhook:
         self._raises = raises
         self.dispatched: list[tuple] = []
 
-    async def dispatch(self, channel_id, message):
+    async def dispatch(self, channel_id, event):
         if self._raises:
             raise RuntimeError("dispatch failed")
-        self.dispatched.append((channel_id, message))
+        self.dispatched.append((channel_id, event))
 
 
 _CF_PAYLOAD_BASE = {
@@ -1230,7 +1240,7 @@ class TestHandleCloudflareWebhook:
         use_case = HandleCloudflareWebhook(
             uow,
             notifications_api=notifications_api,
-            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id)}),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id, name="Dev")}),
             audit_api=FakeAuditApi(),
         )
         await use_case.execute(cloudflare_account_id=uuid4(), payload=_CF_PAYLOAD_BASE)
@@ -1268,7 +1278,7 @@ class TestHandleCloudflareWebhook:
         use_case = HandleCloudflareWebhook(
             uow,
             notifications_api=FakeNotificationsApiForWebhook(),
-            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id)}),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id, name="Dev")}),
             audit_api=FakeAuditApi(),
         )
         await use_case.execute(cloudflare_account_id=uuid4(), payload=_CF_PAYLOAD_BASE)
@@ -1288,6 +1298,44 @@ class TestHandleCloudflareWebhook:
         incidents, _ = await uow.incidents.list_page_filtered(limit=10, offset=0)
         assert incidents == []
 
+    async def test_dispatched_event_carries_the_incident_details(self) -> None:
+        """The channels get the incident itself, not just its title — that is what
+        lets the email show severity, project, environment and a link back."""
+        env_id, project_id = uuid4(), uuid4()
+        uow = FakeObservabilityUnitOfWork()
+        rule = await uow.alert_rules.create(
+            environment_id=env_id,
+            name="Cảnh báo DDoS",
+            source=AlertRuleSource.CLOUDFLARE_NATIVE,
+            cf_alert_type="advanced_ddos_attack_l4_alert",
+            severity=AlertSeverity.HIGH,
+        )
+        await uow.alert_rules.set_cf_policy_id(rule.id, cf_policy_id="policy-789")
+        channel_id = uuid4()
+        await uow.alert_rules.set_channels(rule.id, [channel_id])
+        notifications_api = FakeNotificationsApiForWebhook()
+        use_case = HandleCloudflareWebhook(
+            uow,
+            notifications_api=notifications_api,
+            projects_api=FakeProjectsApi(
+                {env_id: SimpleNamespace(id=env_id, project_id=project_id, name="Production")},
+                projects={project_id: SimpleNamespace(id=project_id, name="Cổng thanh toán")},
+            ),
+            audit_api=FakeAuditApi(),
+        )
+
+        await use_case.execute(cloudflare_account_id=uuid4(), payload=_CF_PAYLOAD_BASE)
+
+        dispatched_channel_id, event = notifications_api.dispatched[0]
+        assert dispatched_channel_id == channel_id
+        assert event.title == "DDoS attack detected on zone example.com"
+        assert event.severity == AlertSeverity.HIGH.value
+        assert event.category == IncidentCategory.DDOS.value
+        assert event.environment_name == "Production"
+        assert event.project_name == "Cổng thanh toán"
+        assert event.rule_name == "Cảnh báo DDoS"
+        assert event.incident_url.endswith("/admin/incidents")
+
     async def test_failed_notification_dispatch_does_not_block_incident_creation(self) -> None:
         env_id, project_id = uuid4(), uuid4()
         uow = FakeObservabilityUnitOfWork()
@@ -1304,7 +1352,7 @@ class TestHandleCloudflareWebhook:
         use_case = HandleCloudflareWebhook(
             uow,
             notifications_api=failing_notifications_api,
-            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id)}),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id, name="Dev")}),
             audit_api=FakeAuditApi(),
         )
         await use_case.execute(cloudflare_account_id=uuid4(), payload=_CF_PAYLOAD_BASE)
@@ -1334,7 +1382,7 @@ class TestHandleLokiWebhook:
         use_case = HandleLokiWebhook(
             uow,
             notifications_api=FakeNotificationsApiForWebhook(),
-            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id)}),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id, name="Dev")}),
             audit_api=FakeAuditApi(),
         )
         rule_labels = {**_LOKI_ALERT_BASE["labels"], "app_alert_rule_id": str(rule.id)}
@@ -1386,7 +1434,7 @@ class TestHandleLokiWebhook:
         use_case = HandleLokiWebhook(
             uow,
             notifications_api=FakeNotificationsApiForWebhook(),
-            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id)}),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id, name="Dev")}),
             audit_api=FakeAuditApi(),
         )
         rule_labels = {**_LOKI_ALERT_BASE["labels"], "app_alert_rule_id": str(rule.id)}
@@ -1409,7 +1457,7 @@ class TestHandleLokiWebhook:
         use_case = HandleLokiWebhook(
             uow,
             notifications_api=FakeNotificationsApiForWebhook(),
-            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id)}),
+            projects_api=FakeProjectsApi({env_id: SimpleNamespace(project_id=project_id, name="Dev")}),
             audit_api=FakeAuditApi(),
         )
         good_alert = {
@@ -1512,7 +1560,7 @@ class TestCreateManualIncident:
         use_case = CreateManualIncident(
             FakeObservabilityUnitOfWork(),
             projects_api=FakeProjectsApi(
-                {env_id: SimpleNamespace(project_id=project_id)},
+                {env_id: SimpleNamespace(project_id=project_id, name="Dev")},
                 permissions=frozenset({"project_incident.create"}),
             ),
             rbac_api=object(),
@@ -1550,7 +1598,7 @@ class TestCreateManualIncident:
         use_case = CreateManualIncident(
             FakeObservabilityUnitOfWork(),
             projects_api=FakeProjectsApi(
-                {env_id: SimpleNamespace(project_id=project_id)}, permissions=frozenset()
+                {env_id: SimpleNamespace(project_id=project_id, name="Dev")}, permissions=frozenset()
             ),
             rbac_api=object(),
             audit_api=FakeAuditApi(),
@@ -1573,7 +1621,7 @@ class TestCreateManualIncident:
         use_case = CreateManualIncident(
             FakeObservabilityUnitOfWork(),
             projects_api=FakeProjectsApi(
-                {env_id: SimpleNamespace(project_id=project_id)},
+                {env_id: SimpleNamespace(project_id=project_id, name="Dev")},
                 permissions=frozenset({"project_incident.create"}),
             ),
             rbac_api=object(),
@@ -1673,7 +1721,9 @@ class TestRunDriftReconciliation:
     async def test_new_external_dns_record_creates_high_severity_incident(self) -> None:
         uow = FakeObservabilityUnitOfWork()
         env_id, project_id, account_id = uuid4(), uuid4(), uuid4()
-        projects_api = FakeProjectsApi({env_id: SimpleNamespace(id=env_id, project_id=project_id)})
+        projects_api = FakeProjectsApi(
+            {env_id: SimpleNamespace(id=env_id, project_id=project_id, name="Dev")}
+        )
         cloudflare_api = FakeCloudflareApiForReconciliation(
             configs=[SimpleNamespace(environment_id=env_id, cloudflare_account_id=account_id)],
             dns_diffs={env_id: SimpleNamespace(new_external=[_dns_record("rec-1")], vanished=[])},
@@ -1695,7 +1745,9 @@ class TestRunDriftReconciliation:
     async def test_vanished_dns_record_creates_low_severity_incident(self) -> None:
         uow = FakeObservabilityUnitOfWork()
         env_id, project_id, account_id = uuid4(), uuid4(), uuid4()
-        projects_api = FakeProjectsApi({env_id: SimpleNamespace(id=env_id, project_id=project_id)})
+        projects_api = FakeProjectsApi(
+            {env_id: SimpleNamespace(id=env_id, project_id=project_id, name="Dev")}
+        )
         cloudflare_api = FakeCloudflareApiForReconciliation(
             configs=[SimpleNamespace(environment_id=env_id, cloudflare_account_id=account_id)],
             dns_diffs={env_id: SimpleNamespace(new_external=[], vanished=[_dns_record("rec-gone")])},
@@ -1715,8 +1767,8 @@ class TestRunDriftReconciliation:
         env_a, env_b, project_a, project_b, account_id = uuid4(), uuid4(), uuid4(), uuid4(), uuid4()
         projects_api = FakeProjectsApi(
             {
-                env_a: SimpleNamespace(id=env_a, project_id=project_a),
-                env_b: SimpleNamespace(id=env_b, project_id=project_b),
+                env_a: SimpleNamespace(id=env_a, project_id=project_a, name="Dev"),
+                env_b: SimpleNamespace(id=env_b, project_id=project_b, name="Dev"),
             }
         )
         cloudflare_api = FakeCloudflareApiForReconciliation(
@@ -1768,7 +1820,9 @@ class TestRunDriftReconciliation:
     async def test_deduplicates_against_a_still_open_incident(self) -> None:
         uow = FakeObservabilityUnitOfWork()
         env_id, project_id, account_id = uuid4(), uuid4(), uuid4()
-        projects_api = FakeProjectsApi({env_id: SimpleNamespace(id=env_id, project_id=project_id)})
+        projects_api = FakeProjectsApi(
+            {env_id: SimpleNamespace(id=env_id, project_id=project_id, name="Dev")}
+        )
         cloudflare_api = FakeCloudflareApiForReconciliation(
             configs=[SimpleNamespace(environment_id=env_id, cloudflare_account_id=account_id)],
             dns_diffs={env_id: SimpleNamespace(new_external=[_dns_record("rec-1")], vanished=[])},
@@ -1786,7 +1840,9 @@ class TestRunDriftReconciliation:
     async def test_resolved_incident_does_not_block_a_fresh_one(self) -> None:
         uow = FakeObservabilityUnitOfWork()
         env_id, project_id, account_id = uuid4(), uuid4(), uuid4()
-        projects_api = FakeProjectsApi({env_id: SimpleNamespace(id=env_id, project_id=project_id)})
+        projects_api = FakeProjectsApi(
+            {env_id: SimpleNamespace(id=env_id, project_id=project_id, name="Dev")}
+        )
         cloudflare_api = FakeCloudflareApiForReconciliation(
             configs=[SimpleNamespace(environment_id=env_id, cloudflare_account_id=account_id)],
             dns_diffs={env_id: SimpleNamespace(new_external=[_dns_record("rec-1")], vanished=[])},
@@ -1808,7 +1864,9 @@ class TestRunDriftReconciliation:
     async def test_one_environments_failure_does_not_stop_the_rest_of_the_pass(self) -> None:
         uow = FakeObservabilityUnitOfWork()
         broken_env, healthy_env, project_id, account_id = uuid4(), uuid4(), uuid4(), uuid4()
-        projects_api = FakeProjectsApi({healthy_env: SimpleNamespace(id=healthy_env, project_id=project_id)})
+        projects_api = FakeProjectsApi(
+            {healthy_env: SimpleNamespace(id=healthy_env, project_id=project_id, name="Dev")}
+        )
 
         class FlakyCloudflareApi(FakeCloudflareApiForReconciliation):
             async def reconcile_dns_records(self, environment_id):
@@ -1837,7 +1895,9 @@ class TestRunDriftReconciliation:
         triggered this, so there's no channel list to fan out to."""
         uow = FakeObservabilityUnitOfWork()
         env_id, project_id, account_id = uuid4(), uuid4(), uuid4()
-        projects_api = FakeProjectsApi({env_id: SimpleNamespace(id=env_id, project_id=project_id)})
+        projects_api = FakeProjectsApi(
+            {env_id: SimpleNamespace(id=env_id, project_id=project_id, name="Dev")}
+        )
         cloudflare_api = FakeCloudflareApiForReconciliation(
             configs=[SimpleNamespace(environment_id=env_id, cloudflare_account_id=account_id)],
             dns_diffs={env_id: SimpleNamespace(new_external=[_dns_record("rec-1")], vanished=[])},

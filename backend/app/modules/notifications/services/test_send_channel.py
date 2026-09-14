@@ -12,8 +12,13 @@ from app.integrations.email.client import EmailClient
 from app.integrations.telegram.client import TelegramClient
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
-from app.modules.notifications.constants import NotificationsAuditActions, NotificationsDefaults
+from app.modules.notifications.constants import (
+    NotificationKind,
+    NotificationsAuditActions,
+    NotificationsDefaults,
+)
 from app.modules.notifications.exceptions import NotificationChannelNotFound
+from app.modules.notifications.schemas import NotificationEvent
 from app.modules.notifications.services.dispatch_notification import DispatchNotification
 from app.modules.notifications.uow import AbstractNotificationsUnitOfWork
 from app.modules.users.public import UserRead
@@ -43,9 +48,11 @@ class TestSendNotificationChannel(AbstractUseCase):
         if channel is None:
             raise NotificationChannelNotFound()
 
-        text = message or NotificationsDefaults.TEST_MESSAGE
+        event = NotificationEvent(
+            kind=NotificationKind.TEST, title=message or NotificationsDefaults.TEST_MESSAGE
+        )
         try:
-            await self._dispatch_use_case.execute(channel, text)
+            await self._dispatch_use_case.execute(channel, event)
         finally:
             await self._audit_api.log_event(
                 type=AuditEventType.AUDIT,
