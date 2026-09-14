@@ -24,7 +24,6 @@ def _dx_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(dx_core_settings, "API_BASE_URL", HttpUrl(DX_BASE_URL))
     monkeypatch.setattr(dx_core_settings, "CLIENT_ID", "itsm")
     monkeypatch.setattr(dx_core_settings, "CLIENT_SECRET", "itsm-secret")
-    monkeypatch.setattr(dx_core_settings, "POST_LOGOUT_REDIRECT_URI", "")
 
 
 def _userinfo(*, without: tuple[str, ...] = (), **overrides) -> dict:
@@ -157,17 +156,10 @@ class TestRevoke:
 
 
 class TestBuildLogoutUrl:
-    def test_carries_only_the_client_id_by_default(self) -> None:
-        """Without a requested URI, DX redirects to the one registered for the client."""
+    def test_carries_only_the_client_id(self) -> None:
+        """DX redirects to the post-logout URI registered for the client, so none is sent."""
         url = urlparse(DxCoreClient().build_logout_url())
 
         assert f"{url.scheme}://{url.netloc}" == DX_BASE_URL
         assert url.path == DxEndpoints.LOGOUT
         assert parse_qs(url.query) == {"client_id": ["itsm"]}
-
-    def test_adds_the_configured_post_logout_redirect_uri(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(dx_core_settings, "POST_LOGOUT_REDIRECT_URI", "https://itsm.test/login")
-
-        query = parse_qs(urlparse(DxCoreClient().build_logout_url()).query)
-
-        assert query == {"client_id": ["itsm"], "post_logout_redirect_uri": ["https://itsm.test/login"]}

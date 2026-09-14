@@ -3,9 +3,8 @@
 Names follow docs/tasks/sso-login.md section 3 exactly. CLIENT_ID/CLIENT_SECRET
 default to an empty string only so the settings object can be imported/tested
 without a real .env; DX rejects a blank client once a real call is attempted.
-POST_LOGOUT_REDIRECT_URI is optional: when empty, DxCoreClient.build_logout_url
-leaves it out and DX redirects to the URI registered for this client. The key
-encrypting stored DX tokens belongs to the auth module (AUTH__DX_TOKEN_FERNET_KEY).
+The key encrypting stored DX tokens belongs to the auth module
+(AUTH__DX_TOKEN_FERNET_KEY).
 """
 
 from pydantic import HttpUrl
@@ -21,7 +20,6 @@ class DxCoreConfig(BaseSettings):
     CLIENT_ID: str = ""
     CLIENT_SECRET: str = ""
     SCOPES: str = ""
-    POST_LOGOUT_REDIRECT_URI: str = ""
 
 
 dx_core_settings = DxCoreConfig()
