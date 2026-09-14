@@ -20,6 +20,7 @@ class DxCoreConfig(BaseSettings):
     CLIENT_ID: str = ""
     CLIENT_SECRET: str = ""
     SCOPES: str = ""
+    POST_LOGOUT_REDIRECT_URI: str = ""
     # Fernet key encrypting DxToken.access_token/refresh_token at rest.
     # Generate with:
     #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"

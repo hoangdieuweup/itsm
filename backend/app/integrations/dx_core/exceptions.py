@@ -5,7 +5,8 @@ from app.integrations.dx_core.constants import DxErrorCode
 
 
 class DxCoreUnavailable(IntegrationError):
-    """Raised when the DX OAuth2 server cannot be reached or returns a server error."""
+    """Raised when the DX OAuth2 server cannot be reached, returns a server error,
+    or answers with a body this client can't parse."""
 
     code = DxErrorCode.UNAVAILABLE
     message = "DX core service unavailable"
@@ -23,17 +24,3 @@ class TokenExchangeFailed(IntegrationError):
 
     code = DxErrorCode.TOKEN_EXCHANGE_FAILED
     message = "Failed to exchange authorization code for tokens"
-
-
-class DxNotLinked(ValidationFailedError):
-    """Raised when a user has no dx_tokens row (never completed SSO, or was revoked)."""
-
-    code = DxErrorCode.NOT_LINKED
-    message = "User has no linked DX account"
-
-
-class DxRefreshFailed(IntegrationError):
-    """Raised when DX rejects a refresh token (expired, revoked)."""
-
-    code = DxErrorCode.REFRESH_FAILED
-    message = "Failed to refresh DX access token"
