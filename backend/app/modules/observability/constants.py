@@ -17,6 +17,7 @@ class ObservabilityLimits:
 
 class ErrorCode(StrEnum):
     CONFIG_NOT_FOUND = "loki_config_not_found"
+    CREDENTIAL_UNREADABLE = "loki_credential_unreadable"
     CONFIG_ALREADY_EXISTS = "loki_config_already_exists"
     ENVIRONMENT_NOT_FOUND = "observability_environment_not_found"
     ALERT_RULE_NOT_FOUND = "alert_rule_not_found"

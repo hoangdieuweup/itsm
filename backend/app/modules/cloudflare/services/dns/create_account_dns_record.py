@@ -7,9 +7,7 @@ from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
-from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.client import CloudflareClient
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.exceptions import CloudflareAccountNotFound
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
 
@@ -32,16 +30,12 @@ class CreateAccountDnsRecord(AbstractUseCase):
         proxied: bool = False,
         priority: int | None = None,
     ) -> str:
-        account = await self._uow.accounts.get_by_id(account_id)
-        if account is None:
+        credentials = await self._uow.accounts.get_credentials(account_id)
+        if credentials is None:
             raise CloudflareAccountNotFound()
-        ciphertext = await self._uow.accounts.get_token_ciphertext(account_id)
-        if ciphertext is None:
-            raise CloudflareAccountNotFound()
-        plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
         return await self._client.create_dns_record(
             zone_id=zone_id,
-            api_token=plaintext,
+            api_token=credentials.api_token,
             record_type=record_type,
             name=name,
             content=content,

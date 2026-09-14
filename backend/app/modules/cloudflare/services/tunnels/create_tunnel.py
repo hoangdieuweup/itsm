@@ -8,11 +8,9 @@ from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
-from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.client import CloudflareClient
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import CloudflareTunnelAuditActions
 from app.modules.cloudflare.exceptions import CloudflareConfigNotFound
 from app.modules.cloudflare.schemas import CloudflareTunnelRead
@@ -36,20 +34,17 @@ class CreateCloudflareTunnel(AbstractUseCase):
         if config is None:
             raise CloudflareConfigNotFound()
 
-        ciphertext = await self._uow.accounts.get_token_ciphertext(config.cloudflare_account_id)
-        if ciphertext is None:
-            raise CloudflareConfigNotFound()
-        plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
-
-        account = await self._uow.accounts.get_by_id(config.cloudflare_account_id)
-        if account is None:
+        credentials = await self._uow.accounts.get_credentials(config.cloudflare_account_id)
+        if credentials is None:
             raise CloudflareConfigNotFound()
 
         cf_tunnel_id = await self._client.create_tunnel(
-            cf_account_id=account.cf_account_id, api_token=plaintext, name=name
+            cf_account_id=credentials.cf_account_id, api_token=credentials.api_token, name=name
         )
         token = await self._client.get_tunnel_token(
-            cf_account_id=account.cf_account_id, cf_tunnel_id=cf_tunnel_id, api_token=plaintext
+            cf_account_id=credentials.cf_account_id,
+            cf_tunnel_id=cf_tunnel_id,
+            api_token=credentials.api_token,
         )
 
         tunnel = await self._uow.tunnels.create(

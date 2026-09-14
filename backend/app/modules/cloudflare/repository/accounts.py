@@ -3,16 +3,24 @@
 from abc import abstractmethod
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
+from app.core.crypto import FernetCodec
+from app.core.exceptions import SecretUnreadableError
+from app.core.pagination import PageQuery
 from app.integrations.cache.client import CacheClient
+from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import CloudflareAccountsCacheKeys
-from app.modules.cloudflare.exceptions import CloudflareAccountNotFound
+from app.modules.cloudflare.exceptions import (
+    CloudflareAccountNotFound,
+    CloudflareAccountTokenUnreadable,
+    CloudflareWebhookSecretUnreadable,
+)
 from app.modules.cloudflare.models import CloudflareAccount
-from app.modules.cloudflare.schemas import CloudflareAccountRead
+from app.modules.cloudflare.schemas import CloudflareAccountRead, CloudflareCredentials
 
 
 class AbstractCloudflareAccountRepository(AbstractRepository[CloudflareAccountRead, UUID]):
@@ -22,14 +30,14 @@ class AbstractCloudflareAccountRepository(AbstractRepository[CloudflareAccountRe
     async def create(
         self, *, label: str, cf_account_id: str, api_token: str, created_by: UUID | None
     ) -> CloudflareAccountRead:
-        """Create a new account. api_token must already be Fernet-ciphertext."""
+        """Create a new account. api_token is plaintext; this repository encrypts it."""
         raise NotImplementedError
 
     @abstractmethod
     async def update(
         self, account_id: UUID, *, label: str | None, api_token: str | None
     ) -> CloudflareAccountRead:
-        """Rename and/or rotate the token. api_token, if given, must already be ciphertext."""
+        """Rename and/or rotate the token. api_token, if given, is plaintext."""
         raise NotImplementedError
 
     @abstractmethod
@@ -38,9 +46,9 @@ class AbstractCloudflareAccountRepository(AbstractRepository[CloudflareAccountRe
         raise NotImplementedError
 
     @abstractmethod
-    async def get_token_ciphertext(self, account_id: UUID) -> str | None:
-        """Return the raw (still-encrypted) api_token column, or None if the
-        account doesn't exist. Bypasses the cache-aside CloudflareAccountRead
+    async def get_credentials(self, account_id: UUID) -> CloudflareCredentials | None:
+        """Return the account's Cloudflare id and decrypted API token, or None when
+        the account doesn't exist. Bypasses the cache-aside CloudflareAccountRead
         entirely — a secret never enters the cache."""
         raise NotImplementedError
 
@@ -57,16 +65,22 @@ class AbstractCloudflareAccountRepository(AbstractRepository[CloudflareAccountRe
         raise NotImplementedError
 
     @abstractmethod
-    async def get_webhook_destination_ciphertext(self, account_id: UUID) -> tuple[str | None, str | None]:
-        """Return (cf_webhook_destination_id, webhook_secret_ciphertext), both
-        None if a webhook destination was never registered for this account."""
+    async def get_webhook_destination_id(self, account_id: UUID) -> str | None:
+        """Return the registered cf_webhook_destination_id, or None when a webhook
+        destination was never registered. Never decrypts, so it works without the key."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_webhook_secret(self, account_id: UUID) -> str | None:
+        """Return the decrypted webhook secret, or None when a webhook destination
+        was never registered."""
         raise NotImplementedError
 
     @abstractmethod
     async def set_webhook_destination(
-        self, account_id: UUID, *, cf_webhook_destination_id: str, secret_ciphertext: str
+        self, account_id: UUID, *, cf_webhook_destination_id: str, secret: str
     ) -> None:
-        """Persist a newly-registered webhook destination."""
+        """Persist a newly-registered webhook destination. secret is plaintext."""
         raise NotImplementedError
 
 
@@ -97,12 +111,14 @@ class CloudflareAccountRepository(AbstractCloudflareAccountRepository):
     async def list_page(self, limit: int, offset: int) -> tuple[list[CloudflareAccountRead], int]:
         """Required by AbstractRepository; the router never lists unfiltered —
         see list_for_ids, which backs the actual GET /cloudflare-accounts route."""
-        rows = await self._session.scalars(
-            select(CloudflareAccount).order_by(CloudflareAccount.id).limit(limit).offset(offset)
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            CloudflareAccount,
+            limit=limit,
+            offset=offset,
+            order_by=CloudflareAccount.id,
         )
-        items = [CloudflareAccountRead.model_validate(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(CloudflareAccount))
-        return items, total or 0
+        return [CloudflareAccountRead.model_validate(row) for row in rows], total
 
     @database
     async def list_all(self) -> list[CloudflareAccountRead]:
@@ -126,7 +142,10 @@ class CloudflareAccountRepository(AbstractCloudflareAccountRepository):
     ) -> CloudflareAccountRead:
         """Create a new account."""
         row = CloudflareAccount(
-            label=label, cf_account_id=cf_account_id, api_token=api_token, created_by=created_by
+            label=label,
+            cf_account_id=cf_account_id,
+            api_token=self._encrypt(api_token),
+            created_by=created_by,
         )
         self._session.add(row)
         await self._session.flush()
@@ -144,7 +163,7 @@ class CloudflareAccountRepository(AbstractCloudflareAccountRepository):
         if label is not None:
             row.label = label
         if api_token is not None:
-            row.api_token = api_token
+            row.api_token = self._encrypt(api_token)
         await self._session.flush()
         await self._session.refresh(row)
         return CloudflareAccountRead.model_validate(row)
@@ -158,25 +177,53 @@ class CloudflareAccountRepository(AbstractCloudflareAccountRepository):
             await self._session.flush()
 
     @database
-    async def get_token_ciphertext(self, account_id: UUID) -> str | None:
-        """Return the raw api_token column, still Fernet-ciphertext. Never cached."""
-        row = await self._session.get(CloudflareAccount, account_id)
-        return row.api_token if row is not None else None
-
-    @database
-    async def get_webhook_destination_ciphertext(self, account_id: UUID) -> tuple[str | None, str | None]:
+    async def get_credentials(self, account_id: UUID) -> CloudflareCredentials | None:
+        """Return the account's Cloudflare id and decrypted API token, read straight
+        from the row so the token never enters the cache."""
         row = await self._session.get(CloudflareAccount, account_id)
         if row is None:
-            return None, None
-        return row.cf_webhook_destination_id, row.webhook_secret_ciphertext
+            return None
+        return CloudflareCredentials(
+            account_id=row.id,
+            cf_account_id=row.cf_account_id,
+            api_token=self._decrypt(row.api_token, CloudflareAccountTokenUnreadable),
+        )
+
+    @database
+    async def get_webhook_destination_id(self, account_id: UUID) -> str | None:
+        """Return the registered cf_webhook_destination_id, or None. Never decrypts."""
+        row = await self._session.get(CloudflareAccount, account_id)
+        return row.cf_webhook_destination_id if row is not None else None
+
+    @database
+    async def get_webhook_secret(self, account_id: UUID) -> str | None:
+        """Return the decrypted webhook secret, or None when none was registered."""
+        row = await self._session.get(CloudflareAccount, account_id)
+        if row is None or row.webhook_secret_ciphertext is None:
+            return None
+        return self._decrypt(row.webhook_secret_ciphertext, CloudflareWebhookSecretUnreadable)
 
     @database
     async def set_webhook_destination(
-        self, account_id: UUID, *, cf_webhook_destination_id: str, secret_ciphertext: str
+        self, account_id: UUID, *, cf_webhook_destination_id: str, secret: str
     ) -> None:
         row = await self._session.get(CloudflareAccount, account_id)
         if row is None:
             raise CloudflareAccountNotFound()
         row.cf_webhook_destination_id = cf_webhook_destination_id
-        row.webhook_secret_ciphertext = secret_ciphertext
+        row.webhook_secret_ciphertext = self._encrypt(secret)
         await self._session.flush()
+
+    @helper
+    def _encrypt(self, plaintext: str) -> str:
+        """Encrypt a secret with the cloudflare module's key."""
+        return FernetCodec.encrypt(plaintext, key=cloudflare_settings.FERNET_KEY)
+
+    @helper
+    def _decrypt(self, ciphertext: str, unreadable: type[SecretUnreadableError]) -> str:
+        """Decrypt a secret with the cloudflare module's key, raising `unreadable`
+        when it was encrypted under another key or no valid key is set."""
+        try:
+            return FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
+        except SecretUnreadableError as exc:
+            raise unreadable() from exc

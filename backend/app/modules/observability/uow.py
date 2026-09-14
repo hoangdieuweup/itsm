@@ -1,11 +1,9 @@
 """Transaction boundary for the observability module."""
 
-import logging
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.base.markers import database
 from app.core.base.uow import AbstractUnitOfWork
+from app.core.uow import SqlAlchemyUnitOfWork
 from app.modules.observability.repository import (
     AbstractAlertRuleRepository,
     AbstractIncidentRepository,
@@ -14,8 +12,6 @@ from app.modules.observability.repository import (
     IncidentRepository,
     LokiConfigRepository,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class AbstractObservabilityUnitOfWork(AbstractUnitOfWork):
@@ -26,7 +22,7 @@ class AbstractObservabilityUnitOfWork(AbstractUnitOfWork):
     incidents: AbstractIncidentRepository
 
 
-class ObservabilityUnitOfWork(AbstractObservabilityUnitOfWork):
+class ObservabilityUnitOfWork(AbstractObservabilityUnitOfWork, SqlAlchemyUnitOfWork):
     """Owns the transaction for the observability module's tables. No cache
     invalidation plumbing (unlike cloudflare/projects) — none of loki_configs,
     alert_rules, or incidents have a cache-aside repository (Decision #9:
@@ -34,16 +30,7 @@ class ObservabilityUnitOfWork(AbstractObservabilityUnitOfWork):
     with no measured benefit)."""
 
     def __init__(self, session: AsyncSession) -> None:
-        self._session = session
+        super().__init__(session)
         self.loki_configs = LokiConfigRepository(session)
         self.alert_rules = AlertRuleRepository(session)
         self.incidents = IncidentRepository(session)
-
-    @database
-    async def commit(self) -> None:
-        await self._session.commit()
-
-    @database
-    async def rollback(self) -> None:
-        await self._session.rollback()
-        logger.warning("observability unit of work rolled back")

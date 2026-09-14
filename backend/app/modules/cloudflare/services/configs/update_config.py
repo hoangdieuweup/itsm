@@ -5,11 +5,9 @@ from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
-from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.client import CloudflareClient
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import CloudflareDnsAuditActions
 from app.modules.cloudflare.exceptions import (
     CloudflareAccountNotFound,
@@ -41,15 +39,13 @@ class UpdateCloudflareConfig(AbstractUseCase):
         if existing is None:
             raise CloudflareConfigNotFound()
 
-        account = await self._uow.accounts.get_by_id(existing.cloudflare_account_id)
-        if account is None:
+        credentials = await self._uow.accounts.get_credentials(existing.cloudflare_account_id)
+        if credentials is None:
             raise CloudflareAccountNotFound()
-        ciphertext = await self._uow.accounts.get_token_ciphertext(existing.cloudflare_account_id)
-        if ciphertext is None:
-            raise CloudflareAccountNotFound()
-        plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
 
-        zones = await self._client.list_zones(cf_account_id=account.cf_account_id, api_token=plaintext)
+        zones = await self._client.list_zones(
+            cf_account_id=credentials.cf_account_id, api_token=credentials.api_token
+        )
         matched = next((z for z in zones if z.id == zone_id), None)
         if matched is None:
             raise ZoneNotOwnedByAccount()

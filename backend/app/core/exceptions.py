@@ -36,6 +36,15 @@ class ConflictError(AppError):
     message = "Conflicting state"
 
 
+class SecretUnreadableError(ConflictError):
+    """Base for a stored secret that can't be decrypted with the configured key —
+    it was saved under a different key, or no valid key is set. The owning module
+    subclasses it with its own code so the message says which secret to re-enter."""
+
+    code = "secret_unreadable"
+    message = "Stored secret cannot be decrypted with the current key"
+
+
 class ForbiddenError(AppError):
     """Base for every permission failure."""
 

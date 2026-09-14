@@ -12,16 +12,20 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+from cryptography.fernet import Fernet
 from sqlalchemy import delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.integrations.cache.client import CacheClient
+from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import DnsRecordType, TunnelStatus
 from app.modules.cloudflare.exceptions import (
     CloudflareAccountNotFound,
+    CloudflareAccountTokenUnreadable,
     CloudflareConfigNotFound,
     CloudflareTunnelNotFound,
+    CloudflareWebhookSecretUnreadable,
     DnsRecordNotFound,
     TunnelPublicHostnameNotFound,
 )
@@ -41,6 +45,12 @@ from app.modules.cloudflare.repository import (
     TunnelHostnameRepository,
 )
 from app.modules.projects.models import Environment, Project
+
+
+@pytest.fixture(autouse=True)
+def _cloudflare_fernet_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CloudflareAccountRepository encrypts the API token and webhook secret itself."""
+    monkeypatch.setattr(cloudflare_settings, "FERNET_KEY", Fernet.generate_key().decode())
 
 
 @pytest.fixture
@@ -484,7 +494,7 @@ class TestUpdatesRaiseNotFoundForMissingRows:
         with pytest.raises(CloudflareAccountNotFound):
             await CloudflareAccountRepository(
                 _session, CacheClient.__new__(CacheClient)
-            ).set_webhook_destination(uuid4(), cf_webhook_destination_id="wh", secret_ciphertext="c")
+            ).set_webhook_destination(uuid4(), cf_webhook_destination_id="wh", secret="c")
 
     async def test_config(self, _session: AsyncSession) -> None:
         with pytest.raises(CloudflareConfigNotFound):
@@ -518,3 +528,72 @@ class TestCloudflareAccountRepositoryListAll:
         accounts = await repo.list_all()
 
         assert [account.label for account in accounts] == ["A", "B", "C"]
+
+
+def _accounts(session: AsyncSession) -> CloudflareAccountRepository:
+    return CloudflareAccountRepository(session, CacheClient.__new__(CacheClient))
+
+
+class TestCloudflareAccountRepositorySecrets:
+    async def test_encrypts_the_token_and_returns_it_through_get_credentials(
+        self, _session: AsyncSession
+    ) -> None:
+        repo = _accounts(_session)
+        account = await repo.create(
+            label="Secrets", cf_account_id="cf-secrets", api_token="plain", created_by=None
+        )
+
+        row = await _session.get(CloudflareAccount, account.id)
+        credentials = await repo.get_credentials(account.id)
+
+        assert row is not None
+        assert row.api_token != "plain"
+        assert credentials is not None
+        assert credentials.api_token == "plain"
+        assert credentials.cf_account_id == "cf-secrets"
+        assert credentials.account_id == account.id
+        assert "plain" not in repr(credentials)
+
+    async def test_get_credentials_returns_none_for_an_unknown_account(self, _session: AsyncSession) -> None:
+        assert await _accounts(_session).get_credentials(uuid4()) is None
+
+    async def test_get_credentials_raises_unreadable_after_a_key_change(
+        self, _session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        repo = _accounts(_session)
+        account = await repo.create(
+            label="Rotated", cf_account_id="cf-rotated", api_token="plain", created_by=None
+        )
+        monkeypatch.setattr(cloudflare_settings, "FERNET_KEY", Fernet.generate_key().decode())
+
+        with pytest.raises(CloudflareAccountTokenUnreadable):
+            await repo.get_credentials(account.id)
+
+    async def test_update_encrypts_a_rotated_token(self, _session: AsyncSession) -> None:
+        repo = _accounts(_session)
+        account = await repo.create(
+            label="Rotate", cf_account_id="cf-rotate", api_token="old", created_by=None
+        )
+
+        await repo.update(account.id, label=None, api_token="new")
+
+        credentials = await repo.get_credentials(account.id)
+        assert credentials is not None
+        assert credentials.api_token == "new"
+
+    async def test_webhook_destination_round_trips_and_only_the_secret_needs_the_key(
+        self, _session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        repo = _accounts(_session)
+        account = await repo.create(
+            label="Webhook", cf_account_id="cf-webhook", api_token="plain", created_by=None
+        )
+        await repo.set_webhook_destination(account.id, cf_webhook_destination_id="wh-1", secret="shh")
+
+        assert await repo.get_webhook_destination_id(account.id) == "wh-1"
+        assert await repo.get_webhook_secret(account.id) == "shh"
+
+        monkeypatch.setattr(cloudflare_settings, "FERNET_KEY", Fernet.generate_key().decode())
+        assert await repo.get_webhook_destination_id(account.id) == "wh-1"
+        with pytest.raises(CloudflareWebhookSecretUnreadable):
+            await repo.get_webhook_secret(account.id)

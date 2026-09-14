@@ -8,12 +8,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.core.crypto import FernetCodec
 from app.integrations.cache.exceptions import CacheUnavailable
 from app.integrations.cloudflare.exceptions import CloudflareApiUnavailable as CfUnavailable
 from app.integrations.cloudflare.exceptions import InvalidCloudflareToken
 from app.integrations.cloudflare.schemas import CloudflareTrafficStats, ZoneOption
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import (
     AccessLevel,
     CloudflareAccountAuditActions,
@@ -24,6 +22,7 @@ from app.modules.cloudflare.constants import (
 from app.modules.cloudflare.exceptions import (
     CloudflareAccountManagerNotFound,
     CloudflareAccountNotFound,
+    CloudflareAccountTokenUnreadable,
     CloudflareConfigAlreadyExists,
     CloudflareConfigNotFound,
     CloudflareEnvironmentNotFound,
@@ -52,6 +51,7 @@ from app.modules.cloudflare.schemas import (
     AccountAccessGrant,
     CloudflareAccountRead,
     CloudflareConfigRead,
+    CloudflareCredentials,
     CloudflareTunnelRead,
     DnsRecordRead,
     TunnelPublicHostnameRead,
@@ -93,7 +93,7 @@ from app.modules.users.public import UserRead
 class FakeCloudflareAccountRepository(AbstractCloudflareAccountRepository):
     def __init__(self) -> None:
         self._rows: dict[UUID, CloudflareAccountRead] = {}
-        self._ciphertexts: dict[UUID, str] = {}
+        self._tokens: dict[UUID, str] = {}
         self._webhook_destinations: dict[UUID, tuple[str | None, str | None]] = {}
 
     async def get_by_id(self, entity_id: UUID) -> CloudflareAccountRead | None:
@@ -121,7 +121,7 @@ class FakeCloudflareAccountRepository(AbstractCloudflareAccountRepository):
             updated_at=datetime.now(UTC),
         )
         self._rows[account.id] = account
-        self._ciphertexts[account.id] = api_token
+        self._tokens[account.id] = api_token
         return account
 
     async def update(
@@ -131,23 +131,33 @@ class FakeCloudflareAccountRepository(AbstractCloudflareAccountRepository):
         updated = existing.model_copy(update={"label": label if label is not None else existing.label})
         self._rows[account_id] = updated
         if api_token is not None:
-            self._ciphertexts[account_id] = api_token
+            self._tokens[account_id] = api_token
         return updated
 
     async def delete(self, account_id: UUID) -> None:
         self._rows.pop(account_id, None)
-        self._ciphertexts.pop(account_id, None)
+        self._tokens.pop(account_id, None)
 
-    async def get_token_ciphertext(self, account_id: UUID) -> str | None:
-        return self._ciphertexts.get(account_id)
+    async def get_credentials(self, account_id: UUID) -> CloudflareCredentials | None:
+        account = self._rows.get(account_id)
+        if account is None or account_id not in self._tokens:
+            return None
+        return CloudflareCredentials(
+            account_id=account.id,
+            cf_account_id=account.cf_account_id,
+            api_token=self._tokens[account_id],
+        )
 
-    async def get_webhook_destination_ciphertext(self, account_id: UUID) -> tuple[str | None, str | None]:
-        return self._webhook_destinations.get(account_id, (None, None))
+    async def get_webhook_destination_id(self, account_id: UUID) -> str | None:
+        return self._webhook_destinations.get(account_id, (None, None))[0]
+
+    async def get_webhook_secret(self, account_id: UUID) -> str | None:
+        return self._webhook_destinations.get(account_id, (None, None))[1]
 
     async def set_webhook_destination(
-        self, account_id: UUID, *, cf_webhook_destination_id: str, secret_ciphertext: str
+        self, account_id: UUID, *, cf_webhook_destination_id: str, secret: str
     ) -> None:
-        self._webhook_destinations[account_id] = (cf_webhook_destination_id, secret_ciphertext)
+        self._webhook_destinations[account_id] = (cf_webhook_destination_id, secret)
 
 
 class FakeCloudflareAccountManagerRepository(AbstractCloudflareAccountManagerRepository):
@@ -671,15 +681,6 @@ class FakeAuditApi:
 
 ACTOR_ID = uuid4()
 ACTOR_EMAIL = "actor@example.com"
-TEST_FERNET_KEY = "kL8Zx3vQ9mN2pR7wT4yU6bC1dF5gH0jK3lM6nO9pQ2s="
-
-
-@pytest.fixture(autouse=True)
-def _cloudflare_fernet_key(monkeypatch) -> None:
-    """Every test in this file that encrypts/decrypts a token needs a real
-    32-byte Fernet key — the module's own default is "" (fail-fast, per
-    CloudflareConfig's docstring convention), which Fernet() rejects outright."""
-    monkeypatch.setattr(cloudflare_settings, "FERNET_KEY", TEST_FERNET_KEY)
 
 
 class TestCreateCloudflareAccount:
@@ -700,15 +701,18 @@ class TestCreateCloudflareAccount:
         assert uow.commits == 1
         assert audit_api.events[0]["action"] == CloudflareAccountAuditActions.ACCOUNT_CREATED
 
-    async def test_stores_token_as_ciphertext_not_plaintext(self) -> None:
+    async def test_hands_the_plaintext_token_to_the_repository(self) -> None:
+        """The repository owns encryption now — tests/cloudflare/test_repository.py
+        covers that the column really is ciphertext."""
         uow = FakeCloudflareUnitOfWork()
 
         account = await CreateCloudflareAccount(uow, FakeCloudflareClient(), FakeAuditApi()).execute(
             "CF - Customer A", "cf-acc-1", "super-secret-token", actor_id=ACTOR_ID, actor_email=ACTOR_EMAIL
         )
 
-        stored = await uow.accounts.get_token_ciphertext(account.id)
-        assert stored != "super-secret-token"
+        credentials = await uow.accounts.get_credentials(account.id)
+        assert credentials is not None
+        assert credentials.api_token == "super-secret-token"
 
     async def test_rejects_bad_token_before_persisting_anything(self) -> None:
         uow = FakeCloudflareUnitOfWork()
@@ -743,7 +747,7 @@ class TestUpdateCloudflareAccount:
     async def test_editor_can_rename_label(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="Old", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="Old", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
 
         updated = await UpdateCloudflareAccount(uow, FakeCloudflareClient(), FakeAuditApi()).execute(
@@ -760,7 +764,7 @@ class TestUpdateCloudflareAccount:
     async def test_editor_cannot_rotate_token(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="Old", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="Old", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
 
         with pytest.raises(InsufficientAccountAccess):
@@ -777,7 +781,7 @@ class TestUpdateCloudflareAccount:
     async def test_owner_can_rotate_token(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="Old", cf_account_id="cf-1", api_token="old-ciphertext", created_by=ACTOR_ID
+            label="Old", cf_account_id="cf-1", api_token="old-token", created_by=ACTOR_ID
         )
         client = FakeCloudflareClient()
 
@@ -790,15 +794,15 @@ class TestUpdateCloudflareAccount:
         )
 
         assert client.calls == [("cf-1", "new-plaintext-token")]
-        stored = await uow.accounts.get_token_ciphertext(account.id)
-        assert stored != "new-plaintext-token"
-        assert stored != "old-ciphertext"
+        credentials = await uow.accounts.get_credentials(account.id)
+        assert credentials is not None
+        assert credentials.api_token == "new-plaintext-token"
 
     async def test_manage_all_bypass_can_rotate_token(self) -> None:
         """held_level=None (manage_all bypass) satisfies OWNER too."""
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="Old", cf_account_id="cf-1", api_token="old-ciphertext", created_by=ACTOR_ID
+            label="Old", cf_account_id="cf-1", api_token="old-token", created_by=ACTOR_ID
         )
 
         await UpdateCloudflareAccount(uow, FakeCloudflareClient(), FakeAuditApi()).execute(
@@ -814,7 +818,7 @@ class TestUpdateCloudflareAccount:
     async def test_rejects_bad_rotated_token_before_persisting(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="Old", cf_account_id="cf-1", api_token="old-ciphertext", created_by=ACTOR_ID
+            label="Old", cf_account_id="cf-1", api_token="old-token", created_by=ACTOR_ID
         )
         client = FakeCloudflareClient(raises=InvalidCloudflareToken())
 
@@ -828,8 +832,9 @@ class TestUpdateCloudflareAccount:
             )
 
         assert uow.commits == 0
-        stored = await uow.accounts.get_token_ciphertext(account.id)
-        assert stored == "old-ciphertext"
+        credentials = await uow.accounts.get_credentials(account.id)
+        assert credentials is not None
+        assert credentials.api_token == "old-token"
 
     async def test_rejects_unknown_account(self) -> None:
         uow = FakeCloudflareUnitOfWork()
@@ -844,7 +849,7 @@ class TestDeleteCloudflareAccount:
     async def test_deletes_account(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="Gone", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="Gone", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
 
         await DeleteCloudflareAccount(uow, FakeAuditApi()).execute(
@@ -868,7 +873,7 @@ class TestDeleteCloudflareAccount:
 class TestTestCloudflareAccountConnection:
     async def test_calls_client_with_decrypted_token(self) -> None:
         uow = FakeCloudflareUnitOfWork()
-        ciphertext = FernetCodec.encrypt("plain-token", key=TEST_FERNET_KEY)
+        ciphertext = "plain-token"
         account = await uow.accounts.create(
             label="A", cf_account_id="cf-1", api_token=ciphertext, created_by=ACTOR_ID
         )
@@ -888,7 +893,7 @@ class TestTestCloudflareAccountConnection:
 class TestRevealCloudflareAccountToken:
     async def test_returns_decrypted_token_and_audits_without_leaking_it(self) -> None:
         uow = FakeCloudflareUnitOfWork()
-        ciphertext = FernetCodec.encrypt("super-secret", key=TEST_FERNET_KEY)
+        ciphertext = "super-secret"
         account = await uow.accounts.create(
             label="A", cf_account_id="cf-1", api_token=ciphertext, created_by=ACTOR_ID
         )
@@ -926,7 +931,7 @@ class TestListCloudflareAccountManagers:
     async def test_lists_managers_enriched_with_user_info(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
         await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
         user = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL, name="Actor")
@@ -941,7 +946,7 @@ class TestListCloudflareAccountManagers:
     async def test_skips_a_manager_row_whose_user_was_deleted(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
         await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
         users_api = FakeUsersApi({})  # ACTOR_ID resolves to None
@@ -961,7 +966,7 @@ class TestAssignCloudflareAccountManager:
     async def test_assigns_manager(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
         target_id = uuid4()
 
@@ -987,7 +992,7 @@ class TestUpdateCloudflareAccountManager:
     async def test_changes_access_level(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
         target_id = uuid4()
         await uow.account_managers.upsert(account.id, target_id, AccessLevel.VIEWER)
@@ -1002,7 +1007,7 @@ class TestUpdateCloudflareAccountManager:
     async def test_blocks_downgrading_the_last_owner(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
         await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
 
@@ -1017,7 +1022,7 @@ class TestUpdateCloudflareAccountManager:
     async def test_allows_downgrading_one_of_two_owners(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
         second_owner = uuid4()
         await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
@@ -1033,7 +1038,7 @@ class TestUpdateCloudflareAccountManager:
     async def test_rejects_unknown_manager(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
 
         with pytest.raises(CloudflareAccountManagerNotFound):
@@ -1046,7 +1051,7 @@ class TestRemoveCloudflareAccountManager:
     async def test_removes_manager(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
         target_id = uuid4()
         await uow.account_managers.upsert(account.id, target_id, AccessLevel.VIEWER)
@@ -1060,7 +1065,7 @@ class TestRemoveCloudflareAccountManager:
     async def test_blocks_removing_the_last_owner(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
         await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
 
@@ -1074,7 +1079,7 @@ class TestRemoveCloudflareAccountManager:
     async def test_allows_removing_a_non_owner(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
         await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
         target_id = uuid4()
@@ -1089,7 +1094,7 @@ class TestRemoveCloudflareAccountManager:
     async def test_rejects_unknown_manager(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
 
         with pytest.raises(CloudflareAccountManagerNotFound):
@@ -1157,7 +1162,7 @@ class TestCreateCloudflareConfig:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
@@ -1178,7 +1183,7 @@ class TestCreateCloudflareConfig:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
@@ -1197,7 +1202,7 @@ class TestCreateCloudflareConfig:
     async def test_rejects_unknown_environment(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
         await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
         actor = UserRead.model_construct(id=ACTOR_ID, email=ACTOR_EMAIL)
@@ -1216,7 +1221,7 @@ class TestCreateCloudflareConfig:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         await uow.account_managers.upsert(account.id, ACTOR_ID, AccessLevel.OWNER)
@@ -1236,7 +1241,7 @@ class TestCreateCloudflareConfig:
     async def test_rejects_insufficient_access(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
         # No manager row for ACTOR_ID on this account, and no manage_all.
         env_id = uuid4()
@@ -1255,7 +1260,7 @@ class TestUpdateCloudflareConfig:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         env_id = uuid4()
@@ -1276,7 +1281,7 @@ class TestUpdateCloudflareConfig:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         env_id = uuid4()
@@ -1314,7 +1319,7 @@ class TestDeleteCloudflareConfig:
         uow = FakeCloudflareUnitOfWork()
         uow.dns_records = FakeDnsRecordsRepoEmpty()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
         env_id = uuid4()
         await uow.configs.create(
@@ -1331,7 +1336,7 @@ class TestDeleteCloudflareConfig:
         uow = FakeCloudflareUnitOfWork()
         uow.dns_records = FakeDnsRecordsRepoNonEmpty()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
         env_id = uuid4()
         await uow.configs.create(
@@ -1349,7 +1354,7 @@ class TestDeleteCloudflareConfig:
 class TestListZones:
     async def test_returns_zones_for_account(self) -> None:
         uow = FakeCloudflareUnitOfWork()
-        ciphertext = FernetCodec.encrypt("plain-token", key=TEST_FERNET_KEY)
+        ciphertext = "plain-token"
         account = await uow.accounts.create(
             label="A", cf_account_id="cf-1", api_token=ciphertext, created_by=ACTOR_ID
         )
@@ -1370,7 +1375,7 @@ class TestListDnsRecords:
     async def test_returns_records_for_bound_environment(self) -> None:
         uow = FakeCloudflareUnitOfWork()
         account = await uow.accounts.create(
-            label="A", cf_account_id="cf-1", api_token="ciphertext", created_by=ACTOR_ID
+            label="A", cf_account_id="cf-1", api_token="stored-token", created_by=ACTOR_ID
         )
         env_id = uuid4()
         await uow.configs.create(
@@ -1449,7 +1454,7 @@ class TestCreateDnsRecord:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         env_id = uuid4()
@@ -1471,7 +1476,7 @@ class TestCreateDnsRecord:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         env_id = uuid4()
@@ -1494,7 +1499,7 @@ class TestCreateDnsRecord:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         env_id = uuid4()
@@ -1546,7 +1551,7 @@ class TestUpdateDnsRecord:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         env_id = uuid4()
@@ -1581,7 +1586,7 @@ class TestUpdateDnsRecord:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         env_id = uuid4()
@@ -1623,7 +1628,7 @@ class TestUpdateDnsRecord:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         env_id = uuid4()
@@ -1645,7 +1650,7 @@ class TestUpdateDnsRecord:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         env_id, other_env_id = uuid4(), uuid4()
@@ -1691,7 +1696,7 @@ class TestDeleteDnsRecord:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         env_id = uuid4()
@@ -1724,7 +1729,7 @@ class TestDeleteDnsRecord:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         env_id = uuid4()
@@ -1761,7 +1766,7 @@ class TestDeleteDnsRecord:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         env_id = uuid4()
@@ -1783,7 +1788,7 @@ class TestDeleteDnsRecord:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         env_id, other_env_id = uuid4(), uuid4()
@@ -1829,7 +1834,7 @@ class TestSyncDnsRecords:
         account = await uow.accounts.create(
             label="acc",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            api_token="tok",
             created_by=None,
         )
         triggering_env_id = uuid4()
@@ -1971,7 +1976,7 @@ class TestCreateCloudflareTunnel:
         account = await uow.accounts.create(
             label="acc",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plaintext-token", key=TEST_FERNET_KEY),
+            api_token="plaintext-token",
             created_by=None,
         )
         config = await uow.configs.create(
@@ -2004,7 +2009,7 @@ class TestDeleteCloudflareTunnel:
         account = await uow.accounts.create(
             label="acc",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            api_token="tok",
             created_by=None,
         )
         config = await uow.configs.create(
@@ -2028,7 +2033,7 @@ class TestDeleteCloudflareTunnel:
         account = await uow.accounts.create(
             label="acc",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            api_token="tok",
             created_by=None,
         )
         config = await uow.configs.create(
@@ -2050,7 +2055,7 @@ class TestDeleteCloudflareTunnel:
         account = await uow.accounts.create(
             label="acc",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            api_token="tok",
             created_by=None,
         )
         config = await uow.configs.create(
@@ -2074,7 +2079,7 @@ class TestRevealCloudflareTunnelToken:
         account = await uow.accounts.create(
             label="acc",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            api_token="tok",
             created_by=None,
         )
         config = await uow.configs.create(
@@ -2096,7 +2101,7 @@ class TestRefreshTunnelStatus:
         account = await uow.accounts.create(
             label="acc",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            api_token="tok",
             created_by=None,
         )
         config = await uow.configs.create(
@@ -2116,7 +2121,7 @@ class TestRefreshTunnelStatus:
         account = await uow.accounts.create(
             label="acc",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            api_token="tok",
             created_by=None,
         )
         config = await uow.configs.create(
@@ -2174,7 +2179,7 @@ class TestListTunnelHostnames:
         account = await uow.accounts.create(
             label="acc",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            api_token="tok",
             created_by=None,
         )
         config = await uow.configs.create(
@@ -2207,7 +2212,7 @@ class TestListTunnelHostnames:
         account = await uow.accounts.create(
             label="acc",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            api_token="tok",
             created_by=None,
         )
         config = await uow.configs.create(
@@ -2232,7 +2237,7 @@ class TestAddTunnelHostname:
         account = await uow.accounts.create(
             label="acc",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            api_token="tok",
             created_by=None,
         )
         config = await uow.configs.create(
@@ -2433,7 +2438,7 @@ class TestUpdateTunnelHostname:
         account = await uow.accounts.create(
             label="acc",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            api_token="tok",
             created_by=None,
         )
         config = await uow.configs.create(
@@ -2539,7 +2544,7 @@ class TestRemoveTunnelHostname:
         account = await uow.accounts.create(
             label="acc",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            api_token="tok",
             created_by=None,
         )
         config = await uow.configs.create(
@@ -2665,7 +2670,7 @@ class TestSyncTunnels:
         account = await uow.accounts.create(
             label="acc",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("tok", key=TEST_FERNET_KEY),
+            api_token="tok",
             created_by=None,
         )
         triggering_config = await uow.configs.create(
@@ -2789,7 +2794,7 @@ class TestGetCloudflareTrafficStats:
         account = await uow.accounts.create(
             label="A",
             cf_account_id="cf-1",
-            api_token=FernetCodec.encrypt("plain", key=TEST_FERNET_KEY),
+            api_token="plain",
             created_by=ACTOR_ID,
         )
         env_id = uuid4()
@@ -2863,3 +2868,22 @@ class TestGetCloudflareTrafficStats:
         call = client.traffic_calls[0]
         assert call["since"] == since
         assert call["until"] == until
+
+
+class TestUnreadableAccountToken:
+    async def test_list_zones_propagates_the_repository_error(self) -> None:
+        """A token saved under a different CLOUDFLARE__FERNET_KEY answers 409 with the
+        module's own code rather than a 500 from cryptography."""
+
+        class UnreadableAccountsRepo(FakeCloudflareAccountRepository):
+            async def get_credentials(self, account_id: UUID) -> CloudflareCredentials | None:
+                raise CloudflareAccountTokenUnreadable()
+
+        uow = FakeCloudflareUnitOfWork()
+        uow.accounts = UnreadableAccountsRepo()
+        account = await uow.accounts.create(
+            label="A", cf_account_id="cf-1", api_token="plain", created_by=ACTOR_ID
+        )
+
+        with pytest.raises(CloudflareAccountTokenUnreadable):
+            await ListZones(uow, FakeCloudflareClient()).execute(account.id)

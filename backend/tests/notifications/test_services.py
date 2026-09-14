@@ -6,9 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.core.crypto import FernetCodec
 from app.integrations.telegram.exceptions import TelegramApiUnavailable
-from app.modules.notifications.config import notifications_settings
 from app.modules.notifications.constants import NotificationChannelType
 from app.modules.notifications.exceptions import (
     InvalidChannelConfig,
@@ -28,12 +26,6 @@ from app.modules.users.public import UserRead
 
 ACTOR_ID = uuid4()
 ACTOR_EMAIL = "actor@example.com"
-TEST_FERNET_KEY = "kL8Zx3vQ9mN2pR7wT4yU6bC1dF5gH0jK3lM6nO9pQ2s="
-
-
-@pytest.fixture(autouse=True)
-def _fernet_key(monkeypatch) -> None:
-    monkeypatch.setattr(notifications_settings, "FERNET_KEY", TEST_FERNET_KEY)
 
 
 def _actor() -> UserRead:
@@ -56,12 +48,7 @@ class FakeChannelRepo(AbstractNotificationChannelRepository):
 
     async def create(self, *, project_id, environment_id, type, name, config):
         channel_id = uuid4()
-        stored_config = dict(config)
-        if type == NotificationChannelType.TELEGRAM and "bot_token" in config:
-            stored_config["bot_token"] = FernetCodec.encrypt(config["bot_token"], key=TEST_FERNET_KEY)
-        if type == NotificationChannelType.BASE_VN and "webhook_url" in config:
-            stored_config["webhook_url"] = FernetCodec.encrypt(config["webhook_url"], key=TEST_FERNET_KEY)
-        self._raw_config[channel_id] = stored_config
+        self._raw_config[channel_id] = dict(config)
         masked = {k: v for k, v in config.items() if k not in ("bot_token", "webhook_url")}
         channel = NotificationChannelRead(
             id=channel_id,
@@ -88,7 +75,7 @@ class FakeChannelRepo(AbstractNotificationChannelRepository):
         self._rows.pop(channel_id, None)
         self._raw_config.pop(channel_id, None)
 
-    async def get_config_ciphertext_fields(self, channel_id):
+    async def get_dispatch_config(self, channel_id):
         return self._raw_config.get(channel_id, {})
 
 

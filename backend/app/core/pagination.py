@@ -1,10 +1,14 @@
 """Pagination primitives shared by every list endpoint."""
 
-from typing import Generic, TypeVar
+from collections.abc import Sequence
+from typing import Any, Generic, TypeVar
 
 from fastapi import Query
 from pydantic import BaseModel
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.base.markers import helper
 from app.core.models import CustomModel
 
 T = TypeVar("T")
@@ -39,3 +43,27 @@ async def pagination_params(
 ) -> PaginationParams:
     """Provide validated pagination parameters to a route."""
     return PaginationParams(limit=limit, offset=offset)
+
+
+class PageQuery:
+    """Runs the two queries behind a repository's list_page: one page of rows and
+    the table's total count. A repository keeps only its own row-to-schema mapping."""
+
+    @staticmethod
+    @helper
+    async def fetch_rows(
+        session: AsyncSession,
+        model: type[Any],
+        *,
+        limit: int,
+        offset: int,
+        order_by: Any = None,
+        options: Sequence[Any] = (),
+    ) -> tuple[list[Any], int]:
+        """Return one page of `model` rows together with the table's total row count."""
+        stmt = select(model).options(*options).limit(limit).offset(offset)
+        if order_by is not None:
+            stmt = stmt.order_by(order_by)
+        rows = list(await session.scalars(stmt))
+        total = await session.scalar(select(func.count()).select_from(model))
+        return rows, total or 0

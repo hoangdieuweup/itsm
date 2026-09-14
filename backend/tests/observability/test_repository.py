@@ -8,12 +8,14 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import delete
+from cryptography.fernet import Fernet
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.notifications.constants import NotificationChannelType
 from app.modules.notifications.models import NotificationChannel
+from app.modules.observability.config import observability_settings
 from app.modules.observability.constants import (
     AlertRuleSource,
     AlertSeverity,
@@ -22,10 +24,27 @@ from app.modules.observability.constants import (
     IncidentStatus,
     LokiAuthType,
 )
-from app.modules.observability.exceptions import AlertRuleNotFound, IncidentNotFound, LokiConfigNotFound
+from app.modules.observability.exceptions import (
+    AlertRuleNotFound,
+    IncidentNotFound,
+    LokiConfigNotFound,
+    LokiCredentialUnreadable,
+)
 from app.modules.observability.models import AlertRule, AlertRuleChannel, Incident, LokiConfig
 from app.modules.observability.repository import AlertRuleRepository, IncidentRepository, LokiConfigRepository
 from app.modules.projects.models import Environment, Project
+
+
+@pytest.fixture(autouse=True)
+def _loki_fernet_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """LokiConfigRepository encrypts the stored credential itself."""
+    monkeypatch.setattr(observability_settings, "FERNET_KEY", Fernet.generate_key().decode())
+
+
+async def _stored_credential(session: AsyncSession, environment_id: UUID) -> str | None:
+    """Read the raw credential column, bypassing the repository's decryption."""
+    row = await session.scalar(select(LokiConfig).where(LokiConfig.environment_id == environment_id))
+    return row.credential if row is not None else None
 
 
 @pytest.fixture
@@ -97,7 +116,7 @@ class TestLokiConfigRepository:
         repo = LokiConfigRepository(_session)
         assert await repo.get_by_environment_id(uuid4()) is None
 
-    async def test_get_credential_ciphertext_returns_raw_column(self, _session: AsyncSession) -> None:
+    async def test_get_credential_decrypts_the_stored_value(self, _session: AsyncSession) -> None:
         env = await _make_environment(_session)
         repo = LokiConfigRepository(_session)
         await repo.create(
@@ -105,15 +124,64 @@ class TestLokiConfigRepository:
             endpoint_url="http://loki:3100",
             tenant_id=None,
             auth_type=LokiAuthType.BEARER,
-            credential="ciphertext-value",
+            credential="tok",
             default_query="",
             default_range_minutes=60,
         )
-        assert await repo.get_credential_ciphertext(env.id) == "ciphertext-value"
 
-    async def test_get_credential_ciphertext_returns_none_when_absent(self, _session: AsyncSession) -> None:
+        assert await _stored_credential(_session, env.id) != "tok"
+        assert await repo.get_credential(env.id) == "tok"
+
+    async def test_get_credential_returns_none_when_absent(self, _session: AsyncSession) -> None:
         repo = LokiConfigRepository(_session)
-        assert await repo.get_credential_ciphertext(uuid4()) is None
+        assert await repo.get_credential(uuid4()) is None
+
+    async def test_get_credential_raises_unreadable_after_a_key_change(
+        self, _session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        env = await _make_environment(_session)
+        repo = LokiConfigRepository(_session)
+        await repo.create(
+            environment_id=env.id,
+            endpoint_url="http://loki:3100",
+            tenant_id=None,
+            auth_type=LokiAuthType.BEARER,
+            credential="tok",
+            default_query="",
+            default_range_minutes=60,
+        )
+        monkeypatch.setattr(observability_settings, "FERNET_KEY", Fernet.generate_key().decode())
+
+        with pytest.raises(LokiCredentialUnreadable):
+            await repo.get_credential(env.id)
+
+    async def test_update_with_keep_credential_leaves_the_stored_value(self, _session: AsyncSession) -> None:
+        env = await _make_environment(_session)
+        repo = LokiConfigRepository(_session)
+        await repo.create(
+            environment_id=env.id,
+            endpoint_url="http://loki:3100",
+            tenant_id=None,
+            auth_type=LokiAuthType.BEARER,
+            credential="tok",
+            default_query="",
+            default_range_minutes=60,
+        )
+        before = await _stored_credential(_session, env.id)
+
+        await repo.update_by_environment_id(
+            env.id,
+            endpoint_url="http://loki-2:3100",
+            tenant_id=None,
+            auth_type=LokiAuthType.BEARER,
+            credential=None,
+            keep_credential=True,
+            default_query="",
+            default_range_minutes=60,
+        )
+
+        assert await _stored_credential(_session, env.id) == before
+        assert await repo.get_credential(env.id) == "tok"
 
     async def test_environment_id_is_unique(self, _session: AsyncSession) -> None:
         env = await _make_environment(_session)
@@ -160,7 +228,7 @@ class TestLokiConfigRepository:
             endpoint_url="http://loki-2:3100",
             tenant_id="tenant-a",
             auth_type=LokiAuthType.BEARER,
-            credential="ciphertext",
+            credential="token",
             default_query='{job="api"}',
             default_range_minutes=120,
         )

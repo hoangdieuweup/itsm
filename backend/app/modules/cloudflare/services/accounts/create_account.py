@@ -5,11 +5,9 @@ from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
-from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.client import CloudflareClient
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import AccessLevel, CloudflareAccountAuditActions
 from app.modules.cloudflare.schemas import CloudflareAccountRead
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
@@ -35,9 +33,8 @@ class CreateCloudflareAccount(AbstractUseCase):
     ) -> CloudflareAccountRead:
         await self._client.test_connection(cf_account_id=cf_account_id, api_token=api_token)
 
-        ciphertext = FernetCodec.encrypt(api_token, key=cloudflare_settings.FERNET_KEY)
         account = await self._uow.accounts.create(
-            label=label, cf_account_id=cf_account_id, api_token=ciphertext, created_by=actor_id
+            label=label, cf_account_id=cf_account_id, api_token=api_token, created_by=actor_id
         )
         await self._uow.account_managers.upsert(account.id, actor_id, AccessLevel.OWNER)
         await self._uow.commit()

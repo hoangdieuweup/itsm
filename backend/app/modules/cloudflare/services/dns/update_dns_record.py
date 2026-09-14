@@ -8,11 +8,9 @@ from uuid import UUID
 
 from app.core.base.markers import use_case
 from app.core.base.use_case import AbstractUseCase
-from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.client import CloudflareClient
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import CloudflareDnsAuditActions
 from app.modules.cloudflare.exceptions import CloudflareConfigNotFound, DnsRecordNotFound, DnsRecordSyncFailed
 from app.modules.cloudflare.rules import CloudflareDnsRules
@@ -51,15 +49,14 @@ class UpdateDnsRecord(AbstractUseCase):
             raise DnsRecordNotFound()
 
         normalized_priority = CloudflareDnsRules.normalize_priority(existing.record_type, priority)
-        ciphertext = await self._uow.accounts.get_token_ciphertext(config.cloudflare_account_id)
-        if ciphertext is None:
+        credentials = await self._uow.accounts.get_credentials(config.cloudflare_account_id)
+        if credentials is None:
             raise CloudflareConfigNotFound()
-        plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
 
         await self._client.update_dns_record(
             zone_id=config.zone_id,
             cf_record_id=existing.cf_record_id,
-            api_token=plaintext,
+            api_token=credentials.api_token,
             record_type=existing.record_type,
             name=existing.name,
             content=content,
@@ -85,7 +82,7 @@ class UpdateDnsRecord(AbstractUseCase):
                 await self._client.update_dns_record(
                     zone_id=config.zone_id,
                     cf_record_id=existing.cf_record_id,
-                    api_token=plaintext,
+                    api_token=credentials.api_token,
                     record_type=existing.record_type,
                     name=existing.name,
                     content=existing.content,

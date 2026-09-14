@@ -24,8 +24,8 @@ class StreamLogTail(AbstractUseCase):
         if config is None:
             raise LokiConfigNotFound()
 
-        ciphertext = await self._uow.loki_configs.get_credential_ciphertext(environment_id)
-        auth_header = LokiAuthHelper.resolve_loki_auth_header(config, ciphertext)
+        credential = await self._uow.loki_configs.get_credential(environment_id)
+        auth_header = LokiAuthHelper.resolve_loki_auth_header(config, credential)
 
         async for entry in self._client.tail(
             endpoint_url=config.endpoint_url,

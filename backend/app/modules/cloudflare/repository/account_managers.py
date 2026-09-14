@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.base.markers import database
 from app.core.base.repository import AbstractRepository
 from app.core.models import FrozenModel
+from app.core.pagination import PageQuery
 from app.modules.cloudflare.constants import AccessLevel
 from app.modules.cloudflare.models import CloudflareAccountManager
 
@@ -75,10 +76,13 @@ class CloudflareAccountManagerRepository(AbstractCloudflareAccountManagerReposit
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[CloudflareAccountManagerRow], int]:
         """Required by AbstractRepository; manager rows are listed per-account in practice."""
-        rows = await self._session.scalars(select(CloudflareAccountManager).limit(limit).offset(offset))
-        items = [CloudflareAccountManagerRow.model_validate(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(CloudflareAccountManager))
-        return items, total or 0
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            CloudflareAccountManager,
+            limit=limit,
+            offset=offset,
+        )
+        return [CloudflareAccountManagerRow.model_validate(row) for row in rows], total
 
     @database
     async def get_for_user(self, account_id: UUID, user_id: UUID) -> CloudflareAccountManagerRow | None:

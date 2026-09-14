@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
+from app.core.pagination import PageQuery
 from app.integrations.cache.client import CacheClient
 from app.modules.rbac.constants import RbacCacheKeys
 from app.modules.rbac.exceptions import RoleNotFound
@@ -85,12 +86,15 @@ class RoleRepository(AbstractRoleRepository):
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[RoleRead], int]:
         """Return one page of roles, each with its permissions, plus the total count."""
-        rows = await self._session.scalars(
-            select(Role).options(selectinload(Role.permissions)).order_by(Role.id).limit(limit).offset(offset)
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            Role,
+            limit=limit,
+            offset=offset,
+            order_by=Role.id,
+            options=[selectinload(Role.permissions)],
         )
-        items = [RoleRead.model_validate(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(Role))
-        return items, total or 0
+        return [RoleRead.model_validate(row) for row in rows], total
 
     @database
     async def create(self, *, name: str, is_system: bool, permission_ids: list[UUID]) -> RoleRead:
@@ -171,12 +175,14 @@ class PermissionRepository(AbstractPermissionRepository):
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[PermissionRead], int]:
         """Return one page of the permission catalog together with the total count."""
-        rows = await self._session.scalars(
-            select(Permission).order_by(Permission.id).limit(limit).offset(offset)
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            Permission,
+            limit=limit,
+            offset=offset,
+            order_by=Permission.id,
         )
-        items = [PermissionRead.model_validate(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(Permission))
-        return items, total or 0
+        return [PermissionRead.model_validate(row) for row in rows], total
 
     @database
     async def list_all(self) -> list[PermissionRead]:

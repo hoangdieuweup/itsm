@@ -7,39 +7,44 @@ from uuid import uuid4
 
 import pytest
 
-from app.core.crypto import FernetCodec
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import DnsRecordType, ManagedBy, TunnelStatus
 from app.modules.cloudflare.exceptions import CloudflareAccountNotFound
 from app.modules.cloudflare.public import CloudflareApi
-from app.modules.cloudflare.schemas import CloudflareTunnelRead, DnsRecordRead, TunnelPublicHostnameRead
-
-TEST_KEY = "kL8Zx3vQ9mN2pR7wT4yU6bC1dF5gH0jK3lM6nO9pQ2s="
-
-
-@pytest.fixture(autouse=True)
-def _fernet_key(monkeypatch) -> None:
-    monkeypatch.setattr(cloudflare_settings, "FERNET_KEY", TEST_KEY)
+from app.modules.cloudflare.schemas import (
+    CloudflareCredentials,
+    CloudflareTunnelRead,
+    DnsRecordRead,
+    TunnelPublicHostnameRead,
+)
 
 
 class FakeAccountsRepo:
-    def __init__(self, accounts=None, token_ciphertexts=None) -> None:
+    def __init__(self, accounts=None, tokens=None) -> None:
         self._accounts = accounts or {}
-        self._tokens = token_ciphertexts or {}
+        self._tokens = tokens or {}
         self._webhook_destinations: dict = {}
         self.set_webhook_destination_calls = []
 
     async def get_by_id(self, account_id):
         return self._accounts.get(account_id)
 
-    async def get_token_ciphertext(self, account_id):
-        return self._tokens.get(account_id)
+    async def get_credentials(self, account_id):
+        account = self._accounts.get(account_id)
+        token = self._tokens.get(account_id)
+        if account is None or token is None:
+            return None
+        return CloudflareCredentials(
+            account_id=account.id, cf_account_id=account.cf_account_id, api_token=token
+        )
 
-    async def get_webhook_destination_ciphertext(self, account_id):
-        return self._webhook_destinations.get(account_id, (None, None))
+    async def get_webhook_destination_id(self, account_id):
+        return self._webhook_destinations.get(account_id, (None, None))[0]
 
-    async def set_webhook_destination(self, account_id, *, cf_webhook_destination_id, secret_ciphertext):
-        self._webhook_destinations[account_id] = (cf_webhook_destination_id, secret_ciphertext)
+    async def get_webhook_secret(self, account_id):
+        return self._webhook_destinations.get(account_id, (None, None))[1]
+
+    async def set_webhook_destination(self, account_id, *, cf_webhook_destination_id, secret):
+        self._webhook_destinations[account_id] = (cf_webhook_destination_id, secret)
         self.set_webhook_destination_calls.append(account_id)
 
 
@@ -269,11 +274,11 @@ class TestGetReadyClientForEnvironment:
         env_id, account_id = uuid4(), uuid4()
         account = SimpleNamespace(id=account_id, cf_account_id="cf-123")
         config = SimpleNamespace(cloudflare_account_id=account_id, zone_id="z1")
-        ciphertext = FernetCodec.encrypt("real-token", key=TEST_KEY)
+        token = "real-token"
         client = FakeCloudflareClient()
         api = CloudflareApi(
             FakeUow(
-                FakeAccountsRepo({account_id: account}, {account_id: ciphertext}),
+                FakeAccountsRepo({account_id: account}, {account_id: token}),
                 FakeConfigsRepo({env_id: config}),
             ),
             client=client,
@@ -296,10 +301,10 @@ class TestGetReadyClientForAccount:
     async def test_returns_ready_client_when_account_exists(self) -> None:
         account_id = uuid4()
         account = SimpleNamespace(id=account_id, cf_account_id="cf-123")
-        ciphertext = FernetCodec.encrypt("real-token", key=TEST_KEY)
+        token = "real-token"
         client = FakeCloudflareClient()
         api = CloudflareApi(
-            FakeUow(FakeAccountsRepo({account_id: account}, {account_id: ciphertext})),
+            FakeUow(FakeAccountsRepo({account_id: account}, {account_id: token})),
             client=client,
             projects_api=object(),
         )
@@ -316,8 +321,8 @@ class TestEnsureWebhookDestination:
     async def test_registers_new_destination_and_returns_id(self) -> None:
         account_id = uuid4()
         account = SimpleNamespace(id=account_id, cf_account_id="cf-123")
-        ciphertext = FernetCodec.encrypt("real-token", key=TEST_KEY)
-        accounts_repo = FakeAccountsRepo({account_id: account}, {account_id: ciphertext})
+        token = "real-token"
+        accounts_repo = FakeAccountsRepo({account_id: account}, {account_id: token})
         client = FakeCloudflareClient(destination_id="wh-new")
         api = CloudflareApi(FakeUow(accounts_repo), client=client, projects_api=object())
 
@@ -357,9 +362,9 @@ class TestGetWebhookSecret:
 
     async def test_returns_decrypted_secret_when_registered(self) -> None:
         account_id = uuid4()
-        secret_ciphertext = FernetCodec.encrypt("real-secret", key=TEST_KEY)
+        secret = "real-secret"
         accounts_repo = FakeAccountsRepo()
-        accounts_repo._webhook_destinations[account_id] = ("wh-1", secret_ciphertext)
+        accounts_repo._webhook_destinations[account_id] = ("wh-1", secret)
         api = CloudflareApi(FakeUow(accounts_repo), client=FakeCloudflareClient(), projects_api=object())
 
         assert await api.get_webhook_secret(account_id) == "real-secret"
@@ -367,9 +372,7 @@ class TestGetWebhookSecret:
 
 def _bound_account(account_id, token="real-token"):
     account = SimpleNamespace(id=account_id, cf_account_id="cf-123")
-    accounts_repo = FakeAccountsRepo(
-        {account_id: account}, {account_id: FernetCodec.encrypt(token, key=TEST_KEY)}
-    )
+    accounts_repo = FakeAccountsRepo({account_id: account}, {account_id: token})
     return account, accounts_repo
 
 

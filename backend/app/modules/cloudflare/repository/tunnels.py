@@ -5,12 +5,13 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import exists as sa_exists
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database
 from app.core.base.repository import AbstractRepository
+from app.core.pagination import PageQuery
 from app.modules.cloudflare.constants import TunnelStatus
 from app.modules.cloudflare.exceptions import CloudflareTunnelNotFound
 from app.modules.cloudflare.models import (
@@ -99,12 +100,14 @@ class CloudflareTunnelRepository(AbstractCloudflareTunnelRepository):
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[CloudflareTunnelRead], int]:
         """Required by AbstractRepository; tunnels are listed per-account in practice."""
-        rows = await self._session.scalars(
-            select(CloudflareTunnel).order_by(CloudflareTunnel.id).limit(limit).offset(offset)
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            CloudflareTunnel,
+            limit=limit,
+            offset=offset,
+            order_by=CloudflareTunnel.id,
         )
-        items = [CloudflareTunnelRead.model_validate(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(CloudflareTunnel))
-        return items, total or 0
+        return [CloudflareTunnelRead.model_validate(row) for row in rows], total
 
     @database
     async def list_for_account(self, cloudflare_account_id: UUID) -> list[CloudflareTunnelRead]:

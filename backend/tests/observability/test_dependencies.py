@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.modules.cloudflare.public import CloudflareWebhookSecretUnreadable
 from app.modules.observability.config import observability_settings
 from app.modules.observability.constants import (
     AlertRuleSource,
@@ -209,3 +210,18 @@ class TestVerifyLokiWebhookSecret:
     async def test_correct_bearer_passes(self, monkeypatch) -> None:
         monkeypatch.setattr(observability_settings, "LOKI_WEBHOOK_SECRET", "real-secret")
         await verify_loki_webhook_secret(authorization="Bearer real-secret")  # no raise
+
+
+class RaisingCloudflareApiForWebhook:
+    async def get_webhook_secret(self, account_id):
+        raise CloudflareWebhookSecretUnreadable()
+
+
+class TestVerifyCloudflareWebhookSecretUnreadable:
+    async def test_unreadable_stored_secret_rejects(self) -> None:
+        with pytest.raises(InvalidWebhookSecret):
+            await verify_cloudflare_webhook_secret(
+                cloudflare_account_id=uuid4(),
+                cf_webhook_auth="anything",
+                cloudflare_api=RaisingCloudflareApiForWebhook(),
+            )

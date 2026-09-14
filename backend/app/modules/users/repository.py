@@ -4,11 +4,12 @@ from abc import abstractmethod
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
+from app.core.pagination import PageQuery
 from app.integrations.cache.client import CacheClient
 from app.modules.common.constants import UserStatus
 from app.modules.users.constants import UsersCacheKeys
@@ -106,10 +107,14 @@ class UserRepository(AbstractUserRepository):
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[UserRead], int]:
         """Return one page of users together with the total count."""
-        rows = await self._session.scalars(select(User).order_by(User.id).limit(limit).offset(offset))
-        items = [UserRead.model_validate(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(User))
-        return items, total or 0
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            User,
+            limit=limit,
+            offset=offset,
+            order_by=User.id,
+        )
+        return [UserRead.model_validate(row) for row in rows], total
 
     @database
     async def create(

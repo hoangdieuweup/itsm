@@ -16,13 +16,11 @@ from uuid import UUID
 
 from app.core.base.markers import helper, use_case
 from app.core.base.use_case import AbstractUseCase
-from app.core.crypto import FernetCodec
 from app.integrations.cache.client import CacheClient
 from app.integrations.cache.keys import CacheKeyBuilder
 from app.integrations.cloudflare.client import CloudflareClient
 from app.modules.audit.constants import AuditEventType, AuditSeverity, AuditSource
 from app.modules.audit.public import AuditActor, AuditApi
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.constants import CloudflareTunnelAuditActions, CloudflareTunnelLockDefaults
 from app.modules.cloudflare.exceptions import (
     CloudflareConfigNotFound,
@@ -106,16 +104,14 @@ class AddTunnelHostname(AbstractUseCase):
             raise TunnelConfigLocked()
 
         try:
-            ciphertext = await self._uow.accounts.get_token_ciphertext(config.cloudflare_account_id)
-            if ciphertext is None:
-                raise CloudflareConfigNotFound()
-            plaintext = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
-            account = await self._uow.accounts.get_by_id(config.cloudflare_account_id)
-            if account is None:
+            credentials = await self._uow.accounts.get_credentials(config.cloudflare_account_id)
+            if credentials is None:
                 raise CloudflareConfigNotFound()
 
             current_ingress = await self._client.get_tunnel_configuration(
-                cf_account_id=account.cf_account_id, cf_tunnel_id=tunnel.cf_tunnel_id, api_token=plaintext
+                cf_account_id=credentials.cf_account_id,
+                cf_tunnel_id=tunnel.cf_tunnel_id,
+                api_token=credentials.api_token,
             )
             named_rules = [r for r in current_ingress if not self._is_catch_all(r)]
             catch_all = [r for r in current_ingress if self._is_catch_all(r)]
@@ -123,9 +119,9 @@ class AddTunnelHostname(AbstractUseCase):
             new_ingress = [*named_rules, new_rule, *catch_all]
 
             await self._client.put_tunnel_configuration(
-                cf_account_id=account.cf_account_id,
+                cf_account_id=credentials.cf_account_id,
                 cf_tunnel_id=tunnel.cf_tunnel_id,
-                api_token=plaintext,
+                api_token=credentials.api_token,
                 ingress=new_ingress,
             )
 
@@ -148,9 +144,9 @@ class AddTunnelHostname(AbstractUseCase):
                 )
                 try:
                     await self._client.put_tunnel_configuration(
-                        cf_account_id=account.cf_account_id,
+                        cf_account_id=credentials.cf_account_id,
                         cf_tunnel_id=tunnel.cf_tunnel_id,
-                        api_token=plaintext,
+                        api_token=credentials.api_token,
                         ingress=current_ingress,
                     )
                     logger.critical("Compensating PUT-back succeeded (tunnel_id=%s)", tunnel_id)

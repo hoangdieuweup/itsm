@@ -35,9 +35,7 @@ from uuid import UUID
 
 from app.core.base.markers import helper, use_case
 from app.core.base.use_case import AbstractUseCase
-from app.core.crypto import FernetCodec
 from app.integrations.cloudflare.client import CloudflareClient
-from app.modules.cloudflare.config import cloudflare_settings
 from app.modules.cloudflare.rules import TunnelHostnameRules, TunnelSyncRules
 from app.modules.cloudflare.schemas import CloudflareTunnelRead
 from app.modules.cloudflare.uow import AbstractCloudflareUnitOfWork
@@ -65,30 +63,25 @@ class SyncTunnels(AbstractUseCase):
         if config is None:
             return await self._uow.tunnels.list_for_environment_via_hostnames(environment_id)
 
-        ciphertext = await self._uow.accounts.get_token_ciphertext(config.cloudflare_account_id)
-        if ciphertext is None:
-            return await self._uow.tunnels.list_for_environment_via_hostnames(environment_id)
-        api_token = FernetCodec.decrypt(ciphertext, key=cloudflare_settings.FERNET_KEY)
-
-        account = await self._uow.accounts.get_by_id(config.cloudflare_account_id)
-        if account is None:
+        credentials = await self._uow.accounts.get_credentials(config.cloudflare_account_id)
+        if credentials is None:
             return await self._uow.tunnels.list_for_environment_via_hostnames(environment_id)
 
         now = datetime.now(UTC)
         try:
             cf_tunnels = await self._client.list_tunnels(
-                cf_account_id=account.cf_account_id, api_token=api_token
+                cf_account_id=credentials.cf_account_id, api_token=credentials.api_token
             )
         except Exception:
             logger.warning(
                 "cloudflare list_tunnels failed for account %s; returning cached rows",
-                account.id,
+                credentials.account_id,
                 exc_info=True,
             )
             return await self._uow.tunnels.list_for_environment_via_hostnames(environment_id)
 
         seen_cf_ids: set[str] = set()
-        candidates = await self._resolve_sibling_environments(account.id)
+        candidates = await self._resolve_sibling_environments(credentials.account_id)
 
         for cf_t in cf_tunnels:
             cf_tid = cf_t.get("id")
@@ -100,7 +93,7 @@ class SyncTunnels(AbstractUseCase):
             status = TunnelSyncRules.map_cf_status(cf_t.get("status", ""))
 
             tunnel = await self._uow.tunnels.upsert_from_sync(
-                cloudflare_account_id=account.id,
+                cloudflare_account_id=credentials.account_id,
                 cf_tunnel_id=cf_tid,
                 name=name,
                 status=status,
@@ -109,15 +102,15 @@ class SyncTunnels(AbstractUseCase):
 
             await self._sync_ingress(
                 tunnel_id=tunnel.id,
-                cf_account_id=account.cf_account_id,
+                cf_account_id=credentials.cf_account_id,
                 cf_tunnel_id=cf_tid,
-                api_token=api_token,
+                api_token=credentials.api_token,
                 candidates=candidates,
                 now=now,
             )
 
         await self._uow.tunnels.mark_missing_tunnels_down(
-            cloudflare_account_id=account.id, active_cf_tunnel_ids=seen_cf_ids, synced_at=now
+            cloudflare_account_id=credentials.account_id, active_cf_tunnel_ids=seen_cf_ids, synced_at=now
         )
 
         await self._uow.commit()

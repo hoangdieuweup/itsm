@@ -3,13 +3,17 @@
 from abc import abstractmethod
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database, helper
 from app.core.base.repository import AbstractRepository
+from app.core.crypto import FernetCodec
+from app.core.exceptions import SecretUnreadableError
+from app.core.pagination import PageQuery
+from app.modules.observability.config import observability_settings
 from app.modules.observability.constants import LokiAuthType
-from app.modules.observability.exceptions import LokiConfigNotFound
+from app.modules.observability.exceptions import LokiConfigNotFound, LokiCredentialUnreadable
 from app.modules.observability.models import LokiConfig
 from app.modules.observability.schemas import LokiConfigRead
 
@@ -23,11 +27,11 @@ class AbstractLokiConfigRepository(AbstractRepository[LokiConfigRead, UUID]):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_credential_ciphertext(self, environment_id: UUID) -> str | None:
-        """Return the raw (still-encrypted) credential column, or None if
-        unconfigured or no credential was ever set. Bypasses LokiConfigRead
-        entirely — mirrors CloudflareAccountRepository.get_token_ciphertext,
-        same reasoning: a secret never enters the safe Read schema."""
+    async def get_credential(self, environment_id: UUID) -> str | None:
+        """Return the decrypted credential, or None if unconfigured or none was
+        ever set. Bypasses LokiConfigRead entirely — mirrors
+        CloudflareAccountRepository.get_credentials, same reasoning: a secret never
+        enters the safe Read schema."""
         raise NotImplementedError
 
     @abstractmethod
@@ -42,7 +46,8 @@ class AbstractLokiConfigRepository(AbstractRepository[LokiConfigRead, UUID]):
         default_query: str,
         default_range_minutes: int,
     ) -> LokiConfigRead:
-        """Create a new config. Caller must confirm no existing config for this environment first."""
+        """Create a new config, encrypting credential. Caller must confirm no existing
+        config for this environment first."""
         raise NotImplementedError
 
     @abstractmethod
@@ -54,10 +59,13 @@ class AbstractLokiConfigRepository(AbstractRepository[LokiConfigRead, UUID]):
         tenant_id: str | None,
         auth_type: LokiAuthType,
         credential: str | None,
+        keep_credential: bool = False,
         default_query: str,
         default_range_minutes: int,
     ) -> LokiConfigRead:
-        """Overwrite an environment's config with the given values."""
+        """Overwrite an environment's config with the given values, encrypting
+        credential. With keep_credential the stored credential column is left
+        untouched, so an update that doesn't rotate it never needs the key."""
         raise NotImplementedError
 
     @abstractmethod
@@ -101,12 +109,14 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
     @database
     async def list_page(self, limit: int, offset: int) -> tuple[list[LokiConfigRead], int]:
         """Required by AbstractRepository; configs are looked up per-environment in practice."""
-        rows = await self._session.scalars(
-            select(LokiConfig).order_by(LokiConfig.id).limit(limit).offset(offset)
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            LokiConfig,
+            limit=limit,
+            offset=offset,
+            order_by=LokiConfig.id,
         )
-        items = [self._to_read(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(LokiConfig))
-        return items, total or 0
+        return [self._to_read(row) for row in rows], total
 
     @database
     async def get_by_environment_id(self, environment_id: UUID) -> LokiConfigRead | None:
@@ -116,11 +126,13 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
         return self._to_read(row) if row else None
 
     @database
-    async def get_credential_ciphertext(self, environment_id: UUID) -> str | None:
+    async def get_credential(self, environment_id: UUID) -> str | None:
         row = await self._session.scalar(
             select(LokiConfig).where(LokiConfig.environment_id == environment_id)
         )
-        return row.credential if row is not None else None
+        if row is None or row.credential is None:
+            return None
+        return self._decrypt(row.credential)
 
     @database
     async def create(
@@ -139,7 +151,7 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
             endpoint_url=endpoint_url,
             tenant_id=tenant_id,
             auth_type=auth_type,
-            credential=credential,
+            credential=self._encrypt(credential),
             default_query=default_query,
             default_range_minutes=default_range_minutes,
         )
@@ -157,6 +169,7 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
         tenant_id: str | None,
         auth_type: LokiAuthType,
         credential: str | None,
+        keep_credential: bool = False,
         default_query: str,
         default_range_minutes: int,
     ) -> LokiConfigRead:
@@ -168,7 +181,8 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
         row.endpoint_url = endpoint_url
         row.tenant_id = tenant_id
         row.auth_type = auth_type
-        row.credential = credential
+        if not keep_credential:
+            row.credential = self._encrypt(credential)
         row.default_query = default_query
         row.default_range_minutes = default_range_minutes
         await self._session.flush()
@@ -183,3 +197,19 @@ class LokiConfigRepository(AbstractLokiConfigRepository):
         if row is not None:
             await self._session.delete(row)
             await self._session.flush()
+
+    @helper
+    def _encrypt(self, plaintext: str | None) -> str | None:
+        """Encrypt a credential with the observability module's key, passing None through."""
+        if plaintext is None:
+            return None
+        return FernetCodec.encrypt(plaintext, key=observability_settings.FERNET_KEY)
+
+    @helper
+    def _decrypt(self, ciphertext: str) -> str:
+        """Decrypt a credential with the observability module's key, raising
+        LokiCredentialUnreadable when it was encrypted under another key."""
+        try:
+            return FernetCodec.decrypt(ciphertext, key=observability_settings.FERNET_KEY)
+        except SecretUnreadableError as exc:
+            raise LokiCredentialUnreadable() from exc

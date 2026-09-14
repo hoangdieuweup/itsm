@@ -4,12 +4,13 @@ from abc import abstractmethod
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base.markers import database
 from app.core.base.repository import AbstractRepository
 from app.core.models import FrozenModel
+from app.core.pagination import PageQuery
 from app.modules.projects.models import ProjectMember
 
 
@@ -76,12 +77,14 @@ class ProjectMemberRepository(AbstractProjectMemberRepository):
     async def list_page(self, limit: int, offset: int) -> tuple[list[ProjectMemberRow], int]:
         """Required by AbstractRepository; membership is listed per-project
         in practice (list_for_project)."""
-        rows = await self._session.scalars(
-            select(ProjectMember).order_by(ProjectMember.created_at).limit(limit).offset(offset)
+        rows, total = await PageQuery.fetch_rows(
+            self._session,
+            ProjectMember,
+            limit=limit,
+            offset=offset,
+            order_by=ProjectMember.created_at,
         )
-        items = [ProjectMemberRow.model_validate(row) for row in rows]
-        total = await self._session.scalar(select(func.count()).select_from(ProjectMember))
-        return items, total or 0
+        return [ProjectMemberRow.model_validate(row) for row in rows], total
 
     @database
     async def is_member(self, project_id: UUID, user_id: UUID) -> bool:
