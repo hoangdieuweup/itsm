@@ -1,13 +1,9 @@
 """Transaction boundary for the projects module."""
 
-import logging
-from abc import abstractmethod
-from uuid import UUID
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.base.markers import database
-from app.core.base.uow import AbstractUnitOfWork
+from app.core.base.uow import AbstractCachedUnitOfWork
+from app.core.uow import CachedSqlAlchemyUnitOfWork
 from app.integrations.cache.client import CacheClient
 from app.modules.projects.repository import (
     AbstractEnvironmentRepository,
@@ -22,10 +18,8 @@ from app.modules.projects.repository import (
     ProjectRoleRepository,
 )
 
-logger = logging.getLogger(__name__)
 
-
-class AbstractProjectsUnitOfWork(AbstractUnitOfWork):
+class AbstractProjectsUnitOfWork(AbstractCachedUnitOfWork):
     """Contract a use case depends on instead of the concrete SQLAlchemy class below."""
 
     projects: AbstractProjectRepository
@@ -34,41 +28,14 @@ class AbstractProjectsUnitOfWork(AbstractUnitOfWork):
     project_members: AbstractProjectMemberRepository
     project_roles: AbstractProjectRoleRepository
 
-    @abstractmethod
-    def mark_stale(self, entity: str, entity_id: UUID) -> None:
-        """Queue a cache entity for invalidation once THIS uow's own commit() runs."""
-        raise NotImplementedError
 
-
-class ProjectsUnitOfWork(AbstractProjectsUnitOfWork):
+class ProjectsUnitOfWork(AbstractProjectsUnitOfWork, CachedSqlAlchemyUnitOfWork):
     """Owns the transaction for the projects module's tables."""
 
     def __init__(self, session: AsyncSession, cache: CacheClient) -> None:
-        self._session = session
-        self._cache = cache
-        self._stale: list[tuple[str, UUID]] = []
+        super().__init__(session, cache)
         self.projects = ProjectRepository(session, cache)
         self.environments = EnvironmentRepository(session, cache)
         self.project_links = ProjectLinkRepository(session)
         self.project_members = ProjectMemberRepository(session)
         self.project_roles = ProjectRoleRepository(session)
-
-    def mark_stale(self, entity: str, entity_id: UUID) -> None:
-        """Queue a cache entity for invalidation once this transaction commits."""
-        self._stale.append((entity, entity_id))
-
-    @database
-    async def commit(self) -> None:
-        """Commit the transaction, then invalidate every queued cache entity — strictly
-        after the database commit, per references/caching.md#order-of-operations."""
-        await self._session.commit()
-        for entity, entity_id in self._stale:
-            await self._cache.bump_version(entity, entity_id)
-        self._stale.clear()
-
-    @database
-    async def rollback(self) -> None:
-        """Roll back the transaction and drop any queued invalidation."""
-        await self._session.rollback()
-        self._stale.clear()
-        logger.warning("projects unit of work rolled back")
