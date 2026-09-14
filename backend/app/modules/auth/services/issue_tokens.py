@@ -23,7 +23,7 @@ class AppTokenSet:
 class IssueTokens(AbstractUseCase):
     """Build the two-tier session's app-level tokens (docs/tasks/sso-login.md #7).
 
-    Independent of DX's own tokens (see app.integrations.dx_core.repository),
+    Independent of DX's own tokens (see app.modules.auth.repository),
     which are stored server side and never leave the backend.
     """
 

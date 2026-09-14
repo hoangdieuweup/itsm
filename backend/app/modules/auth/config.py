@@ -6,13 +6,21 @@ dumping ground and lets a module be extracted with its configuration intact.
 
 from urllib.parse import urlparse
 
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.config import settings
 
 
 class AuthConfig(BaseSettings):
-    """Environment driven settings for the auth module's own session."""
+    """Environment driven settings for the auth module's own session.
+
+    DX_TOKEN_FERNET_KEY encrypts the stored DX token set (dx_tokens). It reads
+    AUTH__DX_TOKEN_FERNET_KEY and falls back to DX_CORE__FERNET_KEY, its name
+    while the dx_core integration owned that table, so an existing env file
+    keeps decrypting the rows already stored. Generate a key with
+    `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+    """
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="AUTH__", extra="ignore")
 
@@ -20,6 +28,10 @@ class AuthConfig(BaseSettings):
     ACCESS_TOKEN_TTL_SECONDS: int = 1800
     REFRESH_TOKEN_TTL_SECONDS: int = 2592000
     COOKIE_SECURE: bool = True
+    DX_TOKEN_FERNET_KEY: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("AUTH__DX_TOKEN_FERNET_KEY", "DX_CORE__FERNET_KEY"),
+    )
 
     @property
     def cookie_domain(self) -> str | None:

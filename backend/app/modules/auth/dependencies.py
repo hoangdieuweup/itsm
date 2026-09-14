@@ -1,7 +1,7 @@
 """Dependency wiring for the auth module.
 
 The composition root: the only place that names a concrete class
-(AuthUnitOfWork, DxTokenRepository, ...) instead of its Abstract* contract.
+(AuthUnitOfWork, IssueTokens, ...) instead of its Abstract* contract.
 
 get_authenticate_with_dx needs RbacApi (rbac.public), and rbac.public
 needs auth.public (for require_permission's current_user), which needs
@@ -27,7 +27,6 @@ from app.integrations.cache.dependencies import get_cache
 from app.integrations.cache.keys import CacheKeyBuilder
 from app.integrations.dx_core.client import DxCoreClient
 from app.integrations.dx_core.dependencies import get_dx_core_client
-from app.integrations.dx_core.repository import AbstractDxTokenRepository, DxTokenRepository
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCacheNamespaces, AuthCookies, TokenType
 from app.modules.auth.exceptions import NotAuthenticated, UserBlocked
@@ -41,16 +40,8 @@ from app.modules.users.public import UserRead, UsersApi, get_users_api
 
 
 async def get_uow(session: AsyncSession = Depends(get_session)) -> AuthUnitOfWork:
-    """Provide the request scoped transaction coordinator for the login flow."""
+    """Provide the request scoped transaction coordinator and DX token repository."""
     return AuthUnitOfWork(session)
-
-
-async def get_dx_token_repository(
-    session: AsyncSession = Depends(get_session),
-) -> AbstractDxTokenRepository:
-    """Provide the DX token repository, sharing this request's session/transaction
-    with get_uow (both resolve from the same cached get_session dependency)."""
-    return DxTokenRepository(session)
 
 
 async def get_current_user(
@@ -114,9 +105,9 @@ async def get_refresh_token(
 
 
 async def get_logout_user(
-    dx_tokens: AbstractDxTokenRepository = Depends(get_dx_token_repository),
+    uow: AuthUnitOfWork = Depends(get_uow),
     dx_client: DxCoreClient = Depends(get_dx_core_client),
     cache: CacheClient = Depends(get_cache),
 ) -> LogoutUser:
     """Provide the logout use case."""
-    return LogoutUser(dx_tokens, dx_client, cache)
+    return LogoutUser(uow, dx_client, cache)

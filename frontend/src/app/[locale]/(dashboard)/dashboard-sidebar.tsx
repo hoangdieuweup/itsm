@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore, type ComponentType } from "react";
+import { useState, useSyncExternalStore, type ComponentType } from "react";
 import { useTranslations } from "next-intl";
 import {
   ChevronLeft,
@@ -12,7 +12,7 @@ import { Link, usePathname } from "@/shared/lib/i18n/navigation";
 import { ROUTES } from "@/shared/constants/routes";
 import { ACTIONS, RESOURCES } from "@/shared/constants/permissions";
 import { Can } from "@/entities/permission";
-import { LanguageSwitch, useAuthSession, useLogout } from "@/modules/auth";
+import { LanguageSwitch, LogoutDialog, useAuthSession, useLogout } from "@/modules/auth";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { AnimatePresence, m } from "@/shared/lib/motion";
 import { cn } from "@/shared/lib/utils";
@@ -425,6 +425,7 @@ export function DashboardSidebar({
   const pathname = usePathname();
   const { data: session } = useAuthSession();
   const logout = useLogout();
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
 
   const isCollapsed = useSyncExternalStore(
     sidebarStore.subscribe,
@@ -517,7 +518,7 @@ export function DashboardSidebar({
           onToggleExpand={() => sidebarStore.toggle(isCollapsed)}
           session={session}
           logoutLabel={tu("logout")}
-          onLogout={() => logout.mutate()}
+          onLogout={() => setIsLogoutDialogOpen(true)}
           isLogoutPending={logout.isPending}
         />
       </aside>
@@ -532,8 +533,18 @@ export function DashboardSidebar({
         logoutLabel={tu("logout")}
         navItems={navItems}
         session={session}
-        onLogout={() => logout.mutate()}
+        onLogout={() => {
+          onMobileClose();
+          setIsLogoutDialogOpen(true);
+        }}
         isLogoutPending={logout.isPending}
+      />
+
+      <LogoutDialog
+        isOpen={isLogoutDialogOpen}
+        onClose={() => setIsLogoutDialogOpen(false)}
+        onConfirm={(variables) => logout.mutate(variables)}
+        isPending={logout.isPending}
       />
     </>
   );

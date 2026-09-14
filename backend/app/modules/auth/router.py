@@ -23,7 +23,7 @@ from app.integrations.dx_core.exceptions import DxCoreUnavailable, TokenExchange
 from app.modules.auth.constants import AuthCookies
 from app.modules.auth.dependencies import get_logout_user, get_refresh_token, require_auth
 from app.modules.auth.exceptions import UserBlocked
-from app.modules.auth.schemas import MeResponse
+from app.modules.auth.schemas import LogoutRequest, LogoutResponse, MeResponse
 from app.modules.auth.services.authenticate import AuthenticateWithDx
 from app.modules.auth.services.logout import LogoutUser
 from app.modules.auth.services.refresh_token import RefreshToken
@@ -98,17 +98,20 @@ async def refresh(
 async def logout(
     request: Request,
     response: Response,
+    body: LogoutRequest | None = None,
     user: UserRead = Depends(require_auth),
     logout_user: LogoutUser = Depends(get_logout_user),
-) -> ApiResponse[None]:
-    """Revoke the DX token and clear the app session."""
-    await logout_user.execute(
+) -> ApiResponse[LogoutResponse]:
+    """Revoke the stored DX tokens and clear the app session. With endDxSession,
+    also return the DX logout URL the browser visits to end its WeUp DX session."""
+    dx_logout_url = await logout_user.execute(
         user.id,
         request.cookies.get(AuthCookies.ACCESS_TOKEN),
         request.cookies.get(AuthCookies.REFRESH_TOKEN),
+        end_dx_session=body.end_dx_session if body else False,
     )
     AuthSessionResponses.clear_session_cookies(response)
-    return ApiResponse[None](success=True)
+    return ApiResponse[LogoutResponse](success=True, data=LogoutResponse(dx_logout_url=dx_logout_url))
 
 
 @router.get("/me")
