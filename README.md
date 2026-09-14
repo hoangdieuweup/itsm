@@ -114,9 +114,8 @@ Then fill in the settings for the features you use:
 |---|---|
 | `BACKEND_BASE_URL`, `FRONTEND_BASE_URL` | Building the SSO redirect URI and sending the user back to the web app. The frontend URL is also allowed by CORS. |
 | `AUTH__JWT_SECRET` | Signing session tokens |
-| `DX_CORE__CLIENT_ID`, `DX_CORE__CLIENT_SECRET`, `DX_CORE__SCOPES` | SSO sign-in. Register `<BACKEND_BASE_URL>/api/v1/auth/oauth/dx/callback` as the redirect URI. |
+| `DX_CORE__CLIENT_ID`, `DX_CORE__CLIENT_SECRET`, `DX_CORE__SCOPES` | SSO sign-in. On the DX client, register `<BACKEND_BASE_URL>/api/v1/auth/oauth/dx/callback` as the redirect URI and the ITSM login page (for example `<FRONTEND_BASE_URL>/login`) as the post-logout redirect URI. |
 | `AUTH__DX_TOKEN_FERNET_KEY` | Encrypting the stored DX tokens. `DX_CORE__FERNET_KEY`, its former name, is still read when it is unset. |
-| `DX_CORE__POST_LOGOUT_REDIRECT_URI` | Optional. Where WeUp DX sends the browser after a user also signs out of WeUp DX. Leave it empty to use the URI registered for this client on DX. |
 | `USERS__ADMIN_EMAIL` | Optional break-glass admin, created by `seed_admin` |
 | `CLOUDFLARE__FERNET_KEY` | Encrypting Cloudflare API tokens |
 | `OBSERVABILITY__FERNET_KEY` | Encrypting Loki credentials |

@@ -104,13 +104,11 @@ class DxCoreClient:
     def build_logout_url(self) -> str:
         """Build the RP-initiated logout URL that ends the browser's DX SSO session.
 
-        post_logout_redirect_uri is sent only when configured: DX redirects to
-        the URI registered for this client when the parameter is absent or
-        equal to it, and to its own login page otherwise.
+        Only client_id is sent. DX keeps one post_logout_redirect_uri per client and
+        redirects there when none is requested; a requested URI can only repeat that
+        value or, when it differs, send the browser to DX's own login page instead.
         """
         params = {"client_id": dx_core_settings.CLIENT_ID}
-        if dx_core_settings.POST_LOGOUT_REDIRECT_URI:
-            params["post_logout_redirect_uri"] = dx_core_settings.POST_LOGOUT_REDIRECT_URI
         base = str(dx_core_settings.API_BASE_URL).rstrip("/")
         return f"{base}{DxEndpoints.LOGOUT}?{urlencode(params)}"
 
