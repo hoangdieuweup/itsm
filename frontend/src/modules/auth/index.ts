@@ -1,5 +1,6 @@
 export { LoginForm } from "./ui/login-form";
 export { UserMenu } from "./ui/user-menu";
+export { LogoutDialog } from "./ui/logout-dialog";
 export { AuthGuard } from "./ui/auth-guard";
 export { LanguageSwitch } from "./ui/language-switch";
 export { useAuthSession } from "./hooks/use-auth-session";
