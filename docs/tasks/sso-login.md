@@ -680,6 +680,11 @@ def resolve_role(profile_roles: list[dict], department_code: str | None) -> Role
 
 ## 9. Refresh Token & Concurrency
 
+> [!NOTE]
+> **ITSM:** chưa dùng luồng này. ITSM chỉ giữ token DX để thu hồi lúc đăng xuất, không gọi API DX thay mặt user,
+> nên không cần refresh token DX hay mutex. Phần dựng sẵn cho luồng này (hằng khoá refresh, `DxNotLinked`,
+> `DxRefreshFailed`, `DxCoreClient.refresh`) đã được xoá ngày 2026-09-14.
+
 ### Vấn đề
 
 DX **rotate refresh token** mỗi lần dùng. Nếu 2 request concurrent cùng refresh → DX coi là token reuse → **revoke toàn bộ token chain**.
@@ -729,6 +734,17 @@ async def wait_for_other_refresh(db, user_id) -> dict:
 ---
 
 ## 10. Logout & Revoke
+
+> [!NOTE]
+> **ITSM (theo dx-core-service `70c9c8a`):**
+> - `POST /api/v1/auth/logout` thu hồi **refresh token rồi access token** của DX. `/oauth2/revoke` chỉ blacklist `jti`
+>   của access token, còn refresh token (7 ngày) phải được thu hồi riêng. Sau đó xoá dòng `dx_tokens` (module `auth`),
+>   blacklist JWT của app và xoá cookie.
+> - Body tuỳ chọn `{"endDxSession": true}` trả về `{"dxLogoutUrl": ".../oauth2/logout?client_id=..."}`. Frontend chuyển
+>   trình duyệt tới URL đó để DX kết thúc phiên SSO (cookie `sso_sid`), rồi DX redirect về `post_logout_redirect_uri`
+>   đã đăng ký cho client. `DX_CORE__POST_LOGOUT_REDIRECT_URI` chỉ được gửi khi có cấu hình.
+> - UI: modal xác nhận đăng xuất có switch "Đăng xuất khỏi cả WeUp DX", mặc định tắt.
+> - Key mã hoá token DX: `AUTH__DX_TOKEN_FERNET_KEY` (vẫn đọc `DX_CORE__FERNET_KEY` nếu chưa đặt).
 
 ```python
 # auth_service.py

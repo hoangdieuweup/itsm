@@ -178,3 +178,12 @@ The DX contract is taken from dx-core-service `docs/sso.md` and `src/modules/aut
 - **DX may not be deployed yet.** `70c9c8a` is not on dx-core-service `main`. Until it is deployed, `/oauth2/logout` sends clients outside `weupbook.com` to the DX login page. ITSM's client also needs a registered `post_logout_redirect_uri` on DX.
 - **Ending the DX session has side effects.** It stops silent login for every DX app in that browser, which is why the switch is opt-in and off by default.
 - **Revoked refresh tokens must not be reused.** `/oauth2/revoke` leaves `revokedReason` empty. Reusing that token would trigger DX theft detection for the user–client pair. ITSM deletes the row immediately, so the token is never reused.
+
+## Execution Notes (2026-09-14)
+
+- Commits on `feature/dx-sso-logout-and-token-ownership`: `5d23f0f` (plan), `22bba7d` (Task 1), `8d365ca` (Task 2; git records the model and repository as renames), `bc87513` (Task 3), then Task 4 and Task 5.
+- Backend: 721 tests passed (698 before; +13 client, +4 config, +3 repository, +3 service), ruff clean, lint-imports 11/11, module boundaries ok, OpenAPI still 65 paths.
+- Frontend: vitest 53 passed (+6 `LogoutDialog`), eslint and `tsc --noEmit` clean.
+- GitNexus rated Task 3 HIGH (8 flows) because the login callback and logout both run through the changed use cases; `tests/auth/test_router.py` covers both flows end to end against real Postgres and Redis.
+- `ConfirmDialog` (CRITICAL) was not touched; `LogoutDialog` composes `Dialog`.
+- Not verified here: the flow against a real WeUp DX, which needs dx-core-service `70c9c8a` deployed and a `post_logout_redirect_uri` registered for the ITSM client, and a manual browser check of the dialog.

@@ -13,6 +13,7 @@ The repository holds two apps:
 |---|---|
 | Projects | Projects, their environments, external links (Jira, Git), members and project-scoped roles |
 | Access control | Global roles and permissions, per-project roles, a break-glass admin account |
+| Sign-in | WeUp DX SSO. Signing out asks for confirmation and can also end the WeUp DX session in that browser |
 | Cloudflare | Accounts with encrypted API tokens, account managers, DNS records, tunnels and their public hostnames, traffic stats |
 | Observability | Per-environment Loki configuration, log search and live tail, alert rules, incidents (acknowledge and resolve), alert webhooks from Cloudflare and Alertmanager |
 | Drift reconciliation | A scheduled job that re-checks DNS and tunnel state in Cloudflare and opens an incident when something changed outside the app |
@@ -114,7 +115,8 @@ Then fill in the settings for the features you use:
 | `BACKEND_BASE_URL`, `FRONTEND_BASE_URL` | Building the SSO redirect URI and sending the user back to the web app. The frontend URL is also allowed by CORS. |
 | `AUTH__JWT_SECRET` | Signing session tokens |
 | `DX_CORE__CLIENT_ID`, `DX_CORE__CLIENT_SECRET`, `DX_CORE__SCOPES` | SSO sign-in. Register `<BACKEND_BASE_URL>/api/v1/auth/oauth/dx/callback` as the redirect URI. |
-| `DX_CORE__FERNET_KEY` | Encrypting stored DX tokens |
+| `AUTH__DX_TOKEN_FERNET_KEY` | Encrypting the stored DX tokens. `DX_CORE__FERNET_KEY`, its former name, is still read when it is unset. |
+| `DX_CORE__POST_LOGOUT_REDIRECT_URI` | Optional. Where WeUp DX sends the browser after a user also signs out of WeUp DX. Leave it empty to use the URI registered for this client on DX. |
 | `USERS__ADMIN_EMAIL` | Optional break-glass admin, created by `seed_admin` |
 | `CLOUDFLARE__FERNET_KEY` | Encrypting Cloudflare API tokens |
 | `OBSERVABILITY__FERNET_KEY` | Encrypting Loki credentials |
