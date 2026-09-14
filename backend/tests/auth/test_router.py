@@ -15,6 +15,7 @@ from httpx import AsyncClient
 from app.config import settings
 from app.integrations.dx_core.client import DxCoreClient, DxDepartment, DxUserProfile
 from app.integrations.dx_core.config import dx_core_settings
+from app.integrations.dx_core.constants import DxEndpoints
 from app.integrations.dx_core.dependencies import get_dx_core_client
 from app.main import app
 from app.modules.auth.constants import AuthCookies
@@ -29,12 +30,13 @@ class _FakeDxTokenSet:
 
 
 class _FakeDxCoreClient:
-    """Overrides only the network methods; PKCE/authorize-URL logic stays real
-    (bound from the real DxCoreClient, which do no I/O — see their own markers)."""
+    """Overrides only the network methods; PKCE, authorize-URL and logout-URL logic
+    stays real (bound from the real DxCoreClient, which do no I/O — see their own markers)."""
 
     CALLBACK_PATH = DxCoreClient.CALLBACK_PATH
     generate_pkce_pair = DxCoreClient.generate_pkce_pair
     build_authorize_url = DxCoreClient.build_authorize_url
+    build_logout_url = DxCoreClient.build_logout_url
     _redirect_uri = DxCoreClient._redirect_uri
 
     def __init__(self, profile: DxUserProfile) -> None:
@@ -79,6 +81,17 @@ async def _start_and_get_state(client: AsyncClient) -> str:
     assert query["client_id"] == [dx_core_settings.CLIENT_ID]
     assert query["code_challenge_method"] == ["S256"]
     return query["state"][0]
+
+
+async def _sign_in(client: AsyncClient, profile: DxUserProfile) -> tuple[_FakeDxCoreClient, dict[str, str]]:
+    fake = _install_fake_dx_client(profile)
+    state = await _start_and_get_state(client)
+    callback = await client.get(
+        "/api/v1/auth/oauth/dx/callback", params={"code": "auth-code", "state": state}
+    )
+    session_cookies = dict(callback.cookies)
+    client.cookies.update(session_cookies)
+    return fake, session_cookies
 
 
 class TestOAuthStart:
@@ -169,25 +182,38 @@ class TestMeWithoutSession:
 
 
 class TestLogout:
-    async def test_logout_clears_cookies_and_blacklists_the_session(self, client: AsyncClient) -> None:
-        fake = _install_fake_dx_client(_profile(email="frank@example.com", sub="dx-sub-router-4"))
-        state = await _start_and_get_state(client)
-        callback = await client.get(
-            "/api/v1/auth/oauth/dx/callback", params={"code": "auth-code", "state": state}
+    async def test_logout_revokes_both_dx_tokens_clears_cookies_and_blacklists_the_session(
+        self, client: AsyncClient
+    ) -> None:
+        fake, session_cookies = await _sign_in(
+            client, _profile(email="frank@example.com", sub="dx-sub-router-4")
         )
-        client.cookies.update(callback.cookies)
 
         response = await client.post("/api/v1/auth/logout")
 
         assert response.status_code == 200
-        assert response.json()["success"] is True
-        assert fake.revoked == ["dx-access-token"]
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"] == {"dxLogoutUrl": None}
+        assert fake.revoked == ["dx-refresh-token", "dx-access-token"]
         set_cookie_headers = response.headers.get_list("set-cookie")
         assert any(AuthCookies.ACCESS_TOKEN in h and "Max-Age=0" in h for h in set_cookie_headers)
 
-        client.cookies.update(callback.cookies)  # simulate a stolen, not-yet-expired cookie
+        client.cookies.update(session_cookies)
         me_after_logout = await client.get("/api/v1/auth/me")
         assert me_after_logout.status_code == 401
+
+    async def test_logout_returns_the_dx_logout_url_when_ending_the_dx_session(
+        self, client: AsyncClient
+    ) -> None:
+        await _sign_in(client, _profile(email="heidi@example.com", sub="dx-sub-router-6"))
+
+        response = await client.post("/api/v1/auth/logout", json={"endDxSession": True})
+
+        assert response.status_code == 200
+        logout_url = urlparse(response.json()["data"]["dxLogoutUrl"])
+        assert logout_url.path == DxEndpoints.LOGOUT
+        assert parse_qs(logout_url.query)["client_id"] == [dx_core_settings.CLIENT_ID]
 
 
 class TestRefreshEndpoint:

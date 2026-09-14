@@ -218,6 +218,9 @@ class FakeDxCoreClient:
     async def revoke(self, token: str) -> None:
         self.revoked.append(token)
 
+    def build_logout_url(self) -> str:
+        return "https://dx.test/oauth2/logout?client_id=itsm"
+
 
 @dataclass
 class FakeEventBus:
@@ -285,6 +288,22 @@ class TestSyncExternalUser:
         assert is_new is False
         assert user.id == existing.id
         assert user.external_user_id == "dx-sub-new"
+
+    async def test_new_user_without_a_dx_name_is_named_after_their_email(self) -> None:
+        """DX leaves name out for a user with no full name, and users.name cannot be empty."""
+        use_case = SyncExternalUser(FakeUsersApi())
+
+        user, _ = await use_case.execute(_dx_profile(name=None))
+
+        assert user.name == "alice@example.com"
+
+    async def test_returning_user_without_a_dx_name_keeps_their_stored_name(self) -> None:
+        use_case = SyncExternalUser(FakeUsersApi())
+        await use_case.execute(_dx_profile(name="Alice"))
+
+        user, _ = await use_case.execute(_dx_profile(name=None))
+
+        assert user.name == "Alice"
 
 
 class TestIssueTokens:
@@ -416,25 +435,35 @@ class TestLogoutUser:
             algorithm="HS256",
         )
 
-    async def test_revokes_dx_token_clears_link_and_blacklists_both_app_tokens(self, cache_client) -> None:
+    async def test_revokes_both_dx_tokens_and_blacklists_the_app_tokens(self, cache_client) -> None:
         uow = FakeAuthUnitOfWork()
         dx_tokens = uow.dx_tokens
         user_id = uuid4()
         await dx_tokens.save(
-            user_id, FakeDxTokenSet(access_token="plain-dx-token"), expires_at=datetime.now(UTC)
+            user_id,
+            FakeDxTokenSet(access_token="plain-dx-token", refresh_token="plain-dx-refresh"),
+            expires_at=datetime.now(UTC),
         )
         dx_client = FakeDxCoreClient()
         use_case = LogoutUser(uow, dx_client, cache_client)
         access = self._valid_token(sub=str(user_id))
         refresh = self._valid_token(sub=str(user_id))
 
-        await use_case.execute(user_id, access, refresh)
+        result = await use_case.execute(user_id, access, refresh)
 
-        assert dx_client.revoked == ["plain-dx-token"]
+        assert result is None
+        assert dx_client.revoked == ["plain-dx-refresh", "plain-dx-token"]
         assert dx_tokens.cleared == [user_id]
         assert uow.commits == 1
         assert await cache_client.get_json(_blacklist_key(access)) == {"revoked": True}
         assert await cache_client.get_json(_blacklist_key(refresh)) == {"revoked": True}
+
+    async def test_returns_the_dx_logout_url_when_ending_the_dx_session(self, cache_client) -> None:
+        use_case = LogoutUser(FakeAuthUnitOfWork(), FakeDxCoreClient(), cache_client)
+
+        result = await use_case.execute(uuid4(), None, None, end_dx_session=True)
+
+        assert result == "https://dx.test/oauth2/logout?client_id=itsm"
 
     async def test_skips_dx_revoke_when_user_never_linked(self, cache_client) -> None:
         uow = FakeAuthUnitOfWork()

@@ -15,13 +15,19 @@ from app.modules.auth.uow import AbstractAuthUnitOfWork
 
 
 class LogoutUser(AbstractUseCase):
-    """Best-effort revoke at DX, clear the stored DX token set, then blacklist
-    the caller's own session tokens (docs/tasks/sso-login.md #10) so a
-    stolen-but-not-yet-expired cookie can't keep working after logout.
+    """Revoke the stored DX tokens, clear them, then blacklist the caller's own
+    session tokens (docs/tasks/sso-login.md #10) so a stolen-but-not-yet-expired
+    cookie can't keep working after logout.
 
-    DX revoke is best-effort by design: DxCoreClient.revoke() already
-    swallows any DX outage internally (see its own docstring), so a user is
-    never stuck signed in locally just because DX is unreachable.
+    Both DX tokens are revoked, refresh token first: DX's /oauth2/revoke only
+    blacklists an access token's jti, so the seven-day refresh token stays
+    usable unless it is revoked on its own. Revocation is best-effort by
+    design — DxCoreClient.revoke() swallows any DX outage — so a user is never
+    stuck signed in locally just because DX is unreachable.
+
+    Ending the browser's DX SSO session needs the browser itself (DX reads its
+    sso_sid cookie), so when asked this only returns the DX logout URL for the
+    client to navigate to.
     """
 
     def __init__(self, uow: AbstractAuthUnitOfWork, dx_client: DxCoreClient, cache: CacheClient) -> None:
@@ -30,9 +36,18 @@ class LogoutUser(AbstractUseCase):
         self._cache = cache
 
     @use_case
-    async def execute(self, user_id: UUID, access_token: str | None, refresh_token: str | None) -> None:
+    async def execute(
+        self,
+        user_id: UUID,
+        access_token: str | None,
+        refresh_token: str | None,
+        *,
+        end_dx_session: bool = False,
+    ) -> str | None:
+        """Return the DX logout URL when end_dx_session is set, otherwise None."""
         row = await self._uow.dx_tokens.get_by_user_id(user_id)
         if row is not None:
+            await self._dx_client.revoke(self._uow.dx_tokens.decrypt_refresh_token(row))
             await self._dx_client.revoke(self._uow.dx_tokens.decrypt_access_token(row))
         await self._uow.dx_tokens.clear(user_id)
         await self._uow.commit()
@@ -40,6 +55,8 @@ class LogoutUser(AbstractUseCase):
         for raw in (access_token, refresh_token):
             if raw is not None:
                 await self._blacklist(raw)
+
+        return self._dx_client.build_logout_url() if end_dx_session else None
 
     @helper
     async def _blacklist(self, raw_token: str) -> None:

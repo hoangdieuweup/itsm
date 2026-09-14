@@ -16,6 +16,10 @@ class SyncExternalUser(AbstractUseCase):
     invalidate the cache itself: AuthenticateWithDx owns both, since it
     orchestrates this alongside DX-token-save and role-assignment writes
     that must all succeed or fail together in one transaction.
+
+    DX leaves name out for a user with no full name, while users.name can't
+    be empty: a new user is then named after their email, and an existing
+    user keeps the name already stored.
     """
 
     def __init__(self, users_api: UsersApi) -> None:
@@ -31,7 +35,7 @@ class SyncExternalUser(AbstractUseCase):
         if existing is None:
             user = await self._users_api.create(
                 email=profile.email,
-                name=profile.name,
+                name=profile.name or profile.email,
                 external_user_id=profile.sub,
                 employee_code=profile.employee_code,
                 email_confirmed=profile.email_verified,
@@ -41,7 +45,7 @@ class SyncExternalUser(AbstractUseCase):
         user = await self._users_api.update_profile(
             existing.id,
             email=profile.email,
-            name=profile.name,
+            name=profile.name or existing.name,
             external_user_id=profile.sub,
             employee_code=profile.employee_code,
             email_confirmed=profile.email_verified,
