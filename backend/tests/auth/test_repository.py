@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.integrations.dx_core.client import DxTokenSet
 from app.modules.auth.config import auth_settings
+from app.modules.auth.exceptions import DxTokenUnreadable
 from app.modules.auth.repository import DxTokenRepository
 from app.modules.common.constants import UserStatus
 from app.modules.users.models import User
@@ -79,3 +80,18 @@ class TestDxTokenRepository:
         await repository.clear(user.id)
 
         assert await repository.get_by_user_id(user.id) is None
+
+    async def test_reports_unreadable_tokens_when_the_key_changed(
+        self, _session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        user = await _user(_session)
+        repository = DxTokenRepository(_session)
+        await repository.save(user.id, _token_set("dx-at", "dx-rt"), expires_at=datetime.now(UTC))
+        row = await repository.get_by_user_id(user.id)
+        assert row is not None
+        monkeypatch.setattr(auth_settings, "DX_TOKEN_FERNET_KEY", SecretStr(Fernet.generate_key().decode()))
+
+        with pytest.raises(DxTokenUnreadable):
+            repository.decrypt_refresh_token(row)
+        with pytest.raises(DxTokenUnreadable):
+            repository.decrypt_access_token(row)

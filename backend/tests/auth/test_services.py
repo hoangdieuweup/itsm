@@ -17,7 +17,7 @@ from app.integrations.cache.keys import CacheKeyBuilder
 from app.integrations.dx_core.client import DxDepartment, DxUserProfile
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCacheNamespaces, TokenType
-from app.modules.auth.exceptions import NotAuthenticated, UserBlocked
+from app.modules.auth.exceptions import DxTokenUnreadable, NotAuthenticated, UserBlocked
 from app.modules.auth.repository import AbstractDxTokenRepository
 from app.modules.auth.services.authenticate import AuthenticateWithDx
 from app.modules.auth.services.issue_tokens import IssueTokens
@@ -162,6 +162,7 @@ class FakeDxTokenRepository(AbstractDxTokenRepository):
         self._rows: dict[UUID, FakeDxTokenRow] = {}
         self.saved: list[tuple[UUID, str]] = []
         self.cleared: list[UUID] = []
+        self.unreadable = False
 
     async def get_by_user_id(self, user_id: UUID) -> FakeDxTokenRow | None:
         return self._rows.get(user_id)
@@ -180,9 +181,13 @@ class FakeDxTokenRepository(AbstractDxTokenRepository):
         self.cleared.append(user_id)
 
     def decrypt_access_token(self, row: FakeDxTokenRow) -> str:
+        if self.unreadable:
+            raise DxTokenUnreadable()
         return row.access_token
 
     def decrypt_refresh_token(self, row: FakeDxTokenRow) -> str:
+        if self.unreadable:
+            raise DxTokenUnreadable()
         return row.refresh_token
 
 
@@ -464,6 +469,22 @@ class TestLogoutUser:
         result = await use_case.execute(uuid4(), None, None, end_dx_session=True)
 
         assert result == "https://dx.test/oauth2/logout?client_id=itsm"
+
+    async def test_still_signs_out_when_the_stored_dx_tokens_cannot_be_decrypted(self, cache_client) -> None:
+        """The key changed since the tokens were saved: skip the DX revoke, never fail the logout."""
+        uow = FakeAuthUnitOfWork()
+        user_id = uuid4()
+        await uow.dx_tokens.save(user_id, FakeDxTokenSet(), expires_at=datetime.now(UTC))
+        uow.dx_tokens.unreadable = True
+        dx_client = FakeDxCoreClient()
+        access = self._valid_token(sub=str(user_id))
+
+        await LogoutUser(uow, dx_client, cache_client).execute(user_id, access, None)
+
+        assert dx_client.revoked == []
+        assert uow.dx_tokens.cleared == [user_id]
+        assert uow.commits == 1
+        assert await cache_client.get_json(_blacklist_key(access)) == {"revoked": True}
 
     async def test_skips_dx_revoke_when_user_never_linked(self, cache_client) -> None:
         uow = FakeAuthUnitOfWork()

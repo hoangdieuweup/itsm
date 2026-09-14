@@ -48,6 +48,7 @@ class ErrorCode(StrEnum):
     INVALID_CREDENTIALS = "auth_invalid_credentials"
     NOT_AUTHENTICATED = "auth_not_authenticated"
     USER_BLOCKED = "auth_user_blocked"
+    DX_TOKEN_UNREADABLE = "auth_dx_token_unreadable"
 
 
 class LoginPolicy:

@@ -182,8 +182,9 @@ The DX contract is taken from dx-core-service `docs/sso.md` and `src/modules/aut
 ## Execution Notes (2026-09-14)
 
 - Commits on `feature/dx-sso-logout-and-token-ownership`: `5d23f0f` (plan), `22bba7d` (Task 1), `8d365ca` (Task 2; git records the model and repository as renames), `bc87513` (Task 3), then Task 4 and Task 5.
-- Backend: 721 tests passed (698 before; +13 client, +4 config, +3 repository, +3 service), ruff clean, lint-imports 11/11, module boundaries ok, OpenAPI still 65 paths.
+- Backend: 723 tests passed (698 before; +13 client, +4 config, +4 repository, +4 service), ruff clean, lint-imports 11/11, module boundaries ok, OpenAPI still 65 paths.
 - Frontend: vitest 53 passed (+6 `LogoutDialog`), eslint and `tsc --noEmit` clean.
 - GitNexus rated Task 3 HIGH (8 flows) because the login callback and logout both run through the changed use cases; `tests/auth/test_router.py` covers both flows end to end against real Postgres and Redis.
 - `ConfirmDialog` (CRITICAL) was not touched; `LogoutDialog` composes `Dialog`.
 - Not verified here: the flow against a real WeUp DX, which needs dx-core-service `70c9c8a` deployed and a `post_logout_redirect_uri` registered for the ITSM client, and a manual browser check of the dialog.
+- Follow-up `fix(auth)`: logout used to answer 500 when the stored DX tokens could not be decrypted (a new `AUTH__DX_TOKEN_FERNET_KEY`, a rotated key, or no key). `DxTokenRepository` now raises `DxTokenUnreadable`, and `LogoutUser` skips the DX revoke but still clears the row, blacklists the app tokens and clears the cookies.

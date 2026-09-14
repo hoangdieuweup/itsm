@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from uuid import UUID
 
+from cryptography.fernet import InvalidToken
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +20,7 @@ from app.core.base.markers import database, helper
 from app.core.crypto import FernetCodec
 from app.integrations.dx_core.client import DxTokenSet
 from app.modules.auth.config import auth_settings
+from app.modules.auth.exceptions import DxTokenUnreadable
 from app.modules.auth.models import DxToken
 
 
@@ -104,5 +106,9 @@ class DxTokenRepository(AbstractDxTokenRepository):
 
     @helper
     def _decrypt(self, ciphertext: str) -> str:
-        """Decrypt one token value with the auth module's DX token key."""
-        return FernetCodec.decrypt(ciphertext, key=auth_settings.DX_TOKEN_FERNET_KEY.get_secret_value())
+        """Decrypt one token value with the auth module's DX token key, raising
+        DxTokenUnreadable when it was encrypted under another key or no valid key is set."""
+        try:
+            return FernetCodec.decrypt(ciphertext, key=auth_settings.DX_TOKEN_FERNET_KEY.get_secret_value())
+        except (InvalidToken, ValueError) as exc:
+            raise DxTokenUnreadable() from exc

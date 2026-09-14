@@ -5,7 +5,7 @@ fact about auth: what counts as blocked, what counts as not-signed-in. The
 mechanism they build on lives in app.exceptions.
 """
 
-from app.core.exceptions import ForbiddenError, ValidationFailedError
+from app.core.exceptions import AppError, ForbiddenError, ValidationFailedError
 from app.modules.auth.constants import ErrorCode
 
 
@@ -29,3 +29,13 @@ class NotAuthenticated(ForbiddenError):
     code = ErrorCode.NOT_AUTHENTICATED
     status_code = 401
     message = "Authentication required"
+
+
+class DxTokenUnreadable(AppError):
+    """Raised when a stored DX token can't be decrypted with the current key — it was
+    saved under a different AUTH__DX_TOKEN_FERNET_KEY, or no valid key is set. Logout
+    treats it as nothing left to revoke; it never reaches an HTTP response."""
+
+    code = ErrorCode.DX_TOKEN_UNREADABLE
+    status_code = 500
+    message = "Stored DX token cannot be decrypted with the current key"

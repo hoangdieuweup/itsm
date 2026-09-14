@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -11,7 +12,11 @@ from app.integrations.cache.keys import CacheKeyBuilder
 from app.integrations.dx_core.client import DxCoreClient
 from app.modules.auth.config import auth_settings
 from app.modules.auth.constants import AuthCacheNamespaces
+from app.modules.auth.exceptions import DxTokenUnreadable
+from app.modules.auth.models import DxToken
 from app.modules.auth.uow import AbstractAuthUnitOfWork
+
+logger = logging.getLogger(__name__)
 
 
 class LogoutUser(AbstractUseCase):
@@ -47,8 +52,7 @@ class LogoutUser(AbstractUseCase):
         """Return the DX logout URL when end_dx_session is set, otherwise None."""
         row = await self._uow.dx_tokens.get_by_user_id(user_id)
         if row is not None:
-            await self._dx_client.revoke(self._uow.dx_tokens.decrypt_refresh_token(row))
-            await self._dx_client.revoke(self._uow.dx_tokens.decrypt_access_token(row))
+            await self._revoke_at_dx(row)
         await self._uow.dx_tokens.clear(user_id)
         await self._uow.commit()
 
@@ -57,6 +61,20 @@ class LogoutUser(AbstractUseCase):
                 await self._blacklist(raw)
 
         return self._dx_client.build_logout_url() if end_dx_session else None
+
+    @helper
+    async def _revoke_at_dx(self, row: DxToken) -> None:
+        """Revoke the stored refresh token, then the access token. Skipped when they can't
+        be decrypted (saved under an earlier key, so nothing usable is left to send to DX)
+        rather than failing the logout."""
+        try:
+            refresh = self._uow.dx_tokens.decrypt_refresh_token(row)
+            access = self._uow.dx_tokens.decrypt_access_token(row)
+        except DxTokenUnreadable:
+            logger.warning("dx tokens unreadable at logout, skipping DX revoke user_id=%s", row.user_id)
+            return
+        await self._dx_client.revoke(refresh)
+        await self._dx_client.revoke(access)
 
     @helper
     async def _blacklist(self, raw_token: str) -> None:
