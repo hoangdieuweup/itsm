@@ -1,0 +1,39 @@
+subjects:
+  incident_detected: "[{severity}] Sự cố mới: {title}"
+  test: "Thông báo thử từ ITSM"
+
+headings:
+  incident_detected: "Phát hiện sự cố mới"
+  test: "Thông báo thử"
+
+labels:
+  severity: "Mức độ"
+  category: "Loại sự cố"
+  source: "Nguồn phát hiện"
+  project: "Dự án"
+  environment: "Môi trường"
+  detected_at: "Thời điểm phát hiện"
+  rule: "Quy tắc cảnh báo"
+  view_incident: "Xem sự cố"
+  footer: "Email này được gửi tự động từ hệ thống ITSM."
+  test_body: "Nếu bạn nhận được email này, kênh thông báo đã được cấu hình đúng."
+
+severity:
+  LOW: "Thấp"
+  MEDIUM: "Trung bình"
+  HIGH: "Cao"
+  CRITICAL: "Nghiêm trọng"
+
+category:
+  TRAFFIC: "Lưu lượng bất thường"
+  DDOS: "Tấn công DDoS"
+  ORIGIN_ERROR: "Lỗi máy chủ gốc"
+  DNS_DRIFT: "Sai lệch bản ghi DNS"
+  TUNNEL_DRIFT: "Sai lệch Tunnel"
+  LOG_MATCH: "Khớp mẫu log"
+  MANUAL: "Tạo thủ công"
+
+source:
+  CLOUDFLARE: "Cloudflare"
+  LOKI: "Grafana Loki"
+  MANUAL: "Thủ công"

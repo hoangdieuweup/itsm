@@ -4,7 +4,28 @@ from uuid import UUID
 from pydantic import Field
 
 from app.core.models import CustomModel, FrozenModel
-from app.modules.notifications.constants import NotificationChannelType, NotificationsLimits
+from app.modules.notifications.constants import (
+    NotificationChannelType,
+    NotificationKind,
+    NotificationsLimits,
+)
+
+
+class NotificationEvent(FrozenModel):
+    """What happened, in the shape the templates render. Every field beyond kind
+    and title is optional: a test-send event carries only a title, while an
+    incident carries everything the email table shows."""
+
+    kind: NotificationKind
+    title: str
+    severity: str | None = None
+    category: str | None = None
+    source: str | None = None
+    detected_at: datetime | None = None
+    project_name: str | None = None
+    environment_name: str | None = None
+    rule_name: str | None = None
+    incident_url: str | None = None
 
 
 class NotificationChannelRead(FrozenModel):

@@ -8,6 +8,22 @@ class NotificationChannelType(StrEnum):
     OTHER = "other"
 
 
+class NotificationKind(StrEnum):
+    """What happened, deciding which template and subject a notification uses."""
+
+    INCIDENT_DETECTED = "incident_detected"
+    TEST = "test"
+
+
+class NotificationTemplateDefaults:
+    """Where the notification templates live and how they format values."""
+
+    DIRECTORY = "templates"
+    I18N_FILE = "i18n.yml"
+    INCIDENT_PATH = "/admin/incidents"
+    DATETIME_FORMAT = "%d/%m/%Y %H:%M"
+
+
 class NotificationsLimits:
     MAX_NAME_LENGTH = 255
     MAX_MESSAGE_TEMPLATE_LENGTH = 2000
