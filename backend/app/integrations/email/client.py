@@ -23,12 +23,17 @@ class EmailClient:
     One instance per request, built in dependencies.py."""
 
     @integration
-    async def send(self, *, recipients: list[str], subject: str, body: str) -> None:
+    async def send(self, *, recipients: list[str], subject: str, body: str, html: str | None = None) -> None:
+        """Send one message. With html the result is multipart/alternative: body is set
+        first and the HTML added after it, the order that leaves a client which can't
+        render HTML something to show."""
         message = EmailMessage()
         message["From"] = email_settings.SMTP_FROM_ADDRESS
         message["To"] = ", ".join(recipients)
         message["Subject"] = subject
         message.set_content(body)
+        if html is not None:
+            message.add_alternative(html, subtype="html")
 
         try:
             await aiosmtplib.send(
